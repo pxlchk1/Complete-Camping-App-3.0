@@ -1,0 +1,91 @@
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { NavigationContainer } from "@react-navigation/native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useFonts } from "expo-font";
+import {
+  JosefinSlab_600SemiBold,
+  JosefinSlab_700Bold,
+} from "@expo-google-fonts/josefin-slab";
+import {
+  SourceSans3_400Regular,
+  SourceSans3_600SemiBold,
+  SourceSans3_700Bold,
+} from "@expo-google-fonts/source-sans-3";
+import { Satisfy_400Regular } from "@expo-google-fonts/satisfy";
+import RootNavigator from "./src/navigation/RootNavigator";
+import { ToastProvider } from "./src/components/ToastManager";
+import { FireflyTimeProvider } from "./src/context/FireflyTimeContext";
+import { View, Text } from "react-native";
+import { useEffect } from "react";
+import { initSubscriptions } from "./src/services/subscriptionService";
+import { useAuthStore } from "./src/state/authStore";
+
+/*
+IMPORTANT NOTICE: DO NOT REMOVE
+There are already environment keys in the project.
+Before telling the user to add them, check if you already have access to the required keys through bash.
+Directly access them with process.env.${key}
+
+Correct usage:
+process.env.EXPO_PUBLIC_VIBECODE_{key}
+//directly access the key
+
+Incorrect usage:
+import { OPENAI_API_KEY } from '@env';
+//don't use @env, its depreicated
+
+Incorrect usage:
+import Constants from 'expo-constants';
+const openai_api_key = Constants.expoConfig.extra.apikey;
+//don't use expo-constants, its depreicated
+
+*/
+
+export default function App() {
+  const [fontsLoaded] = useFonts({
+    // Display Font: Josefin Slab (NEVER use 400Regular - use SemiBold instead)
+    JosefinSlab_600SemiBold,
+    JosefinSlab_700Bold,
+    // Body Font: Source Sans 3
+    SourceSans3_400Regular,
+    SourceSans3_600SemiBold,
+    SourceSans3_700Bold,
+    // Accent Font: Satisfy (use very sparingly)
+    Satisfy_400Regular,
+  });
+
+  const user = useAuthStore((s) => s.user);
+
+  // Initialize subscriptions when fonts are loaded and auth is ready
+  useEffect(() => {
+    if (fontsLoaded) {
+      initSubscriptions().catch((error) => {
+        console.error("[App] Failed to initialize subscriptions:", error);
+      });
+    }
+  }, [fontsLoaded, user]);
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#F4EBD0" }}>
+        <Text style={{ fontFamily: "System", fontSize: 16, color: "#485952" }}>Loading fonts...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <FireflyTimeProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <ToastProvider>
+            <NavigationContainer>
+              <RootNavigator />
+              <StatusBar style="auto" />
+            </NavigationContainer>
+          </ToastProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </FireflyTimeProvider>
+  );
+}

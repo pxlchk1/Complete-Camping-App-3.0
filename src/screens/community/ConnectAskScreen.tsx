@@ -1,0 +1,195 @@
+import React, { useState, useEffect } from "react";
+import { View, Text, Pressable, TextInput, FlatList, ActivityIndicator } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import type { RootStackNavigationProp } from "../../navigation/types";
+import { getQuestions, type Question } from "../../api/qa-service";
+import { useAuthStore } from "../../state/authStore";
+import { useToast } from "../../components/ToastManager";
+import * as Haptics from "expo-haptics";
+import { Timestamp } from "firebase/firestore";
+import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY, TEXT_MUTED } from "../../constants/colors";
+
+// Helper to convert Timestamp to string
+const toDateString = (date: Timestamp | string): string => {
+  if (typeof date === "string") return date;
+  return date.toDate().toISOString();
+};
+
+export default function ConnectAskScreen() {
+  const navigation = useNavigation<RootStackNavigationProp>();
+  const { user } = useAuthStore();
+  const { showError } = useToast();
+
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [questions, setQuestions] = useState<Question[]>([]);
+
+  const load = async () => {
+    if (!user) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const fetchedQuestions = await getQuestions();
+      setQuestions(fetchedQuestions);
+    } catch (error: any) {
+      console.error("Firestore error loading questions:", error);
+      showError("Failed to load questions");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      load();
+    }
+  }, [user]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user) {
+        load();
+      }
+    }, [user])
+  );
+
+  const filteredQuestions = searchQuery.trim()
+    ? questions.filter(
+        (q) =>
+          q.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          q.details.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : questions;
+
+  const formatTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+
+    if (diffInHours < 1) return "Just now";
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+    const diffInWeeks = Math.floor(diffInDays / 7);
+    if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
+    return date.toLocaleDateString();
+  };
+
+  return (
+    <View className="flex-1">
+      {/* Top Navigation Bar */}
+      <View className="bg-forest" style={{ paddingVertical: 12 }}>
+        <View className="flex-row items-center" style={{ paddingHorizontal: 16, minHeight: 44 }}>
+          <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+            Ask a Camper
+          </Text>
+          <View className="flex-1 ml-3 mr-3">
+            <View className="flex-row items-center bg-parchment rounded-xl px-4 py-2">
+              <Ionicons name="search" size={18} color="#9ca3af" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="search questions"
+                placeholderTextColor="#9ca3af"
+                className="flex-1 ml-2 text-forest-800 text-base"
+                style={{ fontFamily: "SourceSans3_400Regular" }}
+              />
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery("")}>
+                  <Ionicons name="close-circle" size={18} color="#9ca3af" />
+                </Pressable>
+              )}
+            </View>
+          </View>
+          <Pressable
+            onPress={() => {
+              if (!user) {
+                return;
+              }
+              navigation.navigate("CreateQuestion");
+            }}
+            className="active:opacity-70"
+          >
+            <Ionicons name="add-circle" size={28} color={PARCHMENT} />
+          </Pressable>
+        </View>
+      </View>
+
+      <View className="px-4 mt-4">
+      {/* Questions List */}
+      {!user ? (
+        <View className="flex-1 items-center justify-center py-12">
+          <Ionicons name="lock-closed" size={64} color={DEEP_FOREST} />
+          <Text className="mt-4 text-base" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+            Sign in to ask questions
+          </Text>
+          <Text className="mt-2 text-center px-8" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+            Join the community to get answers from experienced campers
+          </Text>
+          <Pressable
+            onPress={() => navigation.navigate("Auth")}
+            className="bg-forest-800 rounded-xl px-6 py-3 mt-6 active:opacity-70"
+          >
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>Sign In</Text>
+          </Pressable>
+        </View>
+      ) : loading ? (
+        <View className="flex-1 items-center justify-center py-12">
+          <ActivityIndicator size="large" color={DEEP_FOREST} />
+          <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>Loading questions...</Text>
+        </View>
+      ) : filteredQuestions.length === 0 ? (
+        <View className="flex-1 items-center justify-center py-12">
+          <Ionicons name="chatbubble-ellipses-outline" size={64} color="#9ca3af" />
+          <Text className="mt-4 text-base" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+            {searchQuery.trim() ? "No matching questions" : "No questions yet"}
+          </Text>
+          <Text className="mt-2 text-center px-8" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+            {searchQuery.trim()
+              ? "Try adjusting your search"
+              : "Be the first to ask a question!"}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredQuestions}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <Pressable
+              onPress={() => navigation.navigate("ThreadDetail", { questionId: item.id })}
+              className="rounded-xl p-4 border mb-3 active:opacity-70"
+              style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
+            >
+              {/* Question */}
+              <Text className="text-base mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+                {item.question}
+              </Text>
+
+              {/* Details Preview */}
+              <Text className="text-sm mb-3" numberOfLines={2} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+                {item.details}
+              </Text>
+
+              {/* Footer */}
+              <View className="flex-row items-center justify-between pt-3 border-t" style={{ borderColor: BORDER_SOFT }}>
+                <View className="flex-row items-center">
+                  <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                    by {item.userId}
+                  </Text>
+                  <Text className="mx-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>•</Text>
+                  <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                    {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : ""}
+                  </Text>
+                </View>
+              </View>
+            </Pressable>
+          )}
+        />
+      )}
+      </View>
+    </View>
+  );
+}

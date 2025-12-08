@@ -1,0 +1,259 @@
+/**
+ * My Campground Screen
+ * Manages user's camping contacts
+ */
+
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+} from "react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { format } from "date-fns";
+import { auth } from "../config/firebase";
+import { getCampgroundContacts, deleteCampgroundContact } from "../services/campgroundContactsService";
+import { CampgroundContact } from "../types/campground";
+import { RootStackNavigationProp } from "../navigation/types";
+import ModalHeader from "../components/ModalHeader";
+import {
+  DEEP_FOREST,
+  EARTH_GREEN,
+  PARCHMENT,
+  CARD_BACKGROUND_LIGHT,
+  BORDER_SOFT,
+  TEXT_PRIMARY_STRONG,
+  TEXT_SECONDARY,
+  TEXT_MUTED,
+} from "../constants/colors";
+
+export default function MyCampgroundScreen() {
+  const navigation = useNavigation<RootStackNavigationProp>();
+  const insets = useSafeAreaInsets();
+
+  const [contacts, setContacts] = useState<CampgroundContact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadContacts = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      setError("Please sign in to view your campground");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setError(null);
+      const contactsData = await getCampgroundContacts(user.uid);
+      setContacts(contactsData);
+    } catch (err: any) {
+      console.error("Error loading contacts:", err);
+      setError(err.message || "Failed to load contacts");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadContacts();
+  }, []);
+
+  // Reload contacts when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (!loading) {
+        loadContacts();
+      }
+    }, [])
+  );
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadContacts();
+  };
+
+  const handleAddCamper = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    navigation.navigate("AddCamper");
+  };
+
+  const handleContactPress = (contact: CampgroundContact) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    navigation.navigate("EditCamper", { contactId: contact.id });
+  };
+
+  const handleDeleteContact = (contact: CampgroundContact) => {
+    Alert.alert(
+      "Delete Contact",
+      `Are you sure you want to remove ${contact.contactName} from your campground?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteCampgroundContact(contact.id);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              await loadContacts();
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete contact");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  if (loading) {
+    return (
+      <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
+        <ModalHeader title="My Campground" showTitle />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={DEEP_FOREST} />
+          <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+            Loading contacts...
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error && !auth.currentUser) {
+    return (
+      <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
+        <ModalHeader title="My Campground" showTitle />
+        <View className="flex-1 items-center justify-center px-5">
+          <Ionicons name="people-outline" size={64} color={EARTH_GREEN} />
+          <Text
+            className="mt-4 text-center text-lg"
+            style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+          >
+            Sign in to view your campground
+          </Text>
+          <Pressable
+            onPress={() => navigation.navigate("Auth")}
+            className="mt-6 px-6 py-3 rounded-xl active:opacity-90"
+            style={{ backgroundColor: DEEP_FOREST }}
+          >
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
+              Sign In
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
+      <ModalHeader title="My Campground" showTitle />
+
+      <ScrollView
+        className="flex-1"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={DEEP_FOREST}
+          />
+        }
+      >
+        {/* Header */}
+        <View className="px-5 pt-6 pb-4">
+          <Text
+            className="mt-2"
+            style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+          >
+            The people you camp with
+          </Text>
+        </View>
+
+        {/* Add Camper Button */}
+        <View className="px-5 pb-4">
+          <Pressable
+            onPress={handleAddCamper}
+            className="flex-row items-center justify-center py-3 rounded-xl active:opacity-90"
+            style={{ backgroundColor: DEEP_FOREST }}
+          >
+            <Ionicons name="person-add" size={20} color={PARCHMENT} />
+            <Text
+              className="ml-2"
+              style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+            >
+              Add Camper
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Contacts List */}
+        {contacts.length === 0 ? (
+          <View className="py-12 px-5 items-center">
+            <Ionicons name="people-outline" size={64} color={BORDER_SOFT} />
+            <Text
+              className="mt-4 text-center"
+              style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}
+            >
+              No contacts yet. Add the people you camp with to organize your trips together.
+            </Text>
+          </View>
+        ) : (
+          <View className="px-5 pb-5">
+            {contacts.map(contact => (
+              <Pressable
+                key={contact.id}
+                onPress={() => handleContactPress(contact)}
+                onLongPress={() => handleDeleteContact(contact)}
+                className="mb-3 p-4 rounded-xl border active:opacity-70"
+                style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
+              >
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1">
+                    <View className="flex-row items-center">
+                      <Text
+                        className="text-lg"
+                        style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                      >
+                        {contact.contactName}
+                      </Text>
+                    </View>
+
+                    {contact.contactEmail && (
+                      <Text
+                        className="mt-1"
+                        style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                      >
+                        {contact.contactEmail}
+                      </Text>
+                    )}
+
+                    {contact.contactNote && (
+                      <Text
+                        className="mt-2 text-sm"
+                        style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}
+                      >
+                        {contact.contactNote}
+                      </Text>
+                    )}
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={20} color={TEXT_MUTED} />
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
