@@ -19,7 +19,9 @@
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to take photos of your camping trips, gear, and outdoor adventures.",
         "NSPhotoLibraryUsageDescription": "This app accesses your photo library to select and share photos of your camping experiences.",
-        "NSLocationWhenInUseUsageDescription": "This app uses your location to show you nearby campgrounds, hiking trails, and points of interest."
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to show you nearby campgrounds, hiking trails, and points of interest.",
+        "NSCalendarsUsageDescription": "This app may access your calendar through third-party libraries to enhance your camping trip planning experience.",
+        "NSContactsUsageDescription": "This app may access your contacts through third-party libraries to help you share camping trips with friends and family."
       }
     },
     "android": {
