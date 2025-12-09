@@ -3,30 +3,39 @@
     "name": "Complete Camping App",
     "slug": "complete-camping-app",
     "scheme": "tentlantern",
-    "version": "1.0.5",
+    "version": "1.1.1",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tentlanternchild.completecampingcompanion",
-      "buildNumber": "120",
+      "buildNumber": "12",
       "googleServicesFile": "./GoogleService-Info.plist",
       "usesAppleSignIn": true,
       "entitlements": {
-        "com.apple.developer.applesignin": ["Default"]
+        "com.apple.developer.applesignin": [
+          "Default",
+          "Default"
+        ]
       },
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to take photos of your camping trips, gear, and outdoor adventures.",
         "NSPhotoLibraryUsageDescription": "This app accesses your photo library to select and share photos of your camping experiences.",
         "NSLocationWhenInUseUsageDescription": "This app uses your location to show you nearby campgrounds, hiking trails, and points of interest.",
         "NSCalendarsUsageDescription": "This app may access your calendar through third-party libraries to enhance your camping trip planning experience.",
-        "NSContactsUsageDescription": "This app may access your contacts through third-party libraries to help you share camping trips with friends and family."
+        "NSContactsUsageDescription": "This app may access your contacts through third-party libraries to help you share camping trips with friends and family.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "edgeToEdgeEnabled": true,
       "package": "com.tentlanternchild.completecampingcompanion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "587deb41-d7a9-474f-8baf-09024d0a6ef1"
+      }
     }
   }
 }
