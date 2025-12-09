@@ -300,32 +300,43 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
             )}
           </View>
 
-          <Pressable
-            onPress={() => activeTrips.length > 0 && handleAddToTripPress(item)}
-            disabled={activeTrips.length === 0}
-            className={`rounded-lg px-3 py-2 ${
-              activeTrips.length === 0
-                ? "bg-stone-300"
-                : "bg-forest active:opacity-80"
-            }`}
-            style={{ minWidth: 100 }}
-          >
-            <View className="flex-row items-center justify-center">
+          <View className="items-end">
+            <Pressable
+              onPress={() => activeTrips.length > 0 && handleAddToTripPress(item)}
+              disabled={activeTrips.length === 0}
+              className={`rounded-lg px-3 py-2 ${
+                activeTrips.length === 0
+                  ? "bg-stone-300"
+                  : "bg-forest active:opacity-80"
+              }`}
+              style={{ minWidth: 100 }}
+            >
+              <View className="flex-row items-center justify-center">
+                <Text
+                  className={`text-sm mr-1 ${
+                    activeTrips.length === 0 ? "text-stone-500" : "text-white"
+                  }`}
+                  style={{ fontFamily: "SourceSans3_600SemiBold" }}
+                >
+                  Add to trip
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={14}
+                  color={activeTrips.length === 0 ? "#78716c" : "white"}
+                />
+              </View>
+            </Pressable>
+            
+            {activeTrips.length === 0 && (
               <Text
-                className={`text-sm mr-1 ${
-                  activeTrips.length === 0 ? "text-stone-500" : "text-white"
-                }`}
-                style={{ fontFamily: "SourceSans3_600SemiBold" }}
+                className="text-xs mt-1 text-center"
+                style={{ fontFamily: "SourceSans3_400Regular", color: "#999", maxWidth: 100 }}
               >
-                Add to trip
+                Create a trip first
               </Text>
-              <Ionicons
-                name="chevron-forward"
-                size={14}
-                color={activeTrips.length === 0 ? "#78716c" : "white"}
-              />
-            </View>
-          </Pressable>
+            )}
+          </View>
         </View>
       </View>
     );

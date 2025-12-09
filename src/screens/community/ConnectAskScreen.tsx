@@ -6,6 +6,7 @@ import type { RootStackNavigationProp } from "../../navigation/types";
 import { getQuestions, type Question } from "../../api/qa-service";
 import { useAuthStore } from "../../state/authStore";
 import { useToast } from "../../components/ToastManager";
+import VoteButtons from "../../components/VoteButtons";
 import * as Haptics from "expo-haptics";
 import { Timestamp } from "firebase/firestore";
 import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY, TEXT_MUTED } from "../../constants/colors";
@@ -55,13 +56,22 @@ export default function ConnectAskScreen() {
     }, [user])
   );
 
-  const filteredQuestions = searchQuery.trim()
+  const filteredQuestions = (searchQuery.trim()
     ? questions.filter(
         (q) =>
           q.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
           q.details.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : questions;
+    : questions).filter((q) => (q.score || 0) > -5); // Hide items with score less than -5
+
+  const handleQuestionVote = async (questionId: string, voteType: "up" | "down") => {
+    if (!user) {
+      showError("Please sign in to vote");
+      return;
+    }
+    // TODO: Implement question voting in Firebase
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
 
   const formatTimeAgo = (dateString: string) => {
     const now = new Date();
@@ -163,26 +173,39 @@ export default function ConnectAskScreen() {
               className="rounded-xl p-4 border mb-3 active:opacity-70"
               style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
             >
-              {/* Question */}
-              <Text className="text-base mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                {item.question}
-              </Text>
-
-              {/* Details Preview */}
-              <Text className="text-sm mb-3" numberOfLines={2} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                {item.details}
-              </Text>
-
-              {/* Footer */}
-              <View className="flex-row items-center justify-between pt-3 border-t" style={{ borderColor: BORDER_SOFT }}>
-                <View className="flex-row items-center">
-                  <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                    by {item.userId}
+              <View className="flex-row items-start">
+                <View className="mr-3">
+                  <VoteButtons
+                    score={item.score || (item.upvotes || 0)}
+                    userVote={item.userVote}
+                    onVote={(voteType) => handleQuestionVote(item.id, voteType)}
+                    size="small"
+                    layout="vertical"
+                  />
+                </View>
+                <View className="flex-1">
+                  {/* Question */}
+                  <Text className="text-base mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+                    {item.question}
                   </Text>
-                  <Text className="mx-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>•</Text>
-                  <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                    {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : ""}
+
+                  {/* Details Preview */}
+                  <Text className="text-sm mb-3" numberOfLines={2} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+                    {item.details}
                   </Text>
+
+                  {/* Footer */}
+                  <View className="flex-row items-center justify-between pt-3 border-t" style={{ borderColor: BORDER_SOFT }}>
+                    <View className="flex-row items-center">
+                      <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                        by {item.userId}
+                      </Text>
+                      <Text className="mx-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>•</Text>
+                      <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                        {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : ""}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </View>
             </Pressable>

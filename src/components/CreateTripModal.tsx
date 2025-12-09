@@ -99,6 +99,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
       if (endDate < date) {
         setEndDate(new Date(date.getTime() + 7 * 24 * 60 * 60 * 1000));
       }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
@@ -106,6 +107,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
     setShowEndPicker(false);
     if (date) {
       setEndDate(date);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
@@ -174,7 +176,10 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
               <Text className="text-forest text-sm font-semibold mb-2" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Trip Dates *</Text>
               <View className="flex-row gap-2">
                 <Pressable
-                  onPress={() => setShowStartPicker(true)}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setShowStartPicker(true);
+                  }}
                   className="flex-1 bg-parchment border border-parchmentDark rounded-xl px-4 py-3"
                 >
                   <Text className="text-xs text-[#999] mb-1" style={{ fontFamily: "SourceSans3_400Regular" }}>Start</Text>
@@ -183,7 +188,10 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
                   </Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => setShowEndPicker(true)}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setShowEndPicker(true);
+                  }}
                   className="flex-1 bg-parchment border border-parchmentDark rounded-xl px-4 py-3"
                 >
                   <Text className="text-xs text-[#999] mb-1" style={{ fontFamily: "SourceSans3_400Regular" }}>End</Text>
@@ -197,22 +205,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
               </Text>
             </View>
 
-            {showStartPicker && (
-              <DateTimePicker
-                value={startDate}
-                mode="date"
-                display="default"
-                onChange={handleStartDateChange}
-              />
-            )}
-            {showEndPicker && (
-              <DateTimePicker
-                value={endDate}
-                mode="date"
-                display="default"
-                onChange={handleEndDateChange}
-              />
-            )}
+
 
             {/* Destination */}
             <View className="mb-4">
@@ -265,6 +258,77 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
             </Pressable>
           </View>
         </View>
+
+        {/* Start Date Picker Modal */}
+        {showStartPicker && (
+          <Modal visible transparent animationType="fade">
+            <Pressable
+              className="flex-1 bg-black/50 justify-end"
+              onPress={() => setShowStartPicker(false)}
+            >
+              <Pressable
+                className="bg-parchment rounded-t-3xl p-5"
+                onPress={(e) => e.stopPropagation()}
+              >
+                <View className="flex-row items-center justify-between mb-4">
+                  <Text className="text-xl font-bold text-forest" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+                    Select Start Date
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowStartPicker(false)}
+                    className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
+                    style={{ backgroundColor: "#f0f9f4" }}
+                  >
+                    <Ionicons name="close" size={24} color={DEEP_FOREST} />
+                  </Pressable>
+                </View>
+                <DateTimePicker
+                  value={startDate}
+                  mode="date"
+                  display="inline"
+                  onChange={handleStartDateChange}
+                  themeVariant="light"
+                />
+              </Pressable>
+            </Pressable>
+          </Modal>
+        )}
+
+        {/* End Date Picker Modal */}
+        {showEndPicker && (
+          <Modal visible transparent animationType="fade">
+            <Pressable
+              className="flex-1 bg-black/50 justify-end"
+              onPress={() => setShowEndPicker(false)}
+            >
+              <Pressable
+                className="bg-parchment rounded-t-3xl p-5"
+                onPress={(e) => e.stopPropagation()}
+              >
+                <View className="flex-row items-center justify-between mb-4">
+                  <Text className="text-xl font-bold text-forest" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+                    Select End Date
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowEndPicker(false)}
+                    className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
+                    style={{ backgroundColor: "#f0f9f4" }}
+                  >
+                    <Ionicons name="close" size={24} color={DEEP_FOREST} />
+                  </Pressable>
+                </View>
+                <DateTimePicker
+                  value={endDate}
+                  mode="date"
+                  display="inline"
+                  onChange={handleEndDateChange}
+                  themeVariant="light"
+                  minimumDate={startDate}
+                />
+              </Pressable>
+            </Pressable>
+          </Modal>
+        )}
       </KeyboardAvoidingView>
     </Modal>
   );

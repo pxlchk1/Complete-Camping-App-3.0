@@ -672,6 +672,7 @@ export default function AccountScreen() {
                 className="flex-row items-center justify-between py-3 active:opacity-70"
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("Settings");
                 }}
               >
                 <View className="flex-row items-center flex-1">
@@ -690,6 +691,26 @@ export default function AccountScreen() {
                 className="flex-row items-center justify-between py-3 active:opacity-70"
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("Settings");
+                }}
+              >
+                <View className="flex-row items-center flex-1">
+                  <Ionicons name="mail-outline" size={22} color={EARTH_GREEN} />
+                  <Text
+                    className="ml-3"
+                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 16, color: DEEP_FOREST }}
+                  >
+                    Email & Password
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={22} color={EARTH_GREEN} />
+              </Pressable>
+
+              <Pressable
+                className="flex-row items-center justify-between py-3 active:opacity-70"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("Settings");
                 }}
               >
                 <View className="flex-row items-center flex-1">
@@ -708,6 +729,7 @@ export default function AccountScreen() {
                 className="flex-row items-center justify-between py-3 active:opacity-70"
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("Settings");
                 }}
               >
                 <View className="flex-row items-center flex-1">

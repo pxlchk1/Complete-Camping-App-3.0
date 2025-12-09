@@ -16,8 +16,8 @@ import { Satisfy_400Regular } from "@expo-google-fonts/satisfy";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { ToastProvider } from "./src/components/ToastManager";
 import { FireflyTimeProvider } from "./src/context/FireflyTimeContext";
-import { View, Text } from "react-native";
-import { useEffect } from "react";
+import { View, ImageBackground } from "react-native";
+import { useEffect, useState } from "react";
 import { initSubscriptions } from "./src/services/subscriptionService";
 import { useAuthStore } from "./src/state/authStore";
 
@@ -55,6 +55,7 @@ export default function App() {
     Satisfy_400Regular,
   });
 
+  const [appReady, setAppReady] = useState(false);
   const user = useAuthStore((s) => s.user);
 
   // Initialize subscriptions when fonts are loaded and auth is ready
@@ -66,11 +67,24 @@ export default function App() {
     }
   }, [fontsLoaded, user]);
 
-  if (!fontsLoaded) {
+  // Show splash screen for minimum 2 seconds
+  useEffect(() => {
+    if (fontsLoaded) {
+      const timer = setTimeout(() => {
+        setAppReady(true);
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded || !appReady) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#F4EBD0" }}>
-        <Text style={{ fontFamily: "System", fontSize: 16, color: "#485952" }}>Loading fonts...</Text>
-      </View>
+      <ImageBackground
+        source={require('./assets/images/splash-screen.png')}
+        style={{ flex: 1, width: "100%", height: "100%" }}
+        resizeMode="cover"
+      />
     );
   }
 

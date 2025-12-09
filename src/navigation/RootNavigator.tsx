@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { RootStackParamList } from "./types";
 import CustomBottomTabBar from "../components/CustomBottomTabBar";
+import { useAuthStore } from "../state/authStore";
 
 // Screens
 import HomeScreen from "../screens/HomeScreen";
@@ -100,13 +101,17 @@ function HomeTabs() {
 }
 
 export default function RootNavigator() {
+  const user = useAuthStore((s) => s.user);
+  
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
         animation: 'none',
       }}
+      initialRouteName={user ? "HomeTabs" : "Auth"}
     >
+      <Stack.Screen name="Auth" component={AuthLanding} options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="HomeTabs" component={HomeTabs} />
       <Stack.Screen name="CreateTrip" component={CreateTripScreen} />
       <Stack.Screen name="TripDetail" component={TripDetailScreen} />
@@ -120,7 +125,6 @@ export default function RootNavigator() {
       <Stack.Screen name="AddPeopleToTrip" component={AddPeopleToTripScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
-      <Stack.Screen name="Auth" component={AuthLanding} options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="SeedData" component={SeedDataScreen} />
 
       {/* Learning */}

@@ -28,6 +28,9 @@ export default function PhotosTabContent() {
   const filteredImages = useMemo(() => {
     let filtered = [...images];
 
+    // Filter out items with score less than -5 (community moderation)
+    filtered = filtered.filter((img) => img.score > -5);
+
     // Filter by category
     if (selectedCategory !== "all") {
       filtered = filtered.filter((img) => img.category === selectedCategory);

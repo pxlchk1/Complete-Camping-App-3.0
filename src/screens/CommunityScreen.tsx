@@ -13,6 +13,7 @@ import AccountButtonHeader from "../components/AccountButtonHeader";
 import GearReviewCard from "../components/GearReviewCard";
 import ConnectAskScreen from "./community/ConnectAskScreen";
 import PhotosTabContent from "./community/PhotosTabContent";
+import VoteButtons from "../components/VoteButtons";
 
 // State and services
 import { useTips, TIP_CATEGORIES, useTipStore } from "../state/tipStore";
@@ -157,6 +158,24 @@ export default function CommunityScreen() {
     showError("Voting coming soon");
   };
 
+  const handleTipVote = async (tipId: string, voteType: "up" | "down") => {
+    if (!user) {
+      showError("Please sign in to vote");
+      return;
+    }
+    // TODO: Implement tip voting in Firebase
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleGearVote = async (reviewId: string, voteType: "up" | "down") => {
+    if (!user) {
+      showError("Please sign in to vote");
+      return;
+    }
+    // TODO: Implement gear review voting in Firebase
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
   const handleTipPress = (tipId: string) => {
     navigation.navigate("TipDetail", { tipId });
   };
@@ -227,7 +246,9 @@ export default function CommunityScreen() {
         </View>
       ) : (
         <View className="space-y-4">
-          {tips.map((tip) => (
+          {tips
+            .filter((tip) => (tip.score || 0) > -5) // Hide items with score less than -5
+            .map((tip) => (
             <Pressable
               key={tip.id}
               onPress={() => handleTipPress(tip.id)}
@@ -235,18 +256,18 @@ export default function CommunityScreen() {
               style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
             >
               <View className="flex-row items-start mb-3">
-                <View className="bg-amber-100 rounded-full p-2 mr-3">
-                  <Ionicons name="bulb" size={20} color={LODGE_AMBER} />
+                <View className="mr-3">
+                  <VoteButtons
+                    score={tip.score || (tip.upvoteCount || 0)}
+                    userVote={tip.userVote}
+                    onVote={(voteType) => handleTipVote(tip.id, voteType)}
+                    size="small"
+                    layout="vertical"
+                  />
                 </View>
                 <View className="flex-1">
-                  <View className="flex-row items-center justify-between mb-2">
-                    <View className="flex-row items-center">
-                      <Ionicons name="heart" size={14} color="#dc2626" />
-                      <Text className="text-sm ml-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>{tip.likesCount || 0}</Text>
-                    </View>
-                  </View>
                   <Text className="leading-5 mb-2" numberOfLines={5} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                    {tip.text}
+                    {tip.body || tip.text}
                   </Text>
                   <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
                     {tip.userId}
@@ -306,28 +327,43 @@ export default function CommunityScreen() {
             </View>
           ) : (
             <View className="space-y-3 pb-4">
-              {feedbackPosts.map((post) => (
+              {feedbackPosts
+                .filter((post) => (post.score || 0) > -5) // Hide items with score less than -5
+                .map((post) => (
                 <Pressable
                   key={post.id}
                   onPress={() => navigation.navigate("FeedbackDetail", { postId: post.id })}
                   className="rounded-xl p-4 border active:opacity-70"
                   style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
                 >
-                  <View className="mb-2">
-                    <Text className="text-lg mb-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                      {post.topic}
-                    </Text>
-                    <Text className="leading-5" numberOfLines={3} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                      {post.message}
-                    </Text>
-                  </View>
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                      {post.userId}
-                    </Text>
-                    <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                      {post.createdAt?.toDate ? post.createdAt.toDate().toLocaleDateString() : ""}
-                    </Text>
+                  <View className="flex-row items-start">
+                    <View className="mr-3">
+                      <VoteButtons
+                        score={post.score || (post.voteCount || 0)}
+                        userVote={post.userVote}
+                        onVote={(voteType) => handleFeedbackVote(post.id, voteType)}
+                        size="small"
+                        layout="vertical"
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <View className="mb-2">
+                        <Text className="text-lg mb-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+                          {post.topic}
+                        </Text>
+                        <Text className="leading-5" numberOfLines={3} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+                          {post.message}
+                        </Text>
+                      </View>
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                          {post.userId}
+                        </Text>
+                        <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                          {post.createdAt?.toDate ? post.createdAt.toDate().toLocaleDateString() : ""}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </Pressable>
               ))}
@@ -387,39 +423,54 @@ export default function CommunityScreen() {
             </View>
           ) : (
             <View className="space-y-3 pb-4">
-              {gearReviews.map((review) => (
+              {gearReviews
+                .filter((review) => (review.score || 0) > -5) // Hide items with score less than -5
+                .map((review) => (
                 <Pressable
                   key={review.id}
                   onPress={() => navigation.navigate("GearReviewDetail", { reviewId: review.id })}
                   className="rounded-xl p-4 border active:opacity-70"
                   style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
                 >
-                  <View className="flex-row items-start justify-between mb-2">
+                  <View className="flex-row items-start mb-2">
+                    <View className="mr-3">
+                      <VoteButtons
+                        score={review.score || (review.upvoteCount || 0)}
+                        userVote={review.userVote}
+                        onVote={(voteType) => handleGearVote(review.id, voteType)}
+                        size="small"
+                        layout="vertical"
+                      />
+                    </View>
                     <View className="flex-1">
-                      <Text className="text-lg mb-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                        {review.title}
+                      <View className="flex-row items-start justify-between mb-2">
+                        <View className="flex-1">
+                          <Text className="text-lg mb-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+                            {review.title}
+                          </Text>
+                          <Text className="text-sm mb-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+                            {review.brand} • {review.category}
+                          </Text>
+                        </View>
+                        <View className="flex-row items-center ml-2">
+                          <Ionicons name="star" size={16} color="#f59e0b" />
+                          <Text className="ml-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+                            {review.rating.toFixed(1)}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text className="leading-5" numberOfLines={3} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+                        {review.text}
                       </Text>
-                      <Text className="text-sm mb-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                        {review.brand} • {review.category}
-                      </Text>
+                      <View className="flex-row items-center justify-between mt-3">
+                        <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                          {review.userId}
+                        </Text>
+                        <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                          {review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString() : ""}
+                        </Text>
+                      </View>
                     </View>
-                    <View className="flex-row items-center ml-2">
-                      <Ionicons name="star" size={16} color="#f59e0b" />
-                      <Text className="ml-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                        {review.rating.toFixed(1)}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text className="leading-5" numberOfLines={3} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                    {review.text}
-                  </Text>
-                  <View className="flex-row items-center justify-between mt-3">
-                    <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                      {review.userId}
-                    </Text>
-                    <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                      {review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString() : ""}
-                    </Text>
                   </View>
                 </Pressable>
               ))}

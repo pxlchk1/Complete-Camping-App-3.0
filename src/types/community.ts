@@ -16,7 +16,10 @@ export interface Tip {
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
   upvoteCount: number;
+  downvoteCount: number;
+  score: number; // upvotes - downvotes
   commentCount: number;
+  userVote?: "up" | "down" | null;
 }
 
 export interface TipComment {
@@ -58,7 +61,10 @@ export interface GearReview {
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
   upvoteCount: number;
+  downvoteCount: number;
+  score: number; // upvotes - downvotes
   commentCount: number;
+  userVote?: "up" | "down" | null;
 }
 
 // ==================== Questions (Ask a Camper) ====================
@@ -81,8 +87,11 @@ export interface Question {
   viewCount?: number;
   lastActivityAt: Timestamp | string;
   upvotes: number;
+  downvotes: number;
+  score: number; // upvotes - downvotes
   hasAcceptedAnswer: boolean;
   acceptedAnswerId?: string;
+  userVote?: "up" | "down" | null;
 }
 
 export interface Answer {
@@ -96,8 +105,12 @@ export interface Answer {
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
   upvoteCount: number;
+  downvoteCount: number;
   upvotes: number; // Alias for upvoteCount (legacy support)
+  downvotes: number;
+  score: number; // upvotes - downvotes
   isAccepted: boolean;
+  userVote?: "up" | "down" | null;
 }
 
 export interface QAFilters {
@@ -149,7 +162,11 @@ export interface FeedbackPost {
   createdAt: Timestamp | string;
   status: FeedbackStatus;
   voteCount: number;
+  upvoteCount: number;
+  downvoteCount: number;
+  score: number; // upvotes - downvotes
   commentCount: number;
+  userVote?: "up" | "down" | null;
 }
 
 export interface FeedbackComment {
