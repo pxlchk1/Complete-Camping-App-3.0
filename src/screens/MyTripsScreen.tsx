@@ -17,6 +17,7 @@ import CreateTripModal from "../components/CreateTripModal";
 import ConfirmationModal from "../components/ConfirmationModal";
 import EmptyState from "../components/EmptyState";
 import AccountRequiredModal from "../components/AccountRequiredModal";
+import PaywallModal from "../components/PaywallModal";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../components/Select";
 import { RootStackParamList } from "../navigation/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -85,6 +86,7 @@ export default function MyTripsScreen() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showPaywallModal, setShowPaywallModal] = useState(false);
   const [menuTrip, setMenuTrip] = useState<Trip | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Trip | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -153,7 +155,7 @@ export default function MyTripsScreen() {
 
     // Gate 2: Free users limited to 2 trips
     if (isFree && trips.length >= 2) {
-      nav.navigate("Paywall" as any);
+      setShowPaywallModal(true);
       return;
     }
 
@@ -468,6 +470,12 @@ export default function MyTripsScreen() {
             </Pressable>
           </Pressable>
         </Modal>
+
+        {/* Paywall Modal */}
+        <PaywallModal
+          visible={showPaywallModal}
+          onClose={() => setShowPaywallModal(false)}
+        />
       </View>
     </View>
   );
