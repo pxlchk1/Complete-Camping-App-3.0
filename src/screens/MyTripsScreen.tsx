@@ -153,8 +153,8 @@ export default function MyTripsScreen() {
       return;
     }
 
-    // Gate 2: Free users limited to 2 trips
-    if (isFree && trips.length >= 2) {
+    // Gate 2: Free users limited to 1 trip
+    if (isFree && trips.length >= 1) {
       setShowPaywallModal(true);
       return;
     }
