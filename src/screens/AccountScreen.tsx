@@ -256,22 +256,6 @@ export default function AccountScreen() {
                 <Ionicons name="arrow-back" size={24} color={PARCHMENT} />
               </Pressable>
             </View>
-
-            {/* Camera Button for Cover Photo */}
-            <View className="px-4 pb-2 items-end">
-              <Pressable
-                onPress={handleUpdateCoverPhoto}
-                disabled={uploadingCover}
-                className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
-                style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
-              >
-                {uploadingCover ? (
-                  <ActivityIndicator size="small" color={PARCHMENT} />
-                ) : (
-                  <Ionicons name="camera" size={20} color={PARCHMENT} />
-                )}
-              </Pressable>
-            </View>
           </ImageBackground>
         </View>
 
@@ -279,9 +263,7 @@ export default function AccountScreen() {
         <View className="px-4" style={{ marginTop: -PROFILE_OVERLAP }}>
           <View className="flex-row items-end justify-between mb-3">
             {/* Profile Picture */}
-            <Pressable
-              onPress={handleUpdateProfilePhoto}
-              disabled={uploadingPhoto}
+            <View
               style={{
                 width: PROFILE_SIZE,
                 height: PROFILE_SIZE,
@@ -314,30 +296,7 @@ export default function AccountScreen() {
                   <Ionicons name="person" size={56} color={PARCHMENT} />
                 </View>
               )}
-
-              {/* Camera Icon Overlay */}
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: 4,
-                  right: 4,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: EARTH_GREEN,
-                  borderWidth: 3,
-                  borderColor: "white",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {uploadingPhoto ? (
-                  <ActivityIndicator size="small" color={PARCHMENT} />
-                ) : (
-                  <Ionicons name="camera" size={18} color={PARCHMENT} />
-                )}
-              </View>
-            </Pressable>
+            </View>
 
             {/* Edit Profile Button */}
             <Pressable

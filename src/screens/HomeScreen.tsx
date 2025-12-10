@@ -249,7 +249,7 @@ export default function HomeScreen() {
                 style={{ backgroundColor: RIVER_ROCK, paddingVertical: 14, borderRadius: 10 }}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  navigation.navigate("Community", { initialTab: "connect" });
+                  navigation.navigate("QuestionsListScreen");
                 }}
                 accessibilityLabel="Ask a Camper"
                 accessibilityRole="button"
