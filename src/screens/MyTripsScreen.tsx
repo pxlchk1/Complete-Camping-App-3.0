@@ -16,6 +16,7 @@ import PlanTopNav from "../components/PlanTopNav";
 import CreateTripModal from "../components/CreateTripModal";
 import ConfirmationModal from "../components/ConfirmationModal";
 import EmptyState from "../components/EmptyState";
+import AccountRequiredModal from "../components/AccountRequiredModal";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../components/Select";
 import { RootStackParamList } from "../navigation/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -83,6 +84,7 @@ export default function MyTripsScreen() {
   } = useTripsListStore();
 
   const [showCreate, setShowCreate] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
   const [menuTrip, setMenuTrip] = useState<Trip | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Trip | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -143,9 +145,9 @@ export default function MyTripsScreen() {
   const onMenu = (trip: Trip) => setMenuTrip(trip);
 
   const handleCreateTrip = () => {
-    // Gate 1: Login required
+    // Gate 1: Login required - show AccountRequiredModal
     if (isGuest) {
-      nav.navigate("Auth" as any);
+      setShowAccountModal(true);
       return;
     }
 
@@ -361,6 +363,16 @@ export default function MyTripsScreen() {
           onTripCreated={(tripId) => {
             setShowCreate(false);
           }}
+        />
+
+        {/* Account Required Modal */}
+        <AccountRequiredModal
+          visible={showAccountModal}
+          onCreateAccount={() => {
+            setShowAccountModal(false);
+            nav.navigate("AuthLanding");
+          }}
+          onMaybeLater={() => setShowAccountModal(false)}
         />
 
         {/* Menu Modal */}
