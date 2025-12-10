@@ -417,7 +417,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
   const bottomSpacer = Math.max(insets.bottom || 0, 18) + 72;
 
   return (
-    <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
+    <View className="flex-1" style={{ backgroundColor: DEEP_FOREST }}>
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Hero Header with Background Image */}
         <View style={{ height: COVER_HEIGHT + insets.top }}>
@@ -476,31 +476,13 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 <Ionicons name="create-outline" size={24} color={PARCHMENT} />
               </Pressable>
             </View>
-
-            {/* Camera Button for Cover Photo */}
-            <View style={{ flex: 1, justifyContent: "flex-end", alignItems: "flex-end", paddingRight: 20, paddingBottom: 12 }}>
-              <Pressable
-                onPress={handleUpdateCoverPhoto}
-                disabled={uploadingCover}
-                className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
-                style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
-              >
-                {uploadingCover ? (
-                  <ActivityIndicator size="small" color={PARCHMENT} />
-                ) : (
-                  <Ionicons name="camera" size={20} color={PARCHMENT} />
-                )}
-              </Pressable>
-            </View>
           </ImageBackground>
         </View>
 
         {/* Profile Section with Avatar Overlap */}
         <View className="px-5" style={{ marginTop: -PROFILE_OVERLAP }}>
           {/* Avatar */}
-          <Pressable
-            onPress={handleUpdateProfilePhoto}
-            disabled={uploadingPhoto}
+          <View
             style={{
               width: PROFILE_SIZE,
               height: PROFILE_SIZE,
@@ -542,30 +524,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 </Text>
               </View>
             )}
-
-            {/* Camera Icon Overlay */}
-            <View
-              style={{
-                position: "absolute",
-                bottom: 4,
-                right: 4,
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: EARTH_GREEN,
-                borderWidth: 3,
-                borderColor: PARCHMENT,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {uploadingPhoto ? (
-                <ActivityIndicator size="small" color={PARCHMENT} />
-              ) : (
-                <Ionicons name="camera" size={18} color={PARCHMENT} />
-              )}
-            </View>
-          </Pressable>
+          </View>
 
           {/* User Identity Block */}
           <View className="mb-4">

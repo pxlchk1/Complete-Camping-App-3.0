@@ -27,7 +27,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { auth, db, storage } from "../config/firebase";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useCurrentUser, useUserStore } from "../state/userStore";
 import ModalHeader from "../components/ModalHeader";
@@ -72,23 +72,50 @@ export default function EditProfileScreen() {
   const currentUser = useCurrentUser();
   const updateCurrentUser = useUserStore((s) => s.updateCurrentUser);
 
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
 
   // Form state
-  const [about, setAbout] = useState(currentUser?.about || "");
-  const [favoriteCampingStyle, setFavoriteCampingStyle] = useState<CampingStyle | undefined>(
-    currentUser?.favoriteCampingStyle as CampingStyle | undefined
-  );
-  const [favoriteGear, setFavoriteGear] = useState<GearCategory[]>(
-    (currentUser?.favoriteGear as GearCategory[]) || []
-  );
-  const [photoURL, setPhotoURL] = useState(currentUser?.photoURL);
-  const [coverPhotoURL, setCoverPhotoURL] = useState(currentUser?.coverPhotoURL);
+  const [about, setAbout] = useState("");
+  const [favoriteCampingStyle, setFavoriteCampingStyle] = useState<CampingStyle | undefined>();
+  const [favoriteGear, setFavoriteGear] = useState<GearCategory[]>([]);
+  const [photoURL, setPhotoURL] = useState<string | null>(null);
+  const [coverPhotoURL, setCoverPhotoURL] = useState<string | null>(null);
 
   // Modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  // Load profile from profiles collection
+  React.useEffect(() => {
+    const loadProfile = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      try {
+        setLoading(true);
+        const profileRef = doc(db, "profiles", user.uid);
+        const profileSnap = await getDoc(profileRef);
+
+        if (profileSnap.exists()) {
+          const data = profileSnap.data();
+          setAbout(data.bio || "");
+          setFavoriteCampingStyle(data.campingStyle as CampingStyle | undefined);
+          setPhotoURL(data.avatarUrl || null);
+          setCoverPhotoURL(data.backgroundUrl || null);
+          // favoriteGear is not in profiles collection, use userStore fallback
+          setFavoriteGear((currentUser?.favoriteGear as GearCategory[]) || []);
+        }
+      } catch (error) {
+        console.error("[EditProfile] Error loading profile:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, []);
 
   const handleSave = async () => {
     const user = auth.currentUser;
@@ -97,6 +124,17 @@ export default function EditProfileScreen() {
     try {
       setSaving(true);
 
+      // Update profiles collection (used by MyCampsiteScreen)
+      const profileRef = doc(db, "profiles", user.uid);
+      await updateDoc(profileRef, {
+        bio: about.trim() || null,
+        campingStyle: favoriteCampingStyle || null,
+        avatarUrl: photoURL || null,
+        backgroundUrl: coverPhotoURL || null,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Also update users collection for backwards compatibility
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         about: about.trim() || null,
@@ -209,6 +247,17 @@ export default function EditProfileScreen() {
       setFavoriteGear([...favoriteGear, gear]);
     }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView className="flex-1" style={{ backgroundColor: PARCHMENT }} edges={["top"]}>
+        <ModalHeader title="Edit Profile" showTitle />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={EARTH_GREEN} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: PARCHMENT }} edges={["top"]}>
