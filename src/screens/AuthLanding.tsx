@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, Platform, ActivityIndicator, TextInput, KeyboardAvoidingView, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, Platform, ActivityIndicator, TextInput, KeyboardAvoidingView, ScrollView, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
@@ -281,7 +281,14 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
                 </View>
 
                 <Text style={styles.footerText}>
-                  By continuing, you agree to our Terms and Privacy Policy.
+                  By continuing, you agree to our{" "}
+                  <Text
+                    style={styles.footerLink}
+                    onPress={() => Linking.openURL('https://tentandlantern.com/privacy/')}
+                  >
+                    Terms and Privacy Policy
+                  </Text>
+                  .
                 </Text>
               </View>
             </ScrollView>
@@ -355,7 +362,14 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
 
           {/* Footer */}
           <Text style={styles.footerText}>
-            By continuing, you agree to our Terms and Privacy Policy.
+            By continuing, you agree to our{" "}
+            <Text
+              style={styles.footerLink}
+              onPress={() => Linking.openURL('https://tentandlantern.com/privacy/')}
+            >
+              Terms and Privacy Policy
+            </Text>
+            .
           </Text>
         </View>
       </SafeAreaView>
@@ -530,5 +544,12 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 8,
     marginBottom: 0,
+  },
+
+  footerLink: {
+    fontFamily: "SourceSans3_600SemiBold",
+    fontSize: 12,
+    color: "#F4EBD0",
+    textDecorationLine: "underline",
   }
 });
