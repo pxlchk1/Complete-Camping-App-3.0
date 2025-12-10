@@ -76,9 +76,7 @@ export default function MyGearClosetScreen() {
   // Reload gear when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      if (!loading) {
-        loadGear();
-      }
+      loadGear();
     }, [])
   );
 

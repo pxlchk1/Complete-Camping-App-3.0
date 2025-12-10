@@ -39,8 +39,9 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
   console.log("[ParksBrowseScreen] Component rendered");
 
   // Filter state
-  const [mode, setMode] = useState<FilterMode>("near");
+  const [mode, setMode] = useState<FilterMode>("search");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [driveTime, setDriveTime] = useState<DriveTime>(2);
   const [parkType, setParkType] = useState<ParkType>("all");
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -48,6 +49,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
 
   // Data state
   const [parks, setParks] = useState<Park[]>([]);
+  const [allParks, setAllParks] = useState<Park[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPark, setSelectedPark] = useState<Park | null>(null);
@@ -102,9 +104,14 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
         });
       });
 
+      // Cache all parks on first load
+      if (allParks.length === 0) {
+        setAllParks(fetchedParks);
+      }
+
       // Search by name (only if at least 2 characters, but we still fetched everything)
-      if (mode === "search" && searchQuery.trim().length >= 2) {
-        const lower = searchQuery.toLowerCase();
+      if (mode === \"search\" && debouncedSearchQuery.trim().length >= 2) {
+        const lower = debouncedSearchQuery.toLowerCase();
         fetchedParks = fetchedParks.filter((park) =>
           park.name.toLowerCase().includes(lower)
         );
@@ -153,7 +160,15 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
     } finally {
       setIsLoading(false);
     }
-  }, [mode, searchQuery, userLocation, driveTime, parkType]);
+  }, [mode, debouncedSearchQuery, userLocation, driveTime, parkType, allParks.length]);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Fetch parks when filters change
   useEffect(() => {
