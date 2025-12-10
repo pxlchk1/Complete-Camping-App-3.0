@@ -328,9 +328,22 @@ export default function MyGearClosetScreen() {
                       >
                         {item.name}
                       </Text>
-                      {item.isFavorite && (
-                        <Ionicons name="star" size={16} color="#F59E0B" style={{ marginLeft: 8 }} />
-                      )}
+                      <View className="flex-row items-center">
+                        {item.isFavorite && (
+                          <Ionicons name="star" size={16} color="#F59E0B" style={{ marginRight: 8 }} />
+                        )}
+                        <Pressable
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            navigation.navigate("EditGear", { gearItem: item });
+                          }}
+                          className="p-1"
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Ionicons name="pencil" size={18} color={EARTH_GREEN} />
+                        </Pressable>
+                      </View>
                     </View>
 
                     {(item.brand || item.model) && (

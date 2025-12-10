@@ -32,7 +32,7 @@ export type RootStackParamList = {
   // Gear Closet
   MyGearCloset: undefined;
   AddGear: undefined;
-  EditGear: { gearId: string };
+  EditGear: { gearItem: any };
   GearDetail: { gearId: string };
   EditProfile: undefined;
 
