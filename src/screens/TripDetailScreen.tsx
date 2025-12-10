@@ -7,12 +7,13 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTripsStore } from "../state/tripsStore";
 import { usePlanTabStore } from "../state/planTabStore";
+import { useUserStatus } from "../utils/authHelper";
 import { getTripParticipants, updateParticipantRole } from "../services/tripParticipantsService";
 import { getCampgroundContactById } from "../services/campgroundContactsService";
 import { ParticipantRole } from "../types/campground";
 import { Heading2, BodyText } from "../components/Typography";
-import AccountButton from "../components/AccountButton";
 import Button from "../components/Button";
+import EditTripModal from "../components/EditTripModal";
 import { RootStackParamList } from "../navigation/types";
 import { format } from "date-fns";
 import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY } from "../constants/colors";
@@ -41,6 +42,7 @@ export default function TripDetailScreen() {
   const navigation = useNavigation<TripDetailScreenNavigationProp>();
   const route = useRoute<TripDetailScreenRouteProp>();
   const { tripId } = route.params;
+  const { isGuest } = useUserStatus();
 
   const trip = useTripsStore((s) => s.getTripById(tripId));
   const setActivePlanTab = usePlanTabStore((s) => s.setActiveTab);
@@ -52,6 +54,7 @@ export default function TripDetailScreen() {
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState<{ id: string; name: string; role: ParticipantRole } | null>(null);
   const [savingRole, setSavingRole] = useState(false);
+  const [showEditTripModal, setShowEditTripModal] = useState(false);
 
   const loadParticipants = async () => {
     try {
@@ -167,7 +170,25 @@ export default function TripDetailScreen() {
           >
             Back
           </Button>
-          <AccountButton />
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              
+              // Gate: Login required to edit trips
+              if (isGuest) {
+                navigation.navigate("Auth" as any);
+                return;
+              }
+              
+              setShowEditTripModal(true);
+            }}
+            className="px-3 py-1.5 bg-[#f0f9f4] rounded-lg active:bg-[#dcf3e5] flex-row items-center gap-1"
+          >
+            <Ionicons name="create-outline" size={16} color={DEEP_FOREST} />
+            <Text className="text-forest text-sm font-semibold" style={{ fontFamily: "SourceSans3_600SemiBold" }}>
+              Edit Trip
+            </Text>
+          </Pressable>
         </View>
         <Heading2>{trip.name}</Heading2>
       </View>
@@ -435,6 +456,13 @@ export default function TripDetailScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Edit Trip Modal */}
+      <EditTripModal
+        visible={showEditTripModal}
+        onClose={() => setShowEditTripModal(false)}
+        tripId={tripId}
+      />
     </SafeAreaView>
   );
 }

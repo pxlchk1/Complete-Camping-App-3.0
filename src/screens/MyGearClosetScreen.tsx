@@ -21,6 +21,7 @@ import { auth } from "../config/firebase";
 import { getUserGear, deleteGearItem, deleteGearImages } from "../services/gearClosetService";
 import { GearItem, GearCategory, GEAR_CATEGORIES } from "../types/gear";
 import { RootStackNavigationProp } from "../navigation/types";
+import { useUserStatus } from "../utils/authHelper";
 import ModalHeader from "../components/ModalHeader";
 import {
   DEEP_FOREST,
@@ -37,6 +38,7 @@ type FilterOption = "all" | GearCategory;
 
 export default function MyGearClosetScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
+  const { isLoggedIn, isGuest } = useUserStatus();
 
   const [gear, setGear] = useState<GearItem[]>([]);
   const [filteredGear, setFilteredGear] = useState<GearItem[]>([]);
@@ -101,6 +103,13 @@ export default function MyGearClosetScreen() {
 
   const handleAddGear = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Gate: Login required
+    if (isGuest) {
+      navigation.navigate("Auth");
+      return;
+    }
+
     navigation.navigate("AddGear");
   };
 
@@ -157,7 +166,13 @@ export default function MyGearClosetScreen() {
             className="mt-4 text-center text-lg"
             style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
           >
-            Sign in to view your gear
+            Log in to manage your gear
+          </Text>
+          <Text
+            className="mt-2 text-center"
+            style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+          >
+            Create an account to track your camping gear, add photos, and organize your equipment.
           </Text>
           <Pressable
             onPress={() => navigation.navigate("Auth")}
@@ -165,7 +180,7 @@ export default function MyGearClosetScreen() {
             style={{ backgroundColor: DEEP_FOREST }}
           >
             <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
-              Sign In
+              Log In / Create Account
             </Text>
           </Pressable>
         </View>

@@ -2,9 +2,11 @@ import React, { useRef, useEffect } from "react";
 import { Modal, View, Text, Pressable, ScrollView, Linking, Platform } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { Park } from "../types/camping";
 import { useLocationStore } from "../state/locationStore";
 import { useTripsStore } from "../state/tripsStore";
+import { useUserStatus } from "../utils/authHelper";
 import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, PARCHMENT, BORDER_SOFT } from "../constants/colors";
 
 interface ParkDetailModalProps {
@@ -17,6 +19,8 @@ interface ParkDetailModalProps {
 
 export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, onCheckWeather }: ParkDetailModalProps) {
   const mapRef = useRef<MapView>(null);
+  const navigation = useNavigation();
+  const { isGuest } = useUserStatus();
   const setSelectedLocation = useLocationStore((s) => s.setSelectedLocation);
   const trips = useTripsStore((s) => s.trips);
 
@@ -151,7 +155,14 @@ export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, o
               <>
                 {/* Add to Current Trip */}
                 <Pressable
-                  onPress={() => onAddToTrip(park, activeTrip.id)}
+                  onPress={() => {
+                    if (isGuest) {
+                      onClose();
+                      navigation.navigate("Auth" as any);
+                      return;
+                    }
+                    onAddToTrip(park, activeTrip.id);
+                  }}
                   style={{
                     backgroundColor: PARCHMENT,
                     borderRadius: 16,
@@ -179,7 +190,14 @@ export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, o
 
                 {/* Add to New Trip */}
                 <Pressable
-                  onPress={() => onAddToTrip(park)}
+                  onPress={() => {
+                    if (isGuest) {
+                      onClose();
+                      navigation.navigate("Auth" as any);
+                      return;
+                    }
+                    onAddToTrip(park);
+                  }}
                   style={{
                     backgroundColor: PARCHMENT,
                     borderRadius: 16,
@@ -208,7 +226,14 @@ export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, o
             ) : (
               /* No active trip - just show create new trip */
               <Pressable
-                onPress={() => onAddToTrip(park)}
+                onPress={() => {
+                  if (isGuest) {
+                    onClose();
+                    navigation.navigate("Auth" as any);
+                    return;
+                  }
+                  onAddToTrip(park);
+                }}
                 style={{
                   backgroundColor: PARCHMENT,
                   borderRadius: 16,

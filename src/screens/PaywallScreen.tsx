@@ -1,6 +1,6 @@
 /**
  * Paywall Screen
- * Subscription upgrade screen matching the current design system
+ * Redesigned with CTAs at top, hero image, and features below
  */
 
 import React, { useEffect, useState } from "react";
@@ -11,6 +11,7 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,56 +26,36 @@ import { useSubscriptionStore } from "../state/subscriptionStore";
 // Constants
 import {
   DEEP_FOREST,
+  EARTH_GREEN,
   GRANITE_GOLD,
   PARCHMENT,
   CARD_BACKGROUND_LIGHT,
   BORDER_SOFT,
   TEXT_PRIMARY_STRONG,
   TEXT_SECONDARY,
+  TEXT_MUTED,
 } from "../constants/colors";
 
 const PRO_FEATURES = [
-  {
-    icon: "map" as const,
-    title: "Advanced Park Filters",
-    description: "Find the perfect campsite with premium search filters",
-  },
-  {
-    icon: "calendar" as const,
-    title: "Unlimited Trip Planning",
-    description: "Plan and manage multiple camping trips with full details",
-  },
-  {
-    icon: "checkmark-circle" as const,
-    title: "Complete Packing Lists",
-    description: "Access premium gear lists and custom templates",
-  },
-  {
-    icon: "people" as const,
-    title: "Full Community Access",
-    description: "Post unlimited tips, reviews, and connect with campers",
-  },
-  {
-    icon: "book" as const,
-    title: "Premium Learning Content",
-    description: "Unlock advanced camping guides and expert tips",
-  },
-  {
-    icon: "shield-checkmark" as const,
-    title: "Offline Mode",
-    description: "Access your trips and guides without internet",
-  },
+  "Unlimited trip planning",
+  "Save as many parks as you want",
+  "Create and reuse gear sets",
+  "Custom packing list templates",
+  "Advanced search and filters",
+  "Cloud sync across devices",
+  "Future Pro features included",
 ];
 
 export default function PaywallScreen() {
   const navigation = useNavigation();
   const subscriptionLoading = useSubscriptionStore((s) => s.subscriptionLoading);
 
-  const [packages, setPackages] = useState<PurchasesPackage[]>([]);
-  const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
+  const [monthlyPackage, setMonthlyPackage] = useState<PurchasesPackage | null>(null);
+  const [annualPackage, setAnnualPackage] = useState<PurchasesPackage | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadOfferings();
@@ -83,32 +64,50 @@ export default function PaywallScreen() {
   const loadOfferings = async () => {
     try {
       setLoading(true);
+      setError(null);
       const offering = await getOfferings();
 
       if (offering && offering.availablePackages.length > 0) {
         const pkgs = offering.availablePackages;
-        setPackages(pkgs);
 
-        // Auto-select annual package by packageType, fallback to first package
-        const annualPkg = pkgs.find((p) => p.packageType === PACKAGE_TYPE.ANNUAL);
-        setSelectedPackage(annualPkg || pkgs[0]);
+        // Find monthly and annual packages
+        const monthly = pkgs.find((p) => 
+          p.identifier.toLowerCase().includes("monthly") ||
+          p.packageType === PACKAGE_TYPE.MONTHLY
+        );
+        
+        const annual = pkgs.find((p) => 
+          p.identifier.toLowerCase().includes("annual") || 
+          p.identifier.toLowerCase().includes("yearly") ||
+          p.packageType === PACKAGE_TYPE.ANNUAL
+        );
+
+        setMonthlyPackage(monthly || null);
+        setAnnualPackage(annual || null);
+        
+        console.log("[Paywall] Loaded packages - Monthly:", monthly?.identifier, "Annual:", annual?.identifier);
+        
+        if (!monthly && !annual) {
+          setError("Unable to load subscription options. Check your connection and try again.");
+        }
+      } else {
+        console.log("[Paywall] No packages available");
+        setError("Unable to load subscription options. Check your connection and try again.");
       }
     } catch (error) {
       console.error("[Paywall] Failed to load offerings:", error);
-      Alert.alert("Error", "Failed to load subscription plans. Please try again.");
+      setError("Unable to load subscription options. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubscribe = async () => {
-    if (!selectedPackage) return;
-
+  const handlePurchase = async (pkg: PurchasesPackage) => {
     try {
       setPurchasing(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      const success = await subscribeToPlan(selectedPackage.identifier);
+      const success = await subscribeToPlan(pkg.identifier);
 
       if (success) {
         // Sync subscription status to Firestore
@@ -159,12 +158,6 @@ export default function PaywallScreen() {
     }
   };
 
-  const formatPrice = (pkg: PurchasesPackage): string => {
-    const price = pkg.product.priceString;
-    const period = pkg.identifier.includes("annual") ? "year" : "month";
-    return `${price}/${period}`;
-  };
-
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-parchment">
@@ -185,17 +178,17 @@ export default function PaywallScreen() {
     <SafeAreaView className="flex-1 bg-parchment">
       {/* Header */}
       <View className="flex-row items-center justify-between px-5 py-3 border-b" style={{ borderColor: BORDER_SOFT }}>
-        <View className="flex-1">
-          <Text
-            className="text-2xl"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
-          >
-            Go Pro
-          </Text>
-        </View>
+        <Text
+          className="text-xl"
+          style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+        >
+          Complete Camping Pro
+        </Text>
         <Pressable
           onPress={() => navigation.goBack()}
           className="p-2 active:opacity-70"
+          accessibilityLabel="Close"
+          accessibilityRole="button"
         >
           <Ionicons name="close" size={28} color={DEEP_FOREST} />
         </Pressable>
@@ -203,228 +196,224 @@ export default function PaywallScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Section */}
-        <View className="px-5 pt-6 pb-4">
-          <Text
-            className="text-center mb-3"
-            style={{
-              fontFamily: "JosefinSlab_700Bold",
-              fontSize: 28,
-              color: TEXT_PRIMARY_STRONG,
-            }}
-          >
-            Complete Camping App Pro
-          </Text>
+        {/* Title */}
+        <View className="px-6 pt-6 pb-4">
           <Text
             className="text-center"
             style={{
-              fontFamily: "SourceSans3_400Regular",
-              fontSize: 16,
-              color: TEXT_SECONDARY,
-              lineHeight: 24,
+              fontFamily: "JosefinSlab_700Bold",
+              fontSize: 32,
+              color: TEXT_PRIMARY_STRONG,
+              lineHeight: 38,
             }}
           >
-            Unlock the full potential of your camping adventures with premium features
+            Make every trip easier
           </Text>
         </View>
 
-        {/* Features List */}
-        <View className="px-5 py-4">
-          {PRO_FEATURES.map((feature, index) => (
-            <View
-              key={index}
-              className="flex-row items-start mb-4 p-4 rounded-xl"
-              style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}
-            >
-              <View
-                className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                style={{ backgroundColor: DEEP_FOREST }}
+        {/* Pricing CTAs */}
+        {error ? (
+          <View className="px-6 py-8">
+            <View className="p-6 rounded-xl" style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}>
+              <Ionicons name="alert-circle-outline" size={48} color={TEXT_SECONDARY} style={{ alignSelf: "center", marginBottom: 12 }} />
+              <Text
+                className="text-center"
+                style={{
+                  fontFamily: "SourceSans3_400Regular",
+                  fontSize: 16,
+                  color: TEXT_SECONDARY,
+                  lineHeight: 24,
+                }}
               >
-                <Ionicons name={feature.icon} size={20} color={PARCHMENT} />
-              </View>
-              <View className="flex-1">
+                {error}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View className="px-6 pb-6">
+            {/* Annual Plan */}
+            {annualPackage && (
+              <Pressable
+                onPress={() => handlePurchase(annualPackage)}
+                disabled={purchasing}
+                className="mb-3 p-5 rounded-2xl border-2 active:opacity-90"
+                style={{
+                  backgroundColor: DEEP_FOREST,
+                  borderColor: DEEP_FOREST,
+                }}
+              >
                 <Text
                   className="mb-1"
                   style={{
-                    fontFamily: "SourceSans3_600SemiBold",
-                    fontSize: 16,
-                    color: TEXT_PRIMARY_STRONG,
+                    fontFamily: "SourceSans3_700Bold",
+                    fontSize: 20,
+                    color: PARCHMENT,
                   }}
                 >
-                  {feature.title}
+                  {annualPackage.product.priceString} per year
                 </Text>
                 <Text
                   style={{
                     fontFamily: "SourceSans3_400Regular",
-                    fontSize: 14,
-                    color: TEXT_SECONDARY,
-                    lineHeight: 20,
+                    fontSize: 15,
+                    color: PARCHMENT,
+                    opacity: 0.9,
+                    lineHeight: 22,
                   }}
                 >
-                  {feature.description}
+                  Best value. One simple payment for a full year.
                 </Text>
-              </View>
-            </View>
-          ))}
-        </View>
+              </Pressable>
+            )}
 
-        {/* Plans */}
-        {packages.length > 0 && (
-          <View className="px-5 py-4">
-            <Text
-              className="mb-4"
-              style={{
-                fontFamily: "JosefinSlab_700Bold",
-                fontSize: 20,
-                color: TEXT_PRIMARY_STRONG,
-              }}
-            >
-              Choose Your Plan
-            </Text>
-
-            {packages.map((pkg) => {
-              const isAnnual = pkg.identifier.includes("annual");
-              const isSelected = selectedPackage?.identifier === pkg.identifier;
-
-              return (
-                <Pressable
-                  key={pkg.identifier}
-                  onPress={() => {
-                    setSelectedPackage(pkg);
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }}
-                  className="mb-3 p-4 rounded-xl border-2 active:opacity-90"
+            {/* Monthly Plan */}
+            {monthlyPackage && (
+              <Pressable
+                onPress={() => handlePurchase(monthlyPackage)}
+                disabled={purchasing}
+                className="p-5 rounded-2xl border-2 active:opacity-90"
+                style={{
+                  backgroundColor: CARD_BACKGROUND_LIGHT,
+                  borderColor: BORDER_SOFT,
+                }}
+              >
+                <Text
+                  className="mb-1"
                   style={{
-                    backgroundColor: isSelected ? DEEP_FOREST : CARD_BACKGROUND_LIGHT,
-                    borderColor: isSelected ? DEEP_FOREST : BORDER_SOFT,
+                    fontFamily: "SourceSans3_700Bold",
+                    fontSize: 20,
+                    color: TEXT_PRIMARY_STRONG,
                   }}
                 >
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-1">
-                      <View className="flex-row items-center mb-1">
-                        <Text
-                          style={{
-                            fontFamily: "SourceSans3_600SemiBold",
-                            fontSize: 18,
-                            color: isSelected ? PARCHMENT : TEXT_PRIMARY_STRONG,
-                          }}
-                        >
-                          {isAnnual ? "Annual" : "Monthly"}
-                        </Text>
-                        {isAnnual && (
-                          <View
-                            className="ml-2 px-2 py-1 rounded-full"
-                            style={{ backgroundColor: GRANITE_GOLD }}
-                          >
-                            <Text
-                              style={{
-                                fontFamily: "SourceSans3_600SemiBold",
-                                fontSize: 11,
-                                color: PARCHMENT,
-                              }}
-                            >
-                              BEST VALUE
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text
-                        style={{
-                          fontFamily: "SourceSans3_400Regular",
-                          fontSize: 14,
-                          color: isSelected ? PARCHMENT : TEXT_SECONDARY,
-                        }}
-                      >
-                        {formatPrice(pkg)}
-                      </Text>
-                    </View>
-                    <View
-                      className="w-6 h-6 rounded-full border-2 items-center justify-center"
-                      style={{
-                        borderColor: isSelected ? PARCHMENT : BORDER_SOFT,
-                        backgroundColor: isSelected ? PARCHMENT : "transparent",
-                      }}
-                    >
-                      {isSelected && (
-                        <View
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: DEEP_FOREST }}
-                        />
-                      )}
-                    </View>
-                  </View>
-                </Pressable>
-              );
-            })}
+                  {monthlyPackage.product.priceString} per month
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: "SourceSans3_400Regular",
+                    fontSize: 15,
+                    color: TEXT_SECONDARY,
+                    lineHeight: 22,
+                  }}
+                >
+                  Start planning with flexible billing.
+                </Text>
+              </Pressable>
+            )}
+
+            {purchasing && (
+              <View className="mt-4 items-center">
+                <ActivityIndicator size="small" color={DEEP_FOREST} />
+              </View>
+            )}
           </View>
         )}
-      </ScrollView>
 
-      {/* Bottom Actions */}
-      <View
-        className="absolute bottom-0 left-0 right-0 px-5 py-4 border-t"
-        style={{ backgroundColor: PARCHMENT, borderColor: BORDER_SOFT }}
-      >
-        <Pressable
-          onPress={handleSubscribe}
-          disabled={!selectedPackage || purchasing || subscriptionLoading}
-          className="rounded-xl py-4 mb-3 active:opacity-90"
-          style={{ backgroundColor: DEEP_FOREST }}
-        >
-          {purchasing || subscriptionLoading ? (
-            <ActivityIndicator color={PARCHMENT} />
-          ) : (
+        {/* Hero Illustration */}
+        <View className="px-6 py-8">
+          <View 
+            className="rounded-2xl overflow-hidden items-center justify-center"
+            style={{ 
+              backgroundColor: DEEP_FOREST,
+              height: 200,
+            }}
+          >
+            {/* Placeholder for tent & lantern illustration */}
+            <Ionicons name="bonfire" size={80} color={GRANITE_GOLD} />
             <Text
-              className="text-center"
+              className="mt-4"
               style={{
-                fontFamily: "SourceSans3_600SemiBold",
+                fontFamily: "JosefinSlab_700Bold",
                 fontSize: 18,
                 color: PARCHMENT,
               }}
             >
-              Start Subscription
+              🏕️ ⛺ 🔦
             </Text>
-          )}
-        </Pressable>
+          </View>
+        </View>
 
-        <View className="flex-row items-center justify-center gap-4">
+        {/* Subtitle */}
+        <View className="px-6 pb-4">
+          <Text
+            className="text-center"
+            style={{
+              fontFamily: "SourceSans3_400Regular",
+              fontSize: 17,
+              color: TEXT_SECONDARY,
+              lineHeight: 26,
+            }}
+          >
+            Unlock the full planning toolkit and keep your trips organized in one place.
+          </Text>
+        </View>
+
+        {/* Feature List */}
+        <View className="px-6 pb-6">
+          {PRO_FEATURES.map((feature, index) => (
+            <View key={index} className="flex-row items-start mb-3">
+              <Text
+                style={{
+                  fontFamily: "SourceSans3_400Regular",
+                  fontSize: 20,
+                  color: EARTH_GREEN,
+                  marginRight: 12,
+                }}
+              >
+                •
+              </Text>
+              <Text
+                style={{
+                  fontFamily: "SourceSans3_400Regular",
+                  fontSize: 16,
+                  color: TEXT_PRIMARY_STRONG,
+                  lineHeight: 24,
+                  flex: 1,
+                }}
+              >
+                {feature}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Footer Legal */}
+        <View className="px-6 pb-4">
+          <Text
+            className="text-center"
+            style={{
+              fontFamily: "SourceSans3_400Regular",
+              fontSize: 13,
+              color: TEXT_MUTED,
+              lineHeight: 20,
+            }}
+          >
+            Payment is handled through the App Store. Your subscription renews automatically until canceled. You can manage your plan in your App Store settings.
+          </Text>
+        </View>
+
+        {/* Restore Purchases */}
+        <View className="px-6 pb-4">
           <Pressable
             onPress={handleRestore}
             disabled={restoring}
-            className="py-2 active:opacity-70"
+            className="py-3 active:opacity-70"
           >
             <Text
+              className="text-center"
               style={{
                 fontFamily: "SourceSans3_600SemiBold",
-                fontSize: 14,
+                fontSize: 16,
                 color: TEXT_SECONDARY,
               }}
             >
               {restoring ? "Restoring..." : "Restore Purchases"}
             </Text>
           </Pressable>
-
-          <Text style={{ color: TEXT_SECONDARY }}>•</Text>
-
-          <Pressable
-            onPress={() => navigation.goBack()}
-            className="py-2 active:opacity-70"
-          >
-            <Text
-              style={{
-                fontFamily: "SourceSans3_600SemiBold",
-                fontSize: 14,
-                color: TEXT_SECONDARY,
-              }}
-            >
-              Not Now
-            </Text>
-          </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

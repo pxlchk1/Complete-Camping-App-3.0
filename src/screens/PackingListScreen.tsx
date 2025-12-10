@@ -22,6 +22,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTripsStore } from "../state/tripsStore";
+import { useUserStatus } from "../utils/authHelper";
 import AccountButton from "../components/AccountButton";
 import { RootStackParamList } from "../navigation/types";
 import { PackingItem } from "../types/camping";
@@ -66,6 +67,7 @@ export default function PackingListScreen() {
   const navigation = useNavigation<PackingListScreenNavigationProp>();
   const route = useRoute<PackingListScreenRouteProp>();
   const { tripId } = route.params;
+  const { isGuest } = useUserStatus();
 
   const trip = useTripsStore((s) => s.getTripById(tripId));
   const userId = "demo_user_1"; // TODO: Get from auth
@@ -75,10 +77,10 @@ export default function PackingListScreen() {
   const [error, setError] = useState<string | null>(null);
   const [useLocalStorage, setUseLocalStorage] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
-  const [showAddCategory, setShowAddCategory] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(DEFAULT_CATEGORIES)
   );
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [filterPacked, setFilterPacked] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
@@ -167,6 +169,12 @@ export default function PackingListScreen() {
   const handleAddItem = async () => {
     if (!newItemLabel.trim()) return;
 
+    // Gate: Login required to add items
+    if (isGuest) {
+      navigation.navigate("Auth" as any);
+      return;
+    }
+
     const quantity = parseInt(newItemQuantity) || 1;
 
     try {
@@ -192,6 +200,8 @@ export default function PackingListScreen() {
       setNewItemLabel("");
       setNewItemQuantity("1");
       setNewItemNotes("");
+      setShowNewCategoryInput(false);
+      setNewCategoryName("");
       setShowAddItem(false);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -333,19 +343,6 @@ export default function PackingListScreen() {
               style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
             >
               Add Item
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setShowAddCategory(true)}
-            className="border border-parchmentDark rounded-xl px-4 py-2 flex-row items-center active:opacity-70"
-          >
-            <Ionicons name="folder-outline" size={18} color={DEEP_FOREST} />
-            <Text
-              className="ml-1"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-            >
-              Category
             </Text>
           </Pressable>
         </View>
@@ -569,7 +566,11 @@ export default function PackingListScreen() {
         visible={showAddItem}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowAddItem(false)}
+        onRequestClose={() => {
+          setShowAddItem(false);
+          setShowNewCategoryInput(false);
+          setNewCategoryName("");
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -577,7 +578,11 @@ export default function PackingListScreen() {
         >
           <Pressable
             className="flex-1 bg-black/50 justify-end"
-            onPress={() => setShowAddItem(false)}
+            onPress={() => {
+              setShowAddItem(false);
+              setShowNewCategoryInput(false);
+              setNewCategoryName("");
+            }}
           >
             <Pressable
               className="bg-parchment rounded-t-2xl p-6"
@@ -590,41 +595,105 @@ export default function PackingListScreen() {
                 Add Item
               </Text>
 
-              <Text
-                className="text-sm mb-2"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-              >
-                Category
-              </Text>
-              <View className="mb-4">
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  className="flex-row gap-2"
+              <View className="flex-row items-center justify-between mb-2">
+                <Text
+                  className="text-sm"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
                 >
-                  {DEFAULT_CATEGORIES.map((cat) => (
+                  Category
+                </Text>
+                <Pressable
+                  onPress={() => setShowNewCategoryInput(!showNewCategoryInput)}
+                  className="flex-row items-center gap-1 px-2 py-1 rounded-lg active:opacity-70"
+                  style={{ backgroundColor: showNewCategoryInput ? "#f0f9f4" : "transparent" }}
+                >
+                  <Ionicons name="add-circle-outline" size={16} color={EARTH_GREEN} />
+                  <Text
+                    className="text-xs"
+                    style={{ fontFamily: "SourceSans3_600SemiBold", color: EARTH_GREEN }}
+                  >
+                    New Category
+                  </Text>
+                </Pressable>
+              </View>
+
+              {showNewCategoryInput ? (
+                <View className="mb-4">
+                  <TextInput
+                    value={newCategoryName}
+                    onChangeText={setNewCategoryName}
+                    placeholder="Enter new category name"
+                    className="bg-white border border-parchmentDark rounded-xl px-4 py-3 mb-2"
+                    style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST }}
+                    placeholderTextColor={EARTH_GREEN}
+                    autoFocus
+                  />
+                  <View className="flex-row gap-2">
                     <Pressable
-                      key={cat}
-                      onPress={() => setNewItemCategory(cat)}
-                      className={`px-3 py-2 rounded-xl border ${
-                        newItemCategory === cat
-                          ? "bg-forest border-forest"
-                          : "bg-white border-parchmentDark"
-                      }`}
+                      onPress={() => {
+                        setShowNewCategoryInput(false);
+                        setNewCategoryName("");
+                      }}
+                      className="flex-1 border border-parchmentDark rounded-lg py-2 active:opacity-70"
                     >
                       <Text
-                        className="text-xs"
-                        style={{
-                          fontFamily: "SourceSans3_600SemiBold",
-                          color: newItemCategory === cat ? PARCHMENT : DEEP_FOREST,
-                        }}
+                        className="text-center text-xs"
+                        style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
                       >
-                        {cat}
+                        Cancel
                       </Text>
                     </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
+                    <Pressable
+                      onPress={() => {
+                        if (newCategoryName.trim()) {
+                          setNewItemCategory(newCategoryName.trim());
+                          setShowNewCategoryInput(false);
+                          setNewCategoryName("");
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        }
+                      }}
+                      className="flex-1 bg-forest rounded-lg py-2 active:opacity-90"
+                    >
+                      <Text
+                        className="text-center text-xs"
+                        style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                      >
+                        Create Category
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <View className="mb-4">
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    className="flex-row gap-2"
+                  >
+                    {DEFAULT_CATEGORIES.map((cat) => (
+                      <Pressable
+                        key={cat}
+                        onPress={() => setNewItemCategory(cat)}
+                        className={`px-3 py-2 rounded-xl border ${
+                          newItemCategory === cat
+                            ? "bg-forest border-forest"
+                            : "bg-white border-parchmentDark"
+                        }`}
+                      >
+                        <Text
+                          className="text-xs"
+                          style={{
+                            fontFamily: "SourceSans3_600SemiBold",
+                            color: newItemCategory === cat ? PARCHMENT : DEEP_FOREST,
+                          }}
+                        >
+                          {cat}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
 
               <Text
                 className="text-sm mb-2"
@@ -676,7 +745,11 @@ export default function PackingListScreen() {
 
               <View className="flex-row gap-3">
                 <Pressable
-                  onPress={() => setShowAddItem(false)}
+                  onPress={() => {
+                    setShowAddItem(false);
+                    setShowNewCategoryInput(false);
+                    setNewCategoryName("");
+                  }}
                   className="flex-1 border border-parchmentDark rounded-xl py-3 active:opacity-70"
                 >
                   <Text
@@ -703,77 +776,7 @@ export default function PackingListScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Add Category Modal */}
-      <Modal
-        visible={showAddCategory}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowAddCategory(false)}
-      >
-        <Pressable
-          className="flex-1 bg-black/50 justify-end"
-          onPress={() => setShowAddCategory(false)}
-        >
-          <Pressable
-            className="bg-parchment rounded-t-2xl p-6"
-            onPress={(e) => e.stopPropagation()}
-          >
-            <Text
-              className="text-xl font-bold mb-4"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
-            >
-              Add Custom Category
-            </Text>
 
-            <Text
-              className="text-sm mb-2"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-            >
-              Category Name
-            </Text>
-            <TextInput
-              value={newCategoryName}
-              onChangeText={setNewCategoryName}
-              placeholder="Enter category name"
-              className="bg-white border border-parchmentDark rounded-xl px-4 py-3 mb-6"
-              style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST }}
-              placeholderTextColor={EARTH_GREEN}
-            />
-
-            <View className="flex-row gap-3">
-              <Pressable
-                onPress={() => setShowAddCategory(false)}
-                className="flex-1 border border-parchmentDark rounded-xl py-3 active:opacity-70"
-              >
-                <Text
-                  className="text-center"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                >
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  if (newCategoryName.trim()) {
-                    setNewItemCategory(newCategoryName.trim());
-                    setNewCategoryName("");
-                    setShowAddCategory(false);
-                    setShowAddItem(true);
-                  }
-                }}
-                className="flex-1 bg-forest rounded-xl py-3 active:opacity-90"
-              >
-                <Text
-                  className="text-center"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
-                >
-                  Add
-                </Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
       </SafeAreaView>
     </>
   );

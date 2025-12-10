@@ -22,6 +22,7 @@ import { useAuthStore } from "../state/authStore";
 import { usePaywallStore } from "../state/paywallStore";
 import { useToast } from "../components/ToastManager";
 import { useUserType } from "../utils/userType";
+import { useUserStatus } from "../utils/authHelper";
 import { getFeedbackPosts, type FeedbackPost } from "../api/feedback-service";
 
 // Constants
@@ -55,6 +56,7 @@ export default function CommunityScreen() {
     initialTab || "tips"
   );
   const insets = useSafeAreaInsets();
+  const { isGuest, isFree, isPro } = useUserStatus();
 
   const [tipSubmissionVisible, setTipSubmissionVisible] = useState(false);
 
@@ -92,12 +94,20 @@ export default function CommunityScreen() {
   // Calculate bottom padding
   const bottomSpacer = 50 + Math.max(insets.bottom, 18) + 12;
 
-  // Gate tip submission
+  // Gate tip submission with two-gate system
   const handleSubmitTip = () => {
-    if (userType === "guest" || userType === "free") {
+    // Gate 1: Login required
+    if (isGuest) {
+      navigation.navigate("Auth" as any);
+      return;
+    }
+
+    // Gate 2: Pro required (free users can browse but not post)
+    if (isFree) {
       openPaywall("community_full", { name: "Community" });
       return;
     }
+
     setTipSubmissionVisible(true);
   };
 

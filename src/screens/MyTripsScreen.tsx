@@ -7,6 +7,9 @@ import { useNavigation } from "@react-navigation/native";
 import { useTrips, Trip, useCreateTrip, useDeleteTrip, useUpdateTrip } from "../state/tripsStore";
 import { useTripsListStore, TripSegment, TripSort } from "../state/tripsListStore";
 import { usePlanTabStore } from "../state/planTabStore";
+import { useSubscriptionStore } from "../state/subscriptionStore";
+import { useUserStatus } from "../utils/authHelper";
+import { useAuthStore } from "../state/authStore";
 import TripCard from "../components/TripCard";
 import AccountButtonHeader from "../components/AccountButtonHeader";
 import PlanTopNav from "../components/PlanTopNav";
@@ -50,8 +53,17 @@ function formatShare(trip: Trip) {
 
 export default function MyTripsScreen() {
   const nav = useNavigation<MyTripsScreenNavigationProp>();
-  const trips = useTrips();
+  const allTrips = useTrips();
+  const currentUser = useAuthStore((s) => s.user);
+  const { isLoggedIn, isPro, isFree, isGuest } = useUserStatus();
   const insets = useSafeAreaInsets();
+
+  // Filter trips to only show those for the current logged-in user
+  // Guest users see no trips
+  const trips = useMemo(() => {
+    if (!currentUser) return [];
+    return allTrips.filter((t) => t.userId === currentUser.id);
+  }, [allTrips, currentUser]);
 
   // Plan section tab state - use shared store
   const activePlanTab = usePlanTabStore((s) => s.activeTab);
@@ -130,14 +142,30 @@ export default function MyTripsScreen() {
   const onResume = (trip: Trip) => nav.navigate("TripDetail", { tripId: trip.id });
   const onMenu = (trip: Trip) => setMenuTrip(trip);
 
+  const handleCreateTrip = () => {
+    // Gate 1: Login required
+    if (isGuest) {
+      nav.navigate("Auth" as any);
+      return;
+    }
+
+    // Gate 2: Free users limited to 2 trips
+    if (isFree && trips.length >= 2) {
+      nav.navigate("Paywall" as any);
+      return;
+    }
+
+    setShowCreate(true);
+  };
+
   const empty = (
     <View style={{ flex: 1, backgroundColor: '#F4EBD0' }}>
       <EmptyState
         iconName="compass"
-        title="No active trips"
-        message="Start planning and we will keep your trips here."
-        ctaLabel="Plan a Trip"
-        onPress={() => setShowCreate(true)}
+        title={isGuest ? "Log in to start planning" : "No active trips"}
+        message={isGuest ? "Create an account to plan trips, save parks, and organize your camping adventures." : "Start planning and we will keep your trips here."}
+        ctaLabel={isGuest ? "Log In" : "Plan a Trip"}
+        onPress={handleCreateTrip}
       />
     </View>
   );
@@ -225,7 +253,7 @@ export default function MyTripsScreen() {
               My Trips
             </Text>
             <Pressable
-              onPress={() => setShowCreate(true)}
+              onPress={handleCreateTrip}
               className="ml-3 active:opacity-70"
               accessibilityLabel="Create new trip"
               accessibilityRole="button"

@@ -13,13 +13,18 @@ import {
   Image,
   ActivityIndicator,
   Dimensions,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { auth, db } from "../config/firebase";
-import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore";
+import * as ImagePicker from "expo-image-picker";
+import { auth, db, storage } from "../config/firebase";
+import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp, updateDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { signOut } from "firebase/auth";
+import { restorePurchases, syncSubscriptionToFirestore } from "../services/subscriptionService";
+import { useUserStatus } from "../utils/authHelper";
 import { HERO_IMAGES } from "../constants/images";
 import {
   DEEP_FOREST,
@@ -64,9 +69,13 @@ const PROFILE_SIZE = 120;
 const PROFILE_OVERLAP = 60;
 
 export default function MyCampsiteScreen({ navigation }: any) {
+  const { isGuest } = useUserStatus();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActivityTab>("trips");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -225,6 +234,130 @@ export default function MyCampsiteScreen({ navigation }: any) {
     }
   };
 
+  const handleRestorePurchases = async () => {
+    try {
+      setRestoring(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      const restored = await restorePurchases();
+
+      if (restored) {
+        await syncSubscriptionToFirestore();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert(
+          "Purchases Restored",
+          "Your subscription has been restored successfully."
+        );
+      } else {
+        Alert.alert(
+          "No Purchases Found",
+          "No active subscriptions were found for your account."
+        );
+      }
+    } catch (error: any) {
+      console.error("[MyCampsite] Restore error:", error);
+      Alert.alert(
+        "Restore Failed",
+        "Unable to restore purchases. Please try again or contact support."
+      );
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const handleUpdateProfilePhoto = async () => {
+    const user = auth.currentUser;
+    if (!user || isGuest) {
+      navigation.navigate("Auth");
+      return;
+    }
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "images" as any,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (result.canceled) return;
+
+      setUploadingPhoto(true);
+
+      const imageUri = result.assets[0].uri;
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+
+      const storageRef = ref(storage, `profile-photos/${user.uid}/${Date.now()}.jpg`);
+      await uploadBytes(storageRef, blob);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Update both users and profiles collections
+      await updateDoc(doc(db, "users", user.uid), {
+        photoURL: downloadURL,
+      });
+      await updateDoc(doc(db, "profiles", user.uid), {
+        avatarUrl: downloadURL,
+      });
+
+      setProfile((prev) => (prev ? { ...prev, avatarUrl: downloadURL } : null));
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      console.error("Error updating profile photo:", error);
+      Alert.alert("Error", "Failed to update profile photo. Please try again.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleUpdateCoverPhoto = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "images" as any,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (result.canceled) return;
+
+      setUploadingCover(true);
+
+      const imageUri = result.assets[0].uri;
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+
+      const storageRef = ref(storage, `cover-photos/${user.uid}/${Date.now()}.jpg`);
+      await uploadBytes(storageRef, blob);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Update both users and profiles collections
+      await updateDoc(doc(db, "users", user.uid), {
+        coverPhotoURL: downloadURL,
+      });
+      await updateDoc(doc(db, "profiles", user.uid), {
+        backgroundUrl: downloadURL,
+      });
+
+      setProfile((prev) => (prev ? { ...prev, backgroundUrl: downloadURL } : null));
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      console.error("Error updating cover photo:", error);
+      Alert.alert("Error", "Failed to update cover photo. Please try again.");
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
   const getMembershipLabel = (tier: MembershipTier): string => {
     switch (tier) {
       case "weekendCamper":
@@ -328,12 +461,35 @@ export default function MyCampsiteScreen({ navigation }: any) {
               <Pressable
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  navigation.navigate("Settings");
+                  
+                  // Gate: Login required to edit profile
+                  if (isGuest || !auth.currentUser) {
+                    navigation.navigate("Auth");
+                    return;
+                  }
+                  
+                  navigation.navigate("EditProfile");
                 }}
                 className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
                 style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
               >
-                <Ionicons name="settings-outline" size={24} color={PARCHMENT} />
+                <Ionicons name="create-outline" size={24} color={PARCHMENT} />
+              </Pressable>
+            </View>
+
+            {/* Camera Button for Cover Photo */}
+            <View style={{ flex: 1, justifyContent: "flex-end", alignItems: "flex-end", paddingRight: 20, paddingBottom: 12 }}>
+              <Pressable
+                onPress={handleUpdateCoverPhoto}
+                disabled={uploadingCover}
+                className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
+                style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
+              >
+                {uploadingCover ? (
+                  <ActivityIndicator size="small" color={PARCHMENT} />
+                ) : (
+                  <Ionicons name="camera" size={20} color={PARCHMENT} />
+                )}
               </Pressable>
             </View>
           </ImageBackground>
@@ -342,7 +498,9 @@ export default function MyCampsiteScreen({ navigation }: any) {
         {/* Profile Section with Avatar Overlap */}
         <View className="px-5" style={{ marginTop: -PROFILE_OVERLAP }}>
           {/* Avatar */}
-          <View
+          <Pressable
+            onPress={handleUpdateProfilePhoto}
+            disabled={uploadingPhoto}
             style={{
               width: PROFILE_SIZE,
               height: PROFILE_SIZE,
@@ -384,7 +542,30 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 </Text>
               </View>
             )}
-          </View>
+
+            {/* Camera Icon Overlay */}
+            <View
+              style={{
+                position: "absolute",
+                bottom: 4,
+                right: 4,
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: EARTH_GREEN,
+                borderWidth: 3,
+                borderColor: PARCHMENT,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {uploadingPhoto ? (
+                <ActivityIndicator size="small" color={PARCHMENT} />
+              ) : (
+                <Ionicons name="camera" size={18} color={PARCHMENT} />
+              )}
+            </View>
+          </Pressable>
 
           {/* User Identity Block */}
           <View className="mb-4">
@@ -639,6 +820,34 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={22} color={EARTH_GREEN} />
+            </View>
+          </Pressable>
+
+          {/* Restore Purchases Button */}
+          <Pressable
+            onPress={handleRestorePurchases}
+            disabled={restoring}
+            className="mb-4 py-4 rounded-xl border-2 active:opacity-70"
+            style={{ borderColor: EARTH_GREEN, backgroundColor: CARD_BACKGROUND_LIGHT }}
+          >
+            <View className="flex-row items-center justify-center">
+              {restoring ? (
+                <ActivityIndicator size="small" color={EARTH_GREEN} />
+              ) : (
+                <>
+                  <Ionicons name="reload-circle-outline" size={24} color={EARTH_GREEN} />
+                  <Text
+                    className="ml-2"
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      fontSize: 16,
+                      color: TEXT_PRIMARY_STRONG,
+                    }}
+                  >
+                    Restore Purchases
+                  </Text>
+                </>
+              )}
             </View>
           </Pressable>
 
