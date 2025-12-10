@@ -46,7 +46,7 @@ export default function TipsListScreen() {
       if (sortBy === "my" && currentUser) {
         // Filter tips by current user
         const allTipsData = await tipsService.getTips();
-        allTips = allTipsData.filter(tip => tip.userId === currentUser.uid);
+        allTips = allTipsData.filter(tip => tip.authorId === currentUser.uid);
       } else {
         allTips = await tipsService.getTips();
       }
@@ -128,7 +128,7 @@ export default function TipsListScreen() {
 
       <View className="flex-row items-center">
         <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-          by {item.userName} • {formatTimeAgo(item.createdAt)} • {item.upvotes} upvotes
+          by {item.authorName} • {formatTimeAgo(item.createdAt)} • {item.likes} likes
         </Text>
       </View>
     </Pressable>

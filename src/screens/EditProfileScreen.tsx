@@ -153,8 +153,16 @@ export default function EditProfileScreen() {
         await uploadBytes(storageRef, blob);
         const downloadURL = await getDownloadURL(storageRef);
 
+        // Save to Firestore immediately
+        const userRef = doc(db, "users", user.uid);
+        await updateDoc(userRef, {
+          photoURL: downloadURL,
+          updatedAt: serverTimestamp(),
+        });
+
         setPhotoURL(downloadURL);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        updateCurrentUser({ photoURL: downloadURL });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (error) {
       console.error("[EditProfile] Error uploading photo:", error);
@@ -191,8 +199,16 @@ export default function EditProfileScreen() {
         await uploadBytes(storageRef, blob);
         const downloadURL = await getDownloadURL(storageRef);
 
+        // Save to Firestore immediately
+        const userRef = doc(db, "users", user.uid);
+        await updateDoc(userRef, {
+          coverPhotoURL: downloadURL,
+          updatedAt: serverTimestamp(),
+        });
+
         setCoverPhotoURL(downloadURL);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        updateCurrentUser({ coverPhotoURL: downloadURL });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (error) {
       console.error("[EditProfile] Error uploading cover photo:", error);
