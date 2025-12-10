@@ -39,8 +39,9 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
   console.log("[ParksBrowseScreen] Component rendered");
 
   // Filter state
-  const [mode, setMode] = useState<FilterMode>("near");
+  const [mode, setMode] = useState<FilterMode>("search");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [driveTime, setDriveTime] = useState<DriveTime>(2);
   const [parkType, setParkType] = useState<ParkType>("all");
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -48,9 +49,19 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
 
   // Data state
   const [parks, setParks] = useState<Park[]>([]);
+  const [allParks, setAllParks] = useState<Park[]>([]); // Cache all parks
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPark, setSelectedPark] = useState<Park | null>(null);
+
+  // Debounce search query to prevent flashing on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300); // 300ms debounce delay
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Calculate distance between two coordinates (Haversine formula) - returns distance in miles
   const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -67,11 +78,10 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
     return R * c;
   };
 
-  // Fetch parks based on current filters
-  const fetchParks = useCallback(async () => {
-    // If we are in "near" mode but still waiting on location, do nothing yet
-    if (mode === "near" && !userLocation) {
-      console.log("[ParksBrowse] Skipping fetch, waiting for location");
+  // Fetch all parks from Firebase (only once)
+  const fetchAllParks = useCallback(async () => {
+    // If we already have parks cached, skip
+    if (allParks.length > 0) {
       return;
     }
 
@@ -80,11 +90,10 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
 
     try {
       const parksCollection = collection(db, "parks");
-      // Simple, index friendly query: get up to 2500 parks
       const q = query(parksCollection, firestoreLimit(2500));
       const querySnapshot = await getDocs(q);
 
-      let fetchedParks: Park[] = [];
+      const fetchedParks: Park[] = [];
 
       console.log("[ParksBrowse] Firebase returned", querySnapshot.size, "documents");
 
@@ -102,63 +111,86 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
         });
       });
 
-      // Search by name (only if at least 2 characters, but we still fetched everything)
-      if (mode === "search" && searchQuery.trim().length >= 2) {
-        const lower = searchQuery.toLowerCase();
-        fetchedParks = fetchedParks.filter((park) =>
-          park.name.toLowerCase().includes(lower)
-        );
-      }
-
-      // Filter by park type
-      if (parkType !== "all") {
-        fetchedParks = fetchedParks.filter((park) => park.filter === parkType);
-      }
-
-      // "Near me" filtering and sorting by distance, using drive time
-      if (mode === "near" && userLocation) {
-        const parksWithDistance = fetchedParks.map((park) => ({
-          ...park,
-          distance: getDistance(
-            userLocation.latitude,
-            userLocation.longitude,
-            park.latitude,
-            park.longitude
-          ),
-        }));
-
-        const maxDistanceMiles = driveTime * 55; // simple mph approximation
-
-        fetchedParks = parksWithDistance
-          .filter((p) => p.distance <= maxDistanceMiles)
-          .sort((a, b) => a.distance - b.distance);
-
-        console.log(
-          "[ParksBrowse] Found",
-          fetchedParks.length,
-          "parks within",
-          driveTime,
-          "hours (",
-          maxDistanceMiles,
-          "mi )"
-        );
-      }
-
-      console.log("[ParksBrowse] Final parks count:", fetchedParks.length);
-      setParks(fetchedParks);
+      setAllParks(fetchedParks);
+      console.log("[ParksBrowse] Cached", fetchedParks.length, "parks");
     } catch (err: any) {
       console.error("Error fetching parks:", err?.code, err?.message, err);
       setError("Failed to load parks. Please try again.");
-      setParks([]);
     } finally {
       setIsLoading(false);
     }
-  }, [mode, searchQuery, userLocation, driveTime, parkType]);
+  }, [allParks.length]);
 
-  // Fetch parks when filters change
+  // Filter parks based on current filters (using cached data)
+  const filterParks = useCallback(() => {
+    // If we are in "near" mode but still waiting on location, do nothing yet
+    if (mode === "near" && !userLocation) {
+      console.log("[ParksBrowse] Skipping filter, waiting for location");
+      return;
+    }
+
+    // If no parks cached yet, nothing to filter
+    if (allParks.length === 0) {
+      return;
+    }
+
+    let filtered = [...allParks];
+
+    // Search by name (only if at least 2 characters)
+    if (mode === "search" && debouncedSearchQuery.trim().length >= 2) {
+      const lower = debouncedSearchQuery.toLowerCase();
+      filtered = filtered.filter((park) =>
+        park.name.toLowerCase().includes(lower)
+      );
+    }
+
+    // Filter by park type
+    if (parkType !== "all") {
+      filtered = filtered.filter((park) => park.filter === parkType);
+    }
+
+    // "Near me" filtering and sorting by distance, using drive time
+    if (mode === "near" && userLocation) {
+      const parksWithDistance = filtered.map((park) => ({
+        ...park,
+        distance: getDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          park.latitude,
+          park.longitude
+        ),
+      }));
+
+      const maxDistanceMiles = driveTime * 55; // simple mph approximation
+
+      filtered = parksWithDistance
+        .filter((p) => p.distance <= maxDistanceMiles)
+        .sort((a, b) => a.distance - b.distance);
+
+      console.log(
+        "[ParksBrowse] Found",
+        filtered.length,
+        "parks within",
+        driveTime,
+        "hours (",
+        maxDistanceMiles,
+        "mi )"
+      );
+    }
+
+    console.log("[ParksBrowse] Filtered parks count:", filtered.length);
+    setParks(filtered);
+  }, [mode, debouncedSearchQuery, userLocation, driveTime, parkType, allParks, getDistance]);
+
+  // Fetch all parks once on mount
   useEffect(() => {
-    fetchParks();
-  }, [fetchParks]);
+    fetchAllParks();
+  }, [fetchAllParks]);
+
+  // Filter parks when filters or cached data changes
+  useEffect(() => {
+    filterParks();
+  }, [filterParks]);
 
   // Log loading state changes
   useEffect(() => {
