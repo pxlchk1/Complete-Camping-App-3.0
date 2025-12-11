@@ -212,21 +212,22 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: PARCHMENT }} edges={["top"]}>
-      <ModalHeader
-        title="Edit Profile"
-        showTitle
-        rightAction={{
-          icon: "checkmark",
-          onPress: handleSave,
-        }}
-      />
+    <SafeAreaView className="flex-1" style={{ backgroundColor: DEEP_FOREST }} edges={["top"]}>
+      <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
+        <ModalHeader
+          title="Edit Profile"
+          showTitle
+          rightAction={{
+            icon: "checkmark",
+            onPress: handleSave,
+          }}
+        />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1"
-      >
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1"
+        >
+          <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
           <View className="px-5 pt-5 pb-8">
             {/* Photos Section */}
             <Text
@@ -543,6 +544,7 @@ export default function EditProfileScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+      </View>
     </SafeAreaView>
   );
 }
