@@ -2,7 +2,7 @@
 
 export type UserRole = "user" | "moderator" | "administrator";
 
-export type MembershipTier = "free" | "premium" | "isAdmin";
+export type MembershipTier = "free" | "premium" | "isAdmin" | "isModerator";
 
 export type MembershipDuration = "1_month" | "3_months" | "6_months" | "1_year" | "lifetime";
 

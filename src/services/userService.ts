@@ -387,6 +387,10 @@ export function isAdmin(user: User): boolean {
          user.handle?.toLowerCase() === "tentandlantern";
 }
 
+export function isModerator(user: User): boolean {
+  return user.membershipTier === "isModerator";
+}
+
 export function hasProAccess(user: User): boolean {
   // Admin has full access
   if (isAdmin(user)) return true;
@@ -398,7 +402,7 @@ export function hasProAccess(user: User): boolean {
 }
 
 export function canModerateContent(user: User): boolean {
-  return isAdmin(user) || user.role === "moderator" || user.role === "administrator";
+  return isAdmin(user) || isModerator(user) || user.role === "moderator" || user.role === "administrator";
 }
 
 export function canBanUsers(user: User): boolean {
