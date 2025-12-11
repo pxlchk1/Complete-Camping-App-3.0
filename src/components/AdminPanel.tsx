@@ -13,6 +13,7 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import {
@@ -37,6 +38,7 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ currentUserId }: AdminPanelProps) {
+  const navigation = useNavigation<any>();
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeSection, setActiveSection] = useState<"membership" | "ban" | "role">("membership");
@@ -211,6 +213,27 @@ export default function AdminPanel({ currentUserId }: AdminPanelProps) {
       >
         Administrator Panel
       </Text>
+
+      {/* Seed Community Data Button */}
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          navigation.navigate("SeedData");
+        }}
+        className="mb-4 px-4 py-3 rounded-xl border flex-row items-center justify-between active:opacity-70"
+        style={{ backgroundColor: SIERRA_SKY, borderColor: EARTH_GREEN }}
+      >
+        <View className="flex-row items-center">
+          <Ionicons name="cloud-upload-outline" size={20} color={DEEP_FOREST} />
+          <Text
+            className="ml-2"
+            style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+          >
+            Seed Community Data
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={EARTH_GREEN} />
+      </Pressable>
 
       {/* Section Selector */}
       <View className="flex-row gap-2 mb-6">
