@@ -236,51 +236,22 @@ export default function PhotosListScreen() {
         </View>
       </View>
 
-      {/* Grid */}
-      {stories.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-5">
-          <Ionicons name="images-outline" size={64} color={GRANITE_GOLD} />
-          <Text
-            className="mt-4 text-xl text-center"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
-          >
-            No photos yet
-          </Text>
-          <Text
-            className="mt-2 text-center"
-            style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-          >
-            Be the first to share a camping photo!
-          </Text>
-          <Pressable
-            onPress={handleUploadPhoto}
-            className="mt-6 px-6 py-3 rounded-xl active:opacity-90"
-            style={{ backgroundColor: DEEP_FOREST }}
-          >
-            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
-              Upload Your First Photo
-            </Text>
-          </Pressable>
-        </View>
-      ) : (
-        <FlatList
-          data={stories}
-          renderItem={renderPhoto}
-          keyExtractor={item => item.id}
-          numColumns={2}
-          columnWrapperStyle={{ justifyContent: "space-between", paddingHorizontal: 20 }}
-          contentContainerStyle={{ paddingTop: 20, paddingBottom: 100 }}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            loadingMore ? (
-              <View className="py-4 items-center">
-                <ActivityIndicator size="small" color={DEEP_FOREST} />
-              </View>
-            ) : null
-          }
-        />
-      )}
+      {/* Content removed - coming soon message */}
+      <View className="flex-1 items-center justify-center px-5">
+        <Ionicons name="images-outline" size={64} color={GRANITE_GOLD} />
+        <Text
+          className="mt-4 text-xl text-center"
+          style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+        >
+          Photo sharing coming soon
+        </Text>
+        <Text
+          className="mt-2 text-center"
+          style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+        >
+          We're building an amazing photo sharing experience for the camping community!
+        </Text>
+      </View>
     </View>
   );
 }

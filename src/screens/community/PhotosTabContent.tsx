@@ -9,6 +9,67 @@ import * as ImagePicker from "expo-image-picker";
 import type { ImageCategory } from "../../types/community";
 import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY, TEXT_MUTED } from "../../constants/colors";
 
+// Component to handle individual photo rendering with error state
+function PhotoCard({ item, onVote }: { item: any; onVote: (id: string, type: "up" | "down") => void }) {
+  const [imageError, setImageError] = useState(false);
+
+  // Don't render if image failed to load
+  if (imageError) {
+    return null;
+  }
+
+  return (
+    <View className="w-1/2 p-2">
+      <View className="rounded-xl overflow-hidden border" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}>
+        <Image
+          source={{ uri: item.imageUri }}
+          style={{ width: "100%", aspectRatio: 1, backgroundColor: "transparent" }}
+          contentFit="cover"
+          placeholder={null}
+          transition={0}
+          onError={() => setImageError(true)}
+        />
+        <View className="p-3">
+          <Text className="text-sm mb-1" numberOfLines={1} style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+            {item.title}
+          </Text>
+          <Text className="text-xs mb-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>by @{item.authorHandle}</Text>
+
+          {/* Voting */}
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center">
+              <Pressable
+                onPress={() => onVote(item.id, "up")}
+                className="mr-2"
+              >
+                <Ionicons
+                  name="arrow-up-circle"
+                  size={20}
+                  color={item.userVote === "up" ? "#16a34a" : "#9ca3af"}
+                />
+              </Pressable>
+              <Text className="text-sm" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>{item.score}</Text>
+              <Pressable
+                onPress={() => onVote(item.id, "down")}
+                className="ml-2"
+              >
+                <Ionicons
+                  name="arrow-down-circle"
+                  size={20}
+                  color={item.userVote === "down" ? "#dc2626" : "#9ca3af"}
+                />
+              </Pressable>
+            </View>
+            <View className="bg-amber-100 rounded-full px-2 py-1">
+              <Text className="text-xs text-amber-800" style={{ fontFamily: "SourceSans3_400Regular" }}>{item.category}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function PhotosTabContent() {
   const { user } = useAuthStore();
   const { showError, showSuccess } = useToast();
@@ -246,52 +307,7 @@ export default function PhotosTabContent() {
           contentContainerStyle={{ padding: 8 }}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <View className="w-1/2 p-2">
-              <View className="rounded-xl overflow-hidden border" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}>
-                <Image
-                  source={{ uri: item.imageUri }}
-                  style={{ width: "100%", aspectRatio: 1, backgroundColor: "transparent" }}
-                  contentFit="cover"
-                  placeholder={null}
-                />
-                <View className="p-3">
-                  <Text className="text-sm mb-1" numberOfLines={1} style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                    {item.title}
-                  </Text>
-                  <Text className="text-xs mb-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>by @{item.authorHandle}</Text>
-
-                  {/* Voting */}
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center">
-                      <Pressable
-                        onPress={() => handleVote(item.id, "up")}
-                        className="mr-2"
-                      >
-                        <Ionicons
-                          name="arrow-up-circle"
-                          size={20}
-                          color={item.userVote === "up" ? "#16a34a" : "#9ca3af"}
-                        />
-                      </Pressable>
-                      <Text className="text-sm" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>{item.score}</Text>
-                      <Pressable
-                        onPress={() => handleVote(item.id, "down")}
-                        className="ml-2"
-                      >
-                        <Ionicons
-                          name="arrow-down-circle"
-                          size={20}
-                          color={item.userVote === "down" ? "#dc2626" : "#9ca3af"}
-                        />
-                      </Pressable>
-                    </View>
-                    <View className="bg-amber-100 rounded-full px-2 py-1">
-                      <Text className="text-xs text-amber-800" style={{ fontFamily: "SourceSans3_400Regular" }}>{item.category}</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
+            <PhotoCard item={item} onVote={handleVote} />
           )}
         />
       )}
