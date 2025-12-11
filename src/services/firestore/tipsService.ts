@@ -61,7 +61,7 @@ export const tipsService = {
       return {
         id: doc.id,
         ...data,
-        content: data.content || data.body || '',
+        content: data.text || data.content || data.body || '',
       };
     }) as TipPost[];
   },

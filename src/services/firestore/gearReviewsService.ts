@@ -76,7 +76,7 @@ export const gearReviewsService = {
       return {
         id: doc.id,
         ...data,
-        body: data.body || data.reviewText || '',
+        body: data.review || data.body || data.reviewText || '',
         summary: data.summary || data.title || '',
         rating: data.rating || data.overallRating || 0,
       };

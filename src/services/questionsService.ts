@@ -62,8 +62,8 @@ export async function getQuestions(
     return {
       id: doc.id,
       ...data,
-      body: data.body || data.content || '',
-      content: data.content || data.body || '', // Legacy alias
+      body: data.description || data.body || data.content || '',
+      content: data.description || data.content || data.body || '', // Legacy alias
     };
   }) as Question[];
 
@@ -84,8 +84,8 @@ export async function getQuestionById(questionId: string): Promise<Question | nu
   return {
     id: questionSnap.id,
     ...data,
-    body: data.body || data.content || '',
-    content: data.content || data.body || '', // Legacy alias
+    body: data.description || data.body || data.content || '',
+    content: data.description || data.content || data.body || '', // Legacy alias
   } as Question;
 }
 

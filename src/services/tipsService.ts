@@ -55,7 +55,7 @@ export async function getTips(
     return {
       id: doc.id,
       ...data,
-      body: data.body || data.content || '',
+      body: data.text || data.body || data.content || '',
     };
   }) as Tip[];
 
@@ -88,7 +88,7 @@ export async function getMyTips(
     return {
       id: doc.id,
       ...data,
-      body: data.body || data.content || '',
+      body: data.text || data.body || data.content || '',
     };
   }) as Tip[];
 
@@ -109,7 +109,7 @@ export async function getTipById(tipId: string): Promise<Tip | null> {
   return {
     id: tipSnap.id,
     ...data,
-    body: data.body || data.content || '',
+    body: data.text || data.body || data.content || '',
   } as Tip;
 }
 
