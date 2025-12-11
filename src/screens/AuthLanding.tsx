@@ -97,10 +97,13 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         createdAt: userData?.joinedAt || new Date().toISOString(),
       };
 
+      console.log("🔐 [AuthLanding - Apple] User Profile:", JSON.stringify(userProfile, null, 2));
+      console.log("🔐 [AuthLanding - Apple] Firebase User Data:", JSON.stringify(userData, null, 2));
+
       setUser(userProfile);
       
       // Also update userStore for components that use it (like HomeScreen)
-      setCurrentUser({
+      const userStoreData = {
         id: firebaseUser.uid,
         email: firebaseUser.email || credential.email || "",
         handle: userData?.handle || "user",
@@ -112,7 +115,10 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         isBanned: false,
         createdAt: userData?.joinedAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      });
+      };
+      
+      console.log("🔐 [AuthLanding - Apple] Setting userStore:", JSON.stringify(userStoreData, null, 2));
+      setCurrentUser(userStoreData);
       
       navigation.navigate("HomeTabs");
     } catch (error: any) {
@@ -176,10 +182,13 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         createdAt: userData?.createdAt || new Date().toISOString(),
       };
 
+      console.log("🔐 [AuthLanding - Email] User Profile:", JSON.stringify(userProfile, null, 2));
+      console.log("🔐 [AuthLanding - Email] Firebase User Data:", JSON.stringify(userData, null, 2));
+
       setUser(userProfile);
       
       // Also update userStore for components that use it (like HomeScreen)
-      setCurrentUser({
+      const userStoreData = {
         id: firebaseUser.uid,
         email: firebaseUser.email || email.trim(),
         handle: userData?.handle || firebaseUser.displayName || "user",
@@ -191,7 +200,10 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         isBanned: false,
         createdAt: userData?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      });
+      };
+      
+      console.log("🔐 [AuthLanding - Email] Setting userStore:", JSON.stringify(userStoreData, null, 2));
+      setCurrentUser(userStoreData);
       
       navigation.navigate("HomeTabs");
     } catch (error: any) {

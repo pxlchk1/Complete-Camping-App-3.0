@@ -84,8 +84,17 @@ export default function HomeScreen() {
   // Development helper - initialize test user
   useEffect(() => {
     const currentUser = useUserStore.getState().currentUser;
+    console.log("🔍 [HomeScreen] Current User:", JSON.stringify(currentUser, null, 2));
     if (!currentUser) {
+      console.log("⚠️ [HomeScreen] No user found, creating test user");
       setCurrentUser(createTestUser("administrator"));
+    } else {
+      console.log("✅ [HomeScreen] User exists:", {
+        id: currentUser.id,
+        displayName: currentUser.displayName,
+        handle: currentUser.handle,
+        membershipTier: currentUser.membershipTier,
+      });
     }
   }, [setCurrentUser]);
 
@@ -134,6 +143,11 @@ export default function HomeScreen() {
     : currentUser
     ? `Welcome, ${userFirstName}!`
     : "Welcome, Camper!";
+
+  console.log("🎯 [HomeScreen] Welcome Greeting:", welcomeGreeting);
+  console.log("🎯 [HomeScreen] User First Name:", userFirstName);
+  console.log("🎯 [HomeScreen] Current User Display Name:", currentUser?.displayName);
+  console.log("🎯 [HomeScreen] Current User Membership:", currentUser?.membershipTier);
 
   const bottomSpacer = 50 + Math.max(insets.bottom, 18) + 12;
 
