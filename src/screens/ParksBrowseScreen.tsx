@@ -110,7 +110,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
       }
 
       // Search by name (only if at least 2 characters, but we still fetched everything)
-      if (mode === \"search\" && debouncedSearchQuery.trim().length >= 2) {
+      if (mode === "search" && debouncedSearchQuery.trim().length >= 2) {
         const lower = debouncedSearchQuery.toLowerCase();
         fetchedParks = fetchedParks.filter((park) =>
           park.name.toLowerCase().includes(lower)
