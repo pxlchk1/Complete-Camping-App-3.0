@@ -344,7 +344,7 @@ export async function seedCommunityData() {
     // Seed Tips
     console.log("📝 Seeding tips...");
     for (const tip of SEED_TIPS) {
-      await addDoc(collection(db, "communityTips"), tip);
+      await addDoc(collection(db, "tips"), tip);
     }
     console.log(`✅ Seeded ${SEED_TIPS.length} tips`);
 

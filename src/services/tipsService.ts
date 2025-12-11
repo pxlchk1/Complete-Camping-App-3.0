@@ -50,10 +50,14 @@ export async function getTips(
   }
 
   const snapshot = await getDocs(q);
-  const tips = snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as Tip[];
+  const tips = snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      body: data.body || data.content || '',
+    };
+  }) as Tip[];
 
   const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
 
@@ -79,10 +83,14 @@ export async function getMyTips(
   }
 
   const snapshot = await getDocs(q);
-  const tips = snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as Tip[];
+  const tips = snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      body: data.body || data.content || '',
+    };
+  }) as Tip[];
 
   const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
 
@@ -97,9 +105,11 @@ export async function getTipById(tipId: string): Promise<Tip | null> {
     return null;
   }
 
+  const data = tipSnap.data();
   return {
     id: tipSnap.id,
-    ...tipSnap.data()
+    ...data,
+    body: data.body || data.content || '',
   } as Tip;
 }
 

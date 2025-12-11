@@ -57,11 +57,15 @@ export async function getQuestions(
   }
 
   const snapshot = await getDocs(q);
-  const questions = snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-    content: doc.data().body, // Legacy alias
-  })) as Question[];
+  const questions = snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      body: data.body || data.content || '',
+      content: data.content || data.body || '', // Legacy alias
+    };
+  }) as Question[];
 
   const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
 
@@ -80,7 +84,8 @@ export async function getQuestionById(questionId: string): Promise<Question | nu
   return {
     id: questionSnap.id,
     ...data,
-    content: data.body, // Legacy alias
+    body: data.body || data.content || '',
+    content: data.content || data.body || '', // Legacy alias
   } as Question;
 }
 

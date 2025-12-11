@@ -64,13 +64,23 @@ export const gearReviewsService = {
   },
 
   // Get all gear reviews ordered by createdAt desc
-  async getReviews(): Promise<GearReview[]> {\n    const q = query(\n      collection(db, 'gearReviews'),\n      orderBy('createdAt', 'desc')\n    );
+  async getReviews(): Promise<GearReview[]> {
+    const q = query(
+      collection(db, 'gearReviews'),
+      orderBy('createdAt', 'desc')
+    );
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as GearReview[];
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        body: data.body || data.reviewText || '',
+        summary: data.summary || data.title || '',
+        rating: data.rating || data.overallRating || 0,
+      };
+    }) as GearReview[];
   },
 
   // Get review by ID

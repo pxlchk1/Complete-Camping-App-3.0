@@ -54,13 +54,22 @@ export const feedbackService = {
   },
 
   // Get all feedback ordered by createdAt desc
-  async getFeedback(): Promise<FeedbackPost[]> {\n    const q = query(\n      collection(db, 'feedbackPosts'),\n      orderBy('createdAt', 'desc')\n    );
+  async getFeedback(): Promise<FeedbackPost[]> {
+    const q = query(
+      collection(db, 'feedbackPosts'),
+      orderBy('createdAt', 'desc')
+    );
+
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as FeedbackPost[];
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        body: data.body || data.description || '',
+      };
+    }) as FeedbackPost[];
   },
 
   // Get feedback by ID

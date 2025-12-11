@@ -56,10 +56,14 @@ export const tipsService = {
     const q = query(collection(db, 'tips'), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as TipPost[];
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        content: data.content || data.body || '',
+      };
+    }) as TipPost[];
   },
 
   // Get a single tip by ID
