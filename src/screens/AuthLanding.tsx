@@ -7,6 +7,7 @@ import { OAuthProvider, signInWithCredential, signInWithEmailAndPassword, create
 import { auth, db } from "../config/firebase";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { useAuthStore } from "../state/authStore";
+import { useUserStore } from "../state/userStore";
 import { Ionicons } from "@expo/vector-icons";
 import { createUserProfile } from "../services/userService";
 
@@ -20,6 +21,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
   const setUser = useAuthStore((s) => s.setUser);
+  const setCurrentUser = useUserStore((s) => s.setCurrentUser);
 
   const handleAppleSignIn = async () => {
     try {
@@ -96,6 +98,22 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       };
 
       setUser(userProfile);
+      
+      // Also update userStore for components that use it (like HomeScreen)
+      setCurrentUser({
+        id: firebaseUser.uid,
+        email: firebaseUser.email || credential.email || "",
+        handle: userData?.handle || "user",
+        displayName: userData?.displayName || "User",
+        photoURL: userData?.avatarUrl || firebaseUser.photoURL,
+        coverPhotoURL: userData?.backgroundUrl,
+        role: "user",
+        membershipTier: userData?.membershipTier || "free",
+        isBanned: false,
+        createdAt: userData?.joinedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      
       navigation.navigate("HomeTabs");
     } catch (error: any) {
       if (error.code !== "ERR_REQUEST_CANCELED") {
@@ -159,6 +177,22 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       };
 
       setUser(userProfile);
+      
+      // Also update userStore for components that use it (like HomeScreen)
+      setCurrentUser({
+        id: firebaseUser.uid,
+        email: firebaseUser.email || email.trim(),
+        handle: userData?.handle || firebaseUser.displayName || "user",
+        displayName: userData?.displayName || firebaseUser.displayName || "User",
+        photoURL: userData?.avatarUrl || firebaseUser.photoURL,
+        coverPhotoURL: userData?.backgroundUrl,
+        role: "user",
+        membershipTier: userData?.membershipTier || "free",
+        isBanned: false,
+        createdAt: userData?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      
       navigation.navigate("HomeTabs");
     } catch (error: any) {
       console.error("Email Auth Error:", error);
