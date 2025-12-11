@@ -105,7 +105,7 @@ export async function grantMembership(
 
   // Update user membership
   await updateDoc(userRef, {
-    membershipTier: "premium",
+    membershipTier: "subscribed",
     membershipExpiresAt: expiresAt || null,
     updatedAt: new Date().toISOString(),
   });
@@ -352,7 +352,7 @@ export async function createUserProfile(data: {
     displayName: data.displayName,
     handle: data.handle,
     joinedAt: serverTimestamp(),
-    membershipTier: isAdmin ? "isAdmin" : "free",
+    membershipTier: isAdmin ? "isAdmin" : "freeMember",
     stats: {
       gearReviewsCount: 0,
       photosCount: 0,
@@ -396,9 +396,7 @@ export function hasProAccess(user: User): boolean {
   if (isAdmin(user)) return true;
   
   // Check for paid membership tiers
-  return user.membershipTier === "pro" || 
-         user.membershipTier === "premium" ||
-         user.membershipTier === "lifetime";
+  return user.membershipTier === "subscribed";
 }
 
 export function canModerateContent(user: User): boolean {

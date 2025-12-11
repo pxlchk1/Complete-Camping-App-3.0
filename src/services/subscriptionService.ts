@@ -180,24 +180,14 @@ export const syncSubscriptionToFirestore = async (): Promise<void> => {
     }
 
     // Determine membership tier based on entitlements
-    let membershipTier = "free";
+    let membershipTier = "freeMember";
     let subscriptionStatus = "none";
 
     const activeEntitlements = customerInfo.entitlements.active;
 
     if (Object.keys(activeEntitlements).length > 0) {
-      // Check for specific entitlements and map to tiers
-      if (activeEntitlements["backcountryGuide"]) {
-        membershipTier = "backcountryGuide";
-      } else if (activeEntitlements["trailLeader"]) {
-        membershipTier = "trailLeader";
-      } else if (activeEntitlements["weekendCamper"]) {
-        membershipTier = "weekendCamper";
-      } else if (activeEntitlements["premium"] || activeEntitlements["pro"]) {
-        // Generic premium entitlement
-        membershipTier = "weekendCamper"; // Default to weekendCamper
-      }
-
+      // User has active subscription - set to subscribed
+      membershipTier = "subscribed";
       subscriptionStatus = "active";
     } else {
       // Check if subscription is cancelled or expired

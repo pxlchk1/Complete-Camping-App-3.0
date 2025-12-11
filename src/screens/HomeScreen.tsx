@@ -117,7 +117,7 @@ export default function HomeScreen() {
     }
 
     // Check if user has paid subscription
-    const isPaidSubscriber = currentUser.membershipTier === "premium" || 
+    const isPaidSubscriber = currentUser.membershipTier === "subscribed" || 
                              currentUser.membershipTier === "isAdmin" ||
                              currentUser.membershipTier === "isModerator";
 
@@ -136,7 +136,7 @@ export default function HomeScreen() {
 
   const welcomeMessage = getWelcomeMessage();
   const welcomeGreeting = currentUser && 
-    (currentUser.membershipTier === "premium" || 
+    (currentUser.membershipTier === "subscribed" || 
      currentUser.membershipTier === "isAdmin" ||
      currentUser.membershipTier === "isModerator")
     ? `Welcome back, ${userFirstName}!`

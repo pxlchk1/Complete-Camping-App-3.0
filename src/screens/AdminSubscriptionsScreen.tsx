@@ -69,7 +69,7 @@ export default function AdminSubscriptionsScreen() {
 
       // Update user document
       await updateDoc(doc(db, "users", userId), {
-        membershipTier: "premium",
+        membershipTier: "subscribed",
         subscriptionProvider: "admin_granted",
         subscriptionStatus: "active",
         subscriptionUpdatedAt: serverTimestamp(),

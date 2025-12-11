@@ -37,7 +37,7 @@ import {
   BORDER_SOFT,
 } from "../constants/colors";
 
-type MembershipTier = "free" | "weekendCamper" | "trailLeader" | "backcountryGuide";
+type MembershipTier = "freeMember" | "subscribed" | "isAdmin" | "isModerator";
 
 type ProfileStats = {
   tripsCount: number;
@@ -137,7 +137,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
       email: user.email || "",
       avatarUrl: user.photoURL || null,
       backgroundUrl: null,
-      membershipTier: "free",
+      membershipTier: "freeMember",
       bio: null,
       location: null,
       campingStyle: null,
@@ -270,12 +270,13 @@ export default function MyCampsiteScreen({ navigation }: any) {
 
   const getMembershipLabel = (tier: MembershipTier): string => {
     switch (tier) {
-      case "weekendCamper":
-        return "Weekend Camper";
-      case "trailLeader":
-        return "Trail Leader";
-      case "backcountryGuide":
-        return "Backcountry Guide";
+      case "isAdmin":
+        return "Admin & Founder";
+      case "isModerator":
+        return "Moderator";
+      case "subscribed":
+        return "Pro Member";
+      case "freeMember":
       default:
         return "Free Member";
     }
@@ -283,14 +284,15 @@ export default function MyCampsiteScreen({ navigation }: any) {
 
   const getMembershipBadgeColor = (tier: MembershipTier): string => {
     switch (tier) {
-      case "weekendCamper":
-        return GRANITE_GOLD;
-      case "trailLeader":
-        return "#2563eb";
-      case "backcountryGuide":
-        return "#7c3aed";
+      case "isAdmin":
+        return "#92AFB1"; // Sierra Sky (brand blue)
+      case "isModerator":
+        return "#AC9A6D"; // Granite Gold (dark tan)
+      case "subscribed":
+        return DEEP_FOREST; // Deep forest green
+      case "freeMember":
       default:
-        return EARTH_GREEN;
+        return "#ef4444"; // Red
     }
   };
 

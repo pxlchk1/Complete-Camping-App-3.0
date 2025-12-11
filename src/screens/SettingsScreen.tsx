@@ -186,7 +186,7 @@ export default function SettingsScreen() {
           email: user.email || "",
           createdAt: serverTimestamp(),
           role: "user",
-          membershipTier: "free",
+          membershipTier: "freeMember",
         });
       }
 
