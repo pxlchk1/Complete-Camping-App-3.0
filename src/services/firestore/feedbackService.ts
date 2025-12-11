@@ -54,14 +54,7 @@ export const feedbackService = {
   },
 
   // Get all feedback ordered by createdAt desc
-  async getFeedback(): Promise<FeedbackPost[]> {
-    const user = auth.currentUser;
-    if (!user) throw new Error('Must be signed in to read feedback');
-
-    const q = query(
-      collection(db, 'feedbackPosts'),
-      orderBy('createdAt', 'desc')
-    );
+  async getFeedback(): Promise<FeedbackPost[]> {\n    const q = query(\n      collection(db, 'feedbackPosts'),\n      orderBy('createdAt', 'desc')\n    );
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map((doc) => ({

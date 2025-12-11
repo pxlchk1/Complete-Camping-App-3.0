@@ -53,9 +53,6 @@ export const tipsService = {
 
   // Get all tips ordered by createdAt desc
   async getTips(): Promise<TipPost[]> {
-    const user = auth.currentUser;
-    if (!user) throw new Error('Must be signed in to read tips');
-
     const q = query(collection(db, 'communityTips'), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
 
@@ -67,9 +64,6 @@ export const tipsService = {
 
   // Get a single tip by ID
   async getTipById(tipId: string): Promise<TipPost | null> {
-    const user = auth.currentUser;
-    if (!user) throw new Error('Must be signed in to read tips');
-
     const docRef = doc(db, 'communityTips', tipId);
     const docSnap = await getDoc(docRef);
 

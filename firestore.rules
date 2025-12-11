@@ -37,67 +37,74 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
     }
 
-    // Tips
+    // Tips (legacy)
     match /tips/{id} {
-      allow read: if isSignedIn();
+      allow read: if true; // Public read
+      allow create: if isSignedIn();
+      allow update, delete: if isOwner() || isAdmin();
+    }
+
+    // Community Tips (current)
+    match /communityTips/{id} {
+      allow read: if true; // Public read
       allow create: if isSignedIn();
       allow update, delete: if isOwner() || isAdmin();
     }
 
     match /tipComments/{id} {
-      allow read: if isSignedIn();
+      allow read: if true; // Public read
       allow create: if isSignedIn();
       allow update, delete: if isOwner() || isAdmin();
     }
 
     // Gear Reviews
     match /gearReviews/{id} {
-      allow read: if isSignedIn();
+      allow read: if true; // Public read
       allow create: if isSignedIn();
       allow update, delete: if isOwner() || isAdmin();
     }
 
     // Questions and Answers
     match /questions/{id} {
-      allow read: if isSignedIn();
+      allow read: if true; // Public read
       allow create: if isSignedIn();
       allow update, delete: if isOwner() || isAdmin();
     }
 
     match /answers/{id} {
-      allow read: if isSignedIn();
+      allow read: if true; // Public read
       allow create: if isSignedIn();
       allow update, delete: if isOwner() || isAdmin();
     }
 
     // Stories (Photos)
     match /stories/{id} {
-      allow read: if isSignedIn();
+      allow read: if true; // Public read
       allow create: if isSignedIn();
       allow update, delete: if isOwner() || isAdmin();
     }
 
     match /storyComments/{id} {
-      allow read: if isSignedIn();
+      allow read: if true; // Public read
       allow create: if isSignedIn();
       allow update, delete: if isOwner() || isAdmin();
     }
 
     match /storyVotes/{id} {
-      allow read: if isSignedIn();
+      allow read: if true; // Public read
       allow create: if isSignedIn();
       allow update, delete: if isOwner() || isAdmin();
     }
 
     // Feedback
     match /feedbackPosts/{id} {
-      allow read: if isSignedIn();
+      allow read: if true; // Public read
       allow create: if isSignedIn();
       allow update, delete: if isOwner() || isAdmin();
     }
 
     match /feedbackComments/{id} {
-      allow read: if isSignedIn();
+      allow read: if true; // Public read
       allow create: if isSignedIn();
       allow update, delete: if isOwner() || isAdmin();
     }

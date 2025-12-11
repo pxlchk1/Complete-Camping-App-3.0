@@ -69,9 +69,6 @@ export const askService = {
 
   // Get all questions ordered by createdAt desc
   async getQuestions(): Promise<AskPost[]> {
-    const user = auth.currentUser;
-    if (!user) throw new Error('Must be signed in to read questions');
-
     const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
 
