@@ -342,13 +342,17 @@ export async function createUserProfile(data: {
 }): Promise<void> {
   const userRef = doc(db, "profiles", data.userId);
   
+  // Check if this is the admin account
+  const isAdmin = data.email.toLowerCase() === "alana@tentandlantern.com" || 
+                  data.handle.toLowerCase() === "tentandlantern";
+  
   // Create profile
   await setDoc(userRef, {
     email: data.email,
     displayName: data.displayName,
     handle: data.handle,
     joinedAt: serverTimestamp(),
-    membershipTier: "free",
+    membershipTier: isAdmin ? "isAdmin" : "free",
     stats: {
       gearReviewsCount: 0,
       photosCount: 0,
@@ -377,18 +381,34 @@ export async function createUserProfile(data: {
 
 // ==================== Permission Checks ====================
 
+export function isAdmin(user: User): boolean {
+  return user.membershipTier === "isAdmin" || 
+         user.email?.toLowerCase() === "alana@tentandlantern.com" ||
+         user.handle?.toLowerCase() === "tentandlantern";
+}
+
+export function hasProAccess(user: User): boolean {
+  // Admin has full access
+  if (isAdmin(user)) return true;
+  
+  // Check for paid membership tiers
+  return user.membershipTier === "pro" || 
+         user.membershipTier === "premium" ||
+         user.membershipTier === "lifetime";
+}
+
 export function canModerateContent(user: User): boolean {
-  return user.role === "moderator" || user.role === "administrator";
+  return isAdmin(user) || user.role === "moderator" || user.role === "administrator";
 }
 
 export function canBanUsers(user: User): boolean {
-  return user.role === "administrator";
+  return isAdmin(user) || user.role === "administrator";
 }
 
 export function canGrantMemberships(user: User): boolean {
-  return user.role === "administrator";
+  return isAdmin(user) || user.role === "administrator";
 }
 
 export function canManageRoles(user: User): boolean {
-  return user.role === "administrator";
+  return isAdmin(user) || user.role === "administrator";
 }
