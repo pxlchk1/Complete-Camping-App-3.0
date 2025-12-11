@@ -13,8 +13,8 @@
     },
     "production": {
       "autoIncrement": true,
-      "ios": {
-        "prebuildCommand": "bash eas-hooks/eas-build-pre-install.sh"
+      "hooks": {
+        "pre-install": "bash eas-hooks/eas-build-pre-install.sh $EAS_BUILD_PLATFORM"
       }
     }
   },
