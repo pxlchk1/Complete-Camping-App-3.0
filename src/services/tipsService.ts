@@ -171,16 +171,17 @@ export async function addTipComment(data: {
   tipId: string;
   body: string;
   authorId: string;
+  username?: string;
 }): Promise<string> {
   const commentsRef = collection(db, "tipComments");
 
   const docRef = await addDoc(commentsRef, {
     tipId: data.tipId,
     text: data.body,
-    body: data.body,
-    authorId: data.authorId,
+    userId: data.authorId,
+    username: data.username || 'Anonymous',
     createdAt: serverTimestamp(),
-    upvoteCount: 0,
+    helpful_count: 0,
   });
 
   // Increment comment count on tip

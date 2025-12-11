@@ -170,12 +170,11 @@ export async function createAnswer(data: {
   const docRef = await addDoc(answersRef, {
     questionId: data.questionId,
     text: data.body,
-    body: data.body,
-    authorId: data.authorId,
-    authorHandle: data.authorHandle,
+    userId: data.authorId,
+    username: data.authorHandle,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-    upvoteCount: 0,
+    helpful_count: 0,
     isAccepted: false,
   });
 

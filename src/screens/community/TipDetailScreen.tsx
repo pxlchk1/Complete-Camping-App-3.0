@@ -107,6 +107,7 @@ export default function TipDetailScreen() {
         tipId,
         body: commentText.trim(),
         authorId: currentUser.id,
+        username: currentUser.handle || currentUser.displayName || 'Anonymous',
       });
       setCommentText("");
       await loadTip(); // Reload to get new comment
