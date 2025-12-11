@@ -8,6 +8,7 @@ import { auth, db } from "../config/firebase";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { useAuthStore } from "../state/authStore";
 import { Ionicons } from "@expo/vector-icons";
+import { createUserProfile } from "../services/userService";
 
 export default function AuthLanding({ navigation }: { navigation: any }) {
   const [loading, setLoading] = useState(false);
@@ -62,20 +63,36 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       const userCredential = await signInWithCredential(auth, firebaseCredential);
       const firebaseUser = userCredential.user;
 
-      // Create user profile
-      // Normalize handle - derive from name/email without @ prefix
-      const rawHandle = firebaseUser.displayName || credential.fullName?.givenName || "user";
-      const normalizedHandle = rawHandle.toLowerCase().replace(/[^a-z0-9]/g, "");
+      // Check if profile exists, if not create it
+      const userDoc = await getDoc(doc(db, "profiles", firebaseUser.uid));
+      
+      if (!userDoc.exists()) {
+        // New user - create profile
+        const rawHandle = firebaseUser.displayName || credential.fullName?.givenName || "user";
+        const normalizedHandle = rawHandle.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const displayName = firebaseUser.displayName ||
+          `${credential.fullName?.givenName || ""} ${credential.fullName?.familyName || ""}`.trim() ||
+          "Anonymous User";
+
+        await createUserProfile({
+          userId: firebaseUser.uid,
+          email: firebaseUser.email || credential.email || "",
+          displayName: displayName,
+          handle: normalizedHandle,
+        });
+      }
+
+      // Load profile data
+      const updatedUserDoc = await getDoc(doc(db, "profiles", firebaseUser.uid));
+      const userData = updatedUserDoc.data();
 
       const userProfile = {
         id: firebaseUser.uid,
         email: firebaseUser.email || credential.email || "",
-        handle: normalizedHandle, // Store WITHOUT "@"
-        displayName: firebaseUser.displayName ||
-          `${credential.fullName?.givenName || ""} ${credential.fullName?.familyName || ""}`.trim() ||
-          "Anonymous User",
-        avatarUrl: firebaseUser.photoURL || undefined,
-        createdAt: new Date().toISOString(),
+        handle: userData?.handle || "user",
+        displayName: userData?.displayName || "User",
+        avatarUrl: userData?.avatarUrl || firebaseUser.photoURL || undefined,
+        createdAt: userData?.joinedAt || new Date().toISOString(),
       };
 
       setUser(userProfile);
@@ -111,25 +128,15 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
 
         userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
 
-        // Create user document in Firestore
+        // Create user profile in Firestore (profiles + emailSubscribers)
         // Normalize handle - remove any @ prefix before saving
         const normalizedHandle = handle.trim().replace(/^@+/, "");
 
-        await setDoc(doc(db, "users", userCredential.user.uid), {
+        await createUserProfile({
+          userId: userCredential.user.uid,
           email: email.trim(),
           displayName: displayName.trim(),
-          handle: normalizedHandle, // Store WITHOUT "@"
-          photoURL: null,
-          createdAt: new Date().toISOString(),
-          role: email.trim().toLowerCase() === "alana@tentandlantern.com" ? "admin" : "user",
-          // Default settings - preselected ON
-          notificationsEnabled: true,
-          emailSubscribed: true,
-          profilePublic: false,
-          showUsernamePublicly: true,
-          // Onboarding helpers
-          onboardingStartAt: serverTimestamp(),
-          onboardingCompleted: false,
+          handle: normalizedHandle,
         });
       } else {
         // Sign in existing user
@@ -139,7 +146,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       const firebaseUser = userCredential.user;
 
       // Load user profile from Firestore
-      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+      const userDoc = await getDoc(doc(db, "profiles", firebaseUser.uid));
       const userData = userDoc.data();
 
       const userProfile = {
