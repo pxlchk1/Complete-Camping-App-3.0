@@ -47,13 +47,13 @@ export const tipsService = {
       createdAt: serverTimestamp(),
     };
 
-    const docRef = await addDoc(collection(db, 'communityTips'), tipData);
+    const docRef = await addDoc(collection(db, 'tips'), tipData);
     return docRef.id;
   },
 
   // Get all tips ordered by createdAt desc
   async getTips(): Promise<TipPost[]> {
-    const q = query(collection(db, 'communityTips'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'tips'), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map((doc) => ({
@@ -64,7 +64,7 @@ export const tipsService = {
 
   // Get a single tip by ID
   async getTipById(tipId: string): Promise<TipPost | null> {
-    const docRef = doc(db, 'communityTips', tipId);
+    const docRef = doc(db, 'tips', tipId);
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) return null;
@@ -83,7 +83,7 @@ export const tipsService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to update a tip');
 
-    const docRef = doc(db, 'communityTips', tipId);
+    const docRef = doc(db, 'tips', tipId);
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) throw new Error('Tip not found');
@@ -108,7 +108,7 @@ export const tipsService = {
 
     if (!isAdmin) throw new Error('Only admins can delete tips');
 
-    await deleteDoc(doc(db, 'communityTips', tipId));
+    await deleteDoc(doc(db, 'tips', tipId));
   },
 
   // Upvote a tip
@@ -116,7 +116,7 @@ export const tipsService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to upvote');
 
-    const docRef = doc(db, 'communityTips', tipId);
+    const docRef = doc(db, 'tips', tipId);
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) throw new Error('Tip not found');
