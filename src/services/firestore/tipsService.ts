@@ -47,7 +47,7 @@ export const tipsService = {
       createdAt: serverTimestamp(),
     };
 
-    const docRef = await addDoc(collection(db, 'tips'), tipData);
+    const docRef = await addDoc(collection(db, 'communityTips'), tipData);
     return docRef.id;
   },
 
@@ -56,7 +56,7 @@ export const tipsService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to read tips');
 
-    const q = query(collection(db, 'tips'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'communityTips'), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map((doc) => ({
@@ -70,7 +70,7 @@ export const tipsService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to read tips');
 
-    const docRef = doc(db, 'tips', tipId);
+    const docRef = doc(db, 'communityTips', tipId);
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) return null;
@@ -89,7 +89,7 @@ export const tipsService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to update a tip');
 
-    const docRef = doc(db, 'tips', tipId);
+    const docRef = doc(db, 'communityTips', tipId);
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) throw new Error('Tip not found');
@@ -114,7 +114,7 @@ export const tipsService = {
 
     if (!isAdmin) throw new Error('Only admins can delete tips');
 
-    await deleteDoc(doc(db, 'tips', tipId));
+    await deleteDoc(doc(db, 'communityTips', tipId));
   },
 
   // Upvote a tip
@@ -122,7 +122,7 @@ export const tipsService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to upvote');
 
-    const docRef = doc(db, 'tips', tipId);
+    const docRef = doc(db, 'communityTips', tipId);
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) throw new Error('Tip not found');
