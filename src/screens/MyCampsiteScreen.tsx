@@ -481,7 +481,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
         {/* Profile Section */}
         <View className="px-5" style={{ marginTop: 16 }}>
           {/* Merit Badges Row */}
-          <View className="flex-row items-start justify-end mb-4">
+          <View className="flex-row items-center justify-center mb-4">
             {/* Merit Badges */}
             <View className="flex-row gap-2">
                 {/* Weekend Camper Badge */}

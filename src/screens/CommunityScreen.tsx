@@ -505,6 +505,26 @@ export default function CommunityScreen() {
             <View className="flex-1" style={{ paddingTop: insets.top }}>
               {/* Account Button - Top Right */}
               <AccountButtonHeader color={TEXT_ON_DARK} />
+              
+              {/* Title at bottom left */}
+              <View className="flex-1 justify-end px-6 pb-4">
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.4)"]}
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 100,
+                  }}
+                />
+                <Text className="text-3xl" style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, zIndex: 1 }}>
+                  Connect
+                </Text>
+                <Text className="mt-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3, zIndex: 1 }}>
+                  Share experiences and learn from fellow campers
+                </Text>
+              </View>
             </View>
           </ImageBackground>
         </View>

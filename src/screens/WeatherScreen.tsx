@@ -143,54 +143,6 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.parchment }}>
-      {/* Hero Image Header - Full Bleed */}
-      <ImageBackground
-        source={HERO_IMAGES.WEATHER}
-        style={{
-          width: "100%",
-          height: 150 + insets.top,
-        }}
-        resizeMode="cover"
-      >
-        <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
-          <AccountButtonHeader color={TEXT_ON_DARK} />
-          <View
-            style={{
-              flex: 1,
-              justifyContent: "flex-end",
-              paddingHorizontal: spacing.lg,
-              paddingBottom: spacing.md,
-            }}
-          >
-            <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.4)"]}
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 80,
-              }}
-            />
-            <Text
-              style={{
-                fontFamily: fonts.displayBold,
-                fontSize: fontSizes.lg,
-                color: colors.parchment,
-                textShadowColor: "rgba(0, 0, 0, 0.5)",
-                textShadowOffset: { width: 0, height: 1 },
-                textShadowRadius: 4,
-                zIndex: 1,
-              }}
-            >
-              Weather Forecast
-            </Text>
-          </View>
-        </SafeAreaView>
-      </ImageBackground>
-
-      {/* Top Navigation */}
-      <PlanTopNav activeTab="weather" onTabChange={onTabChange} />
 
       <ScrollView
         style={{ flex: 1 }}

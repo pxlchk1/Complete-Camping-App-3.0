@@ -191,51 +191,6 @@ export default function PackingTabScreen({ onTabChange }: PackingTabScreenProps)
 
   return (
     <View className="flex-1 bg-parchment">
-      {/* Hero Image Header */}
-      <View style={{ height: 150 + insets.top }}>
-        <ImageBackground
-          source={HERO_IMAGES.PACKING}
-          style={{ flex: 1 }}
-          resizeMode="cover"
-          accessibilityLabel="Packing gear scene"
-        >
-          <View
-            className="flex-1 justify-end"
-            style={{
-              paddingTop: insets.top,
-              paddingHorizontal: 16,
-              paddingBottom: 12,
-            }}
-          >
-            <AccountButtonHeader color={TEXT_ON_DARK} />
-            <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.4)"]}
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 80,
-              }}
-            />
-            <Text
-              className="text-parchment text-3xl"
-              style={{
-                fontFamily: "JosefinSlab_700Bold",
-                textShadowColor: "rgba(0, 0, 0, 0.5)",
-                textShadowOffset: { width: 0, height: 1 },
-                textShadowRadius: 4,
-                zIndex: 1,
-              }}
-            >
-              Packing
-            </Text>
-          </View>
-        </ImageBackground>
-      </View>
-
-      {/* Top Navigation */}
-      <PlanTopNav activeTab="packing" onTabChange={onTabChange} />
 
       {activeTrips.length === 0 ? (
         /* No Active Trips */
