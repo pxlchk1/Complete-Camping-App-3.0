@@ -84,6 +84,7 @@ export default function EditProfileScreen() {
   const [favoriteGear, setFavoriteGear] = useState<GearCategory[]>(
     (currentUser?.favoriteGear as GearCategory[]) || []
   );
+  const [favoriteGearDetails, setFavoriteGearDetails] = useState(currentUser?.favoriteGearDetails || "");
   const [photoURL, setPhotoURL] = useState(currentUser?.photoURL);
   const [coverPhotoURL, setCoverPhotoURL] = useState(currentUser?.coverPhotoURL);
 
@@ -103,6 +104,7 @@ export default function EditProfileScreen() {
         about: about.trim() || null,
         favoriteCampingStyle: favoriteCampingStyle || null,
         favoriteGear: favoriteGear.length > 0 ? favoriteGear : null,
+        favoriteGearDetails: favoriteGearDetails.trim() || null,
         avatarUrl: photoURL || null,
         backgroundUrl: coverPhotoURL || null,
         updatedAt: serverTimestamp(),
@@ -113,6 +115,7 @@ export default function EditProfileScreen() {
         about: about.trim() || undefined,
         favoriteCampingStyle: favoriteCampingStyle || undefined,
         favoriteGear: favoriteGear.length > 0 ? favoriteGear : undefined,
+        favoriteGearDetails: favoriteGearDetails.trim() || undefined,
         photoURL: photoURL || undefined,
         coverPhotoURL: coverPhotoURL || undefined,
       });
@@ -462,6 +465,37 @@ export default function EditProfileScreen() {
                 ))}
               </View>
             </View>
+
+            {/* Favorite Gear Details */}
+            {favoriteGear.length > 0 && (
+              <View className="mb-6">
+                <Text
+                  className="mb-2"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  Tell us about your favorite gear
+                </Text>
+                <Text
+                  className="mb-2 text-sm"
+                  style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}
+                >
+                  Example: "Tent and Lantern BaseCamp Box" or "MSR Hubba Hubba NX 2-Person Tent"
+                </Text>
+                <TextInput
+                  value={favoriteGearDetails}
+                  onChangeText={setFavoriteGearDetails}
+                  placeholder="Enter your favorite gear details..."
+                  placeholderTextColor={TEXT_MUTED}
+                  className="px-4 py-3 rounded-xl border"
+                  style={{
+                    backgroundColor: PARCHMENT,
+                    borderColor: BORDER_SOFT,
+                    fontFamily: "SourceSans3_400Regular",
+                    color: TEXT_PRIMARY_STRONG,
+                  }}
+                />
+              </View>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

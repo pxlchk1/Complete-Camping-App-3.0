@@ -12,23 +12,17 @@ import {
   Image,
   ImageBackground,
   Dimensions,
-  ActivityIndicator,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
-import { useCurrentUser, useIsModerator, useIsAdministrator, useUserStore } from "../state/userStore";
+import { useCurrentUser, useIsModerator, useIsAdministrator } from "../state/userStore";
 import { useIsPro } from "../state/subscriptionStore";
 import { RootStackParamList } from "../navigation/types";
 import AdminPanel from "../components/AdminPanel";
 import ModeratorPanel from "../components/ModeratorPanel";
-import { auth, db, storage } from "../config/firebase";
-import { doc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -53,93 +47,7 @@ export default function AccountScreen() {
   const isModerator = useIsModerator();
   const isAdministrator = useIsAdministrator();
   const isPro = useIsPro();
-  const updateCurrentUser = useUserStore((s) => s.updateCurrentUser);
-
   const [activeTab, setActiveTab] = useState<TabType>("posts");
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [uploadingCover, setUploadingCover] = useState(false);
-
-  const handleUpdateProfilePhoto = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: "images" as any,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (result.canceled) return;
-
-      setUploadingPhoto(true);
-
-      const imageUri = result.assets[0].uri;
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-
-      const storageRef = ref(storage, `avatars/${user.uid}/${Date.now()}.jpg`);
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
-
-      await updateDoc(doc(db, "profiles", user.uid), {
-        avatarUrl: downloadURL,
-      });
-
-      updateCurrentUser({ photoURL: downloadURL });
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error: any) {
-      console.error("Error updating profile photo:", error);
-      Alert.alert("Error", "Failed to update profile photo. Please try again.");
-    } finally {
-      setUploadingPhoto(false);
-    }
-  };
-
-  const handleUpdateCoverPhoto = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: "images" as any,
-        allowsEditing: true,
-        aspect: [16, 9],
-        quality: 0.8,
-      });
-
-      if (result.canceled) return;
-
-      setUploadingCover(true);
-
-      const imageUri = result.assets[0].uri;
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-
-      const storageRef = ref(storage, `profileBackgrounds/${user.uid}/${Date.now()}.jpg`);
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
-
-      await updateDoc(doc(db, "profiles", user.uid), {
-        backgroundUrl: downloadURL,
-      });
-
-      updateCurrentUser({ coverPhotoURL: downloadURL });
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error: any) {
-      console.error("Error updating cover photo:", error);
-      Alert.alert("Error", "Failed to update cover photo. Please try again.");
-    } finally {
-      setUploadingCover(false);
-    }
-  };
 
   if (!currentUser) {
     return (
@@ -278,22 +186,6 @@ export default function AccountScreen() {
                 <Ionicons name="arrow-back" size={24} color={PARCHMENT} />
               </Pressable>
             </View>
-
-            {/* Camera Button for Cover Photo */}
-            <View className="px-4 pb-2 items-end">
-              <Pressable
-                onPress={handleUpdateCoverPhoto}
-                disabled={uploadingCover}
-                className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
-                style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
-              >
-                {uploadingCover ? (
-                  <ActivityIndicator size="small" color={PARCHMENT} />
-                ) : (
-                  <Ionicons name="camera" size={20} color={PARCHMENT} />
-                )}
-              </Pressable>
-            </View>
           </ImageBackground>
         </View>
 
@@ -301,9 +193,7 @@ export default function AccountScreen() {
         <View className="px-4" style={{ marginTop: -PROFILE_OVERLAP }}>
           <View className="flex-row items-end justify-between mb-3">
             {/* Profile Picture */}
-            <Pressable
-              onPress={handleUpdateProfilePhoto}
-              disabled={uploadingPhoto}
+            <View
               style={{
                 width: PROFILE_SIZE,
                 height: PROFILE_SIZE,
@@ -336,30 +226,7 @@ export default function AccountScreen() {
                   <Ionicons name="person" size={56} color={PARCHMENT} />
                 </View>
               )}
-
-              {/* Camera Icon Overlay */}
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: 4,
-                  right: 4,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: EARTH_GREEN,
-                  borderWidth: 3,
-                  borderColor: "white",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {uploadingPhoto ? (
-                  <ActivityIndicator size="small" color={PARCHMENT} />
-                ) : (
-                  <Ionicons name="camera" size={18} color={PARCHMENT} />
-                )}
-              </View>
-            </Pressable>
+            </View>
 
             {/* Edit Profile Button */}
             <Pressable
@@ -715,6 +582,59 @@ export default function AccountScreen() {
                 </View>
               </View>
             </View>
+
+            {/* Camping Preferences */}
+            {(currentUser.favoriteCampingStyle || (currentUser.favoriteGear && currentUser.favoriteGear.length > 0)) && (
+              <View className="px-4 py-4 border-b border-neutral-200">
+                <Text
+                  className="text-lg mb-3"
+                  style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+                >
+                  Camping Preferences
+                </Text>
+
+                {currentUser.favoriteCampingStyle && (
+                  <View className="flex-row items-start mb-3">
+                    <Ionicons name="compass-outline" size={20} color={EARTH_GREEN} style={{ marginTop: 2 }} />
+                    <View className="ml-3 flex-1">
+                      <Text
+                        style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 14, color: EARTH_GREEN }}
+                      >
+                        Favorite Camping Style
+                      </Text>
+                      <Text
+                        style={{ fontFamily: "SourceSans3_400Regular", fontSize: 15, color: DEEP_FOREST }}
+                      >
+                        {currentUser.favoriteCampingStyle.split('_').map(word => 
+                          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                        ).join(' ')}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {currentUser.favoriteGear && currentUser.favoriteGear.length > 0 && (
+                  <View className="flex-row items-start">
+                    <Ionicons name="bag-handle-outline" size={20} color={EARTH_GREEN} style={{ marginTop: 2 }} />
+                    <View className="ml-3 flex-1">
+                      <Text
+                        style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 14, color: EARTH_GREEN }}
+                      >
+                        Favorite Gear
+                      </Text>
+                      <Text
+                        style={{ fontFamily: "SourceSans3_400Regular", fontSize: 15, color: DEEP_FOREST }}
+                      >
+                        {currentUser.favoriteGear.map(gear => 
+                          gear.charAt(0).toUpperCase() + gear.slice(1)
+                        ).join(', ')}
+                        {currentUser.favoriteGearDetails && ` - ${currentUser.favoriteGearDetails}`}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Account Settings */}
             <View className="px-4 py-4">

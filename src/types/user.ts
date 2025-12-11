@@ -16,6 +16,7 @@ export interface User {
   about?: string; // User bio/about section
   favoriteCampingStyle?: string; // Favorite camping style
   favoriteGear?: string[]; // Array of favorite gear categories
+  favoriteGearDetails?: string; // Details about their favorite gear item
   role: UserRole;
   membershipTier: MembershipTier;
   membershipExpiresAt?: string; // ISO string, undefined for lifetime or free
