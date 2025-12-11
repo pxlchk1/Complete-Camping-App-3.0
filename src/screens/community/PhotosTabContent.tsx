@@ -31,6 +31,15 @@ export default function PhotosTabContent() {
     // Filter out items with score less than -5 (community moderation)
     filtered = filtered.filter((img) => img.score > -5);
 
+    // Filter out items without valid image URIs (including placeholders)
+    filtered = filtered.filter((img) => {
+      if (!img.imageUri || img.imageUri.trim() === '') return false;
+      // Filter out placeholder URLs
+      if (img.imageUri.includes('placeholder.com')) return false;
+      if (img.imageUri.includes('via.placeholder')) return false;
+      return true;
+    });
+
     // Filter by category
     if (selectedCategory !== "all") {
       filtered = filtered.filter((img) => img.category === selectedCategory);
@@ -235,13 +244,15 @@ export default function PhotosTabContent() {
           keyExtractor={(item) => item.id}
           numColumns={2}
           contentContainerStyle={{ padding: 8 }}
+          showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <View className="w-1/2 p-2">
               <View className="rounded-xl overflow-hidden border" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}>
                 <Image
                   source={{ uri: item.imageUri }}
-                  style={{ width: "100%", aspectRatio: 1 }}
+                  style={{ width: "100%", aspectRatio: 1, backgroundColor: "transparent" }}
                   contentFit="cover"
+                  placeholder={null}
                 />
                 <View className="p-3">
                   <Text className="text-sm mb-1" numberOfLines={1} style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
