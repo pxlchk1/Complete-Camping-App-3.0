@@ -33,21 +33,11 @@ export async function uploadPhoto(
   isPrivate?: boolean
 ): Promise<string> {
   try {
-    // Fetch the local image as a blob
-    const response = await fetch(localUri);
-    const blob = await response.blob();
-
-    // Upload to Firebase Storage
-    const filename = `photos/${userId}/${Date.now()}.jpg`;
-    const storageRef = ref(storage, filename);
-    await uploadBytes(storageRef, blob);
-    const imageUri = await getDownloadURL(storageRef);
-
-    // Create photo document
+    // Create photo document first to get ID
     const photoDoc = {
       title,
       description,
-      imageUri,
+      imageUri: "", // Temporary, will update after upload
       category,
       tags,
       authorId: userId,
@@ -63,7 +53,22 @@ export async function uploadPhoto(
     };
 
     const docRef = await addDoc(collection(db, PHOTOS_COLLECTION), photoDoc);
-    return docRef.id;
+    const photoId = docRef.id;
+
+    // Fetch the local image as a blob
+    const response = await fetch(localUri);
+    const blob = await response.blob();
+
+    // Upload to Firebase Storage - matches rules: stories/{userId}/{storyId}/{fileName}
+    const filename = `stories/${userId}/${photoId}/${Date.now()}.jpg`;
+    const storageRef = ref(storage, filename);
+    await uploadBytes(storageRef, blob);
+    const imageUri = await getDownloadURL(storageRef);
+
+    // Update photo document with actual image URL
+    await updateDoc(docRef, { imageUri });
+
+    return photoId;
   } catch (error) {
     console.error("Error uploading photo:", error);
     throw error;

@@ -155,8 +155,8 @@ export async function uploadGearImage(
     const response = await fetch(imageUri);
     const blob = await response.blob();
 
-    // Create storage reference
-    const storageRef = ref(storage, `gearCloset/${userId}/${gearId}/main.jpg`);
+    // Create storage reference - matches Firebase Storage rules: userGear/{userId}/{gearItemId}/{fileName}
+    const storageRef = ref(storage, `userGear/${userId}/${gearId}/${Date.now()}.jpg`);
 
     // Upload image
     await uploadBytes(storageRef, blob);
@@ -176,7 +176,7 @@ export async function uploadGearImage(
  */
 export async function deleteGearImages(userId: string, gearId: string): Promise<void> {
   try {
-    const folderRef = ref(storage, `gearCloset/${userId}/${gearId}`);
+    const folderRef = ref(storage, `userGear/${userId}/${gearId}`);
     const fileList = await listAll(folderRef);
 
     // Delete all files in the folder

@@ -81,9 +81,10 @@ export default function UploadPhotoScreen() {
     }
   };
 
-  const uploadImageToStorage = async (uri: string): Promise<string> => {
+  const uploadImageToStorage = async (uri: string, storyId: string): Promise<string> => {
     const storage = getStorage();
-    const filename = `stories/${currentUser?.id || "anonymous"}/${Date.now()}.jpg`;
+    // Matches Firebase Storage rules: stories/{userId}/{storyId}/{fileName}
+    const filename = `stories/${currentUser?.id || "anonymous"}/${storyId}/${Date.now()}.jpg`;
     const storageRef = ref(storage, filename);
 
     // Fetch the image as a blob
@@ -111,17 +112,27 @@ export default function UploadPhotoScreen() {
       setError(null);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
-      // Upload image to Firebase Storage
-      const imageUrl = await uploadImageToStorage(imageUri);
-
-      // Create story in Firestore
+      // Create story first to get the storyId
       const storyId = await createStory({
-        imageUrl,
+        imageUrl: "", // Temporary empty URL
         caption: caption.trim(),
         tags,
         authorId: currentUser.id,
         locationLabel: locationLabel.trim() || undefined,
       });
+
+      // Upload image to Firebase Storage with storyId
+      const imageUrl = await uploadImageToStorage(imageUri, storyId);
+
+      // Update story with actual image URL
+      // Note: storiesService should have an update function
+      await createStory({
+        imageUrl,
+        caption: caption.trim(),
+        tags,
+        authorId: currentUser.id,
+        locationLabel: locationLabel.trim() || undefined,
+      }, storyId);
 
       // Navigate to the photo detail
       navigation.replace("PhotoDetail", { storyId });
