@@ -18,7 +18,6 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
 import { auth, db, storage } from "../config/firebase";
 import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -57,6 +56,9 @@ type UserProfile = {
   bio: string | null;
   location: string | null;
   campingStyle: string | null;
+  favoriteCampingStyle?: string;
+  favoriteGear?: string[];
+  favoriteGearDetails?: string;
   joinedAt: any;
   stats?: ProfileStats;
 };
@@ -73,8 +75,6 @@ export default function MyCampsiteScreen({ navigation }: any) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActivityTab>("trips");
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [uploadingCover, setUploadingCover] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -265,93 +265,6 @@ export default function MyCampsiteScreen({ navigation }: any) {
     }
   };
 
-  const handleUpdateProfilePhoto = async () => {
-    const user = auth.currentUser;
-    if (!user || isGuest) {
-      navigation.navigate("Auth");
-      return;
-    }
-
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: "images" as any,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (result.canceled) return;
-
-      setUploadingPhoto(true);
-
-      const imageUri = result.assets[0].uri;
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-
-      const storageRef = ref(storage, `avatars/${user.uid}/${Date.now()}.jpg`);
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
-
-      // Update profiles collection
-      await updateDoc(doc(db, "profiles", user.uid), {
-        avatarUrl: downloadURL,
-      });
-
-      setProfile((prev) => (prev ? { ...prev, avatarUrl: downloadURL } : null));
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error: any) {
-      console.error("Error updating profile photo:", error);
-      Alert.alert("Error", "Failed to update profile photo. Please try again.");
-    } finally {
-      setUploadingPhoto(false);
-    }
-  };
-
-  const handleUpdateCoverPhoto = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: "images" as any,
-        allowsEditing: true,
-        aspect: [16, 9],
-        quality: 0.8,
-      });
-
-      if (result.canceled) return;
-
-      setUploadingCover(true);
-
-      const imageUri = result.assets[0].uri;
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-
-      const storageRef = ref(storage, `profileBackgrounds/${user.uid}/${Date.now()}.jpg`);
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
-
-      // Update profiles collection
-      await updateDoc(doc(db, "profiles", user.uid), {
-        backgroundUrl: downloadURL,
-      });
-
-      setProfile((prev) => (prev ? { ...prev, backgroundUrl: downloadURL } : null));
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error: any) {
-      console.error("Error updating cover photo:", error);
-      Alert.alert("Error", "Failed to update cover photo. Please try again.");
-    } finally {
-      setUploadingCover(false);
-    }
-  };
-
   const getMembershipLabel = (tier: MembershipTier): string => {
     switch (tier) {
       case "weekendCamper":
@@ -470,31 +383,13 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 <Ionicons name="create-outline" size={24} color={PARCHMENT} />
               </Pressable>
             </View>
-
-            {/* Camera Button for Cover Photo */}
-            <View style={{ flex: 1, justifyContent: "flex-end", alignItems: "flex-end", paddingRight: 20, paddingBottom: 12 }}>
-              <Pressable
-                onPress={handleUpdateCoverPhoto}
-                disabled={uploadingCover}
-                className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
-                style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
-              >
-                {uploadingCover ? (
-                  <ActivityIndicator size="small" color={PARCHMENT} />
-                ) : (
-                  <Ionicons name="camera" size={20} color={PARCHMENT} />
-                )}
-              </Pressable>
-            </View>
           </ImageBackground>
         </View>
 
         {/* Profile Section with Avatar Overlap */}
         <View className="px-5" style={{ marginTop: -PROFILE_OVERLAP }}>
           {/* Avatar */}
-          <Pressable
-            onPress={handleUpdateProfilePhoto}
-            disabled={uploadingPhoto}
+          <View
             style={{
               width: PROFILE_SIZE,
               height: PROFILE_SIZE,
@@ -536,30 +431,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 </Text>
               </View>
             )}
-
-            {/* Camera Icon Overlay */}
-            <View
-              style={{
-                position: "absolute",
-                bottom: 4,
-                right: 4,
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: EARTH_GREEN,
-                borderWidth: 3,
-                borderColor: PARCHMENT,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {uploadingPhoto ? (
-                <ActivityIndicator size="small" color={PARCHMENT} />
-              ) : (
-                <Ionicons name="camera" size={18} color={PARCHMENT} />
-              )}
-            </View>
-          </Pressable>
+          </View>
 
           {/* User Identity Block */}
           <View className="mb-4">
@@ -720,7 +592,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
             )}
 
             {profile.campingStyle && (
-              <View className="flex-row items-center">
+              <View className="flex-row items-center mb-2">
                 <Ionicons name="bonfire-outline" size={18} color={EARTH_GREEN} />
                 <Text
                   className="ml-2"
@@ -728,6 +600,47 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 >
                   {profile.campingStyle}
                 </Text>
+              </View>
+            )}
+
+            {profile.favoriteCampingStyle && (
+              <View className="flex-row items-center mb-2">
+                <Ionicons name="compass-outline" size={18} color={EARTH_GREEN} />
+                <View className="ml-2">
+                  <Text
+                    style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: EARTH_GREEN }}
+                  >
+                    Favorite Camping Style
+                  </Text>
+                  <Text
+                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 15, color: TEXT_PRIMARY_STRONG }}
+                  >
+                    {profile.favoriteCampingStyle.split('_').map(word => 
+                      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                    ).join(' ')}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {profile.favoriteGear && profile.favoriteGear.length > 0 && (
+              <View className="flex-row items-start">
+                <Ionicons name="bag-handle-outline" size={18} color={EARTH_GREEN} style={{ marginTop: 2 }} />
+                <View className="ml-2 flex-1">
+                  <Text
+                    style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: EARTH_GREEN }}
+                  >
+                    Favorite Gear
+                  </Text>
+                  <Text
+                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 15, color: TEXT_PRIMARY_STRONG }}
+                  >
+                    {profile.favoriteGear.map(gear => 
+                      gear.charAt(0).toUpperCase() + gear.slice(1)
+                    ).join(', ')}
+                    {profile.favoriteGearDetails && ` - ${profile.favoriteGearDetails}`}
+                  </Text>
+                </View>
               </View>
             )}
           </View>
