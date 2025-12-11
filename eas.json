@@ -12,13 +12,13 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "hooks": {
-        "pre-install": "bash eas-hooks/eas-build-pre-install.sh $EAS_BUILD_PLATFORM"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
     "production": {}
+  },
+  "hooks": {
+    "pre-install": "bash eas-hooks/eas-build-pre-install.sh $EAS_BUILD_PLATFORM"
   }
 }
