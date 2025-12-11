@@ -12,7 +12,10 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "ios": {
+        "prebuildCommand": "bash eas-hooks/eas-build-pre-install.sh"
+      }
     }
   },
   "submit": {
