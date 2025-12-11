@@ -97,17 +97,18 @@ export default function EditProfileScreen() {
     try {
       setSaving(true);
 
-      const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, {
+      // Update profiles collection with correct field names
+      const profileRef = doc(db, "profiles", user.uid);
+      await updateDoc(profileRef, {
         about: about.trim() || null,
         favoriteCampingStyle: favoriteCampingStyle || null,
         favoriteGear: favoriteGear.length > 0 ? favoriteGear : null,
-        photoURL: photoURL || null,
-        coverPhotoURL: coverPhotoURL || null,
+        avatarUrl: photoURL || null,
+        backgroundUrl: coverPhotoURL || null,
         updatedAt: serverTimestamp(),
       });
 
-      // Update local store
+      // Update local store (keeping photoURL/coverPhotoURL for backward compatibility)
       updateCurrentUser({
         about: about.trim() || undefined,
         favoriteCampingStyle: favoriteCampingStyle || undefined,
@@ -149,7 +150,7 @@ export default function EditProfileScreen() {
         const response = await fetch(imageUri);
         const blob = await response.blob();
 
-        const storageRef = ref(storage, `profile-photos/${user.uid}/${Date.now()}.jpg`);
+        const storageRef = ref(storage, `avatars/${user.uid}/${Date.now()}.jpg`);
         await uploadBytes(storageRef, blob);
         const downloadURL = await getDownloadURL(storageRef);
 
@@ -187,7 +188,7 @@ export default function EditProfileScreen() {
         const response = await fetch(imageUri);
         const blob = await response.blob();
 
-        const storageRef = ref(storage, `cover-photos/${user.uid}/${Date.now()}.jpg`);
+        const storageRef = ref(storage, `profileBackgrounds/${user.uid}/${Date.now()}.jpg`);
         await uploadBytes(storageRef, blob);
         const downloadURL = await getDownloadURL(storageRef);
 

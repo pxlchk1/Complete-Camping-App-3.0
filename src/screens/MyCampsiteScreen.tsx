@@ -290,14 +290,11 @@ export default function MyCampsiteScreen({ navigation }: any) {
       const response = await fetch(imageUri);
       const blob = await response.blob();
 
-      const storageRef = ref(storage, `profile-photos/${user.uid}/${Date.now()}.jpg`);
+      const storageRef = ref(storage, `avatars/${user.uid}/${Date.now()}.jpg`);
       await uploadBytes(storageRef, blob);
       const downloadURL = await getDownloadURL(storageRef);
 
-      // Update both users and profiles collections
-      await updateDoc(doc(db, "users", user.uid), {
-        photoURL: downloadURL,
-      });
+      // Update profiles collection
       await updateDoc(doc(db, "profiles", user.uid), {
         avatarUrl: downloadURL,
       });
@@ -335,14 +332,11 @@ export default function MyCampsiteScreen({ navigation }: any) {
       const response = await fetch(imageUri);
       const blob = await response.blob();
 
-      const storageRef = ref(storage, `cover-photos/${user.uid}/${Date.now()}.jpg`);
+      const storageRef = ref(storage, `profileBackgrounds/${user.uid}/${Date.now()}.jpg`);
       await uploadBytes(storageRef, blob);
       const downloadURL = await getDownloadURL(storageRef);
 
-      // Update both users and profiles collections
-      await updateDoc(doc(db, "users", user.uid), {
-        coverPhotoURL: downloadURL,
-      });
+      // Update profiles collection
       await updateDoc(doc(db, "profiles", user.uid), {
         backgroundUrl: downloadURL,
       });

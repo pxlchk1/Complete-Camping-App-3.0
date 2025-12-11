@@ -35,8 +35,7 @@ export const photosService = {
     const response = await fetch(uri);
     const blob = await response.blob();
 
-    const storageRef = ref(storage, `stories/${userId}/${postId}.jpg`);
-    await uploadBytes(storageRef, blob);
+    const storageRef = ref(storage, `stories/${userId}/${postId}/${Date.now()}.jpg`);\n    await uploadBytes(storageRef, blob);
 
     const downloadUrl = await getDownloadURL(storageRef);
     return downloadUrl;

@@ -81,12 +81,12 @@ export default function AccountScreen() {
       const response = await fetch(imageUri);
       const blob = await response.blob();
 
-      const storageRef = ref(storage, `profile-photos/${user.uid}/${Date.now()}.jpg`);
+      const storageRef = ref(storage, `avatars/${user.uid}/${Date.now()}.jpg`);
       await uploadBytes(storageRef, blob);
       const downloadURL = await getDownloadURL(storageRef);
 
-      await updateDoc(doc(db, "users", user.uid), {
-        photoURL: downloadURL,
+      await updateDoc(doc(db, "profiles", user.uid), {
+        avatarUrl: downloadURL,
       });
 
       updateCurrentUser({ photoURL: downloadURL });
@@ -122,12 +122,12 @@ export default function AccountScreen() {
       const response = await fetch(imageUri);
       const blob = await response.blob();
 
-      const storageRef = ref(storage, `cover-photos/${user.uid}/${Date.now()}.jpg`);
+      const storageRef = ref(storage, `profileBackgrounds/${user.uid}/${Date.now()}.jpg`);
       await uploadBytes(storageRef, blob);
       const downloadURL = await getDownloadURL(storageRef);
 
-      await updateDoc(doc(db, "users", user.uid), {
-        coverPhotoURL: downloadURL,
+      await updateDoc(doc(db, "profiles", user.uid), {
+        backgroundUrl: downloadURL,
       });
 
       updateCurrentUser({ coverPhotoURL: downloadURL });

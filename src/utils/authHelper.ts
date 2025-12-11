@@ -7,6 +7,19 @@ import { useAuthStore } from "../state/authStore";
 import { useSubscriptionStore } from "../state/subscriptionStore";
 import { NavigationProp } from "@react-navigation/native";
 import { RootStackParamList } from "../navigation/types";
+import { auth } from "../config/firebase";
+
+/**
+ * Get current authenticated user ID
+ * Throws error if user is not signed in
+ */
+export function requireUserId(): string {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    throw new Error('User must be signed in to upload files');
+  }
+  return uid;
+}
 
 /**
  * Check if user is logged in
