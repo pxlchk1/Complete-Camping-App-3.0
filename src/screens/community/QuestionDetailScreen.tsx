@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import ModalHeader from "../../components/ModalHeader";
@@ -98,7 +98,20 @@ export default function QuestionDetailScreen() {
   };
 
   const handleUpvoteAnswer = async (answerId: string) => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      Alert.alert(
+        "You need to be logged in to do that",
+        "",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Log In / Sign Up",
+            onPress: () => navigation.navigate("Account"),
+          },
+        ]
+      );
+      return;
+    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
@@ -112,7 +125,22 @@ export default function QuestionDetailScreen() {
   };
 
   const handleSubmitAnswer = async () => {
-    if (!currentUser || !answerText.trim() || submitting) return;
+    if (!currentUser) {
+      Alert.alert(
+        "You need to be logged in to do that",
+        "",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Log In / Sign Up",
+            onPress: () => navigation.navigate("Account"),
+          },
+        ]
+      );
+      return;
+    }
+    
+    if (!answerText.trim() || submitting) return;
 
     try {
       setSubmitting(true);

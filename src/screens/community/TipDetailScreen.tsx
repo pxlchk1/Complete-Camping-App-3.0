@@ -77,7 +77,17 @@ export default function TipDetailScreen() {
 
   const handleUpvote = async () => {
     if (!currentUser) {
-      Alert.alert("Sign In Required", "Please sign in to upvote tips");
+      Alert.alert(
+        "You need to be logged in to do that",
+        "",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Log In / Sign Up",
+            onPress: () => navigation.navigate("Account"),
+          },
+        ]
+      );
       return;
     }
 
@@ -95,7 +105,17 @@ export default function TipDetailScreen() {
 
   const handleAddComment = async () => {
     if (!currentUser) {
-      Alert.alert("Sign In Required", "Please sign in to comment");
+      Alert.alert(
+        "You need to be logged in to do that",
+        "",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Log In / Sign Up",
+            onPress: () => navigation.navigate("Account"),
+          },
+        ]
+      );
       return;
     }
 
@@ -121,7 +141,17 @@ export default function TipDetailScreen() {
 
   const handleReport = () => {
     if (!currentUser) {
-      Alert.alert("Sign In Required", "Please sign in to report content");
+      Alert.alert(
+        "You need to be logged in to do that",
+        "",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Log In / Sign Up",
+            onPress: () => navigation.navigate("Account"),
+          },
+        ]
+      );
       return;
     }
 
