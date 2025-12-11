@@ -54,6 +54,24 @@ const CAMPING_TIPS = [
   "Arrive at your campsite with enough daylight to set up comfortably.",
 ];
 
+// Camping style welcome messages
+const CAMPING_STYLE_MESSAGES: { [key: string]: string } = {
+  "backpacking": "Ready to hit the trails? Every mile brings new adventures.",
+  "car camping": "Time to load up and chase the sunset. Your perfect campsite awaits!",
+  "rv camping": "The open road is calling. Let's roll into your next adventure!",
+  "glamping": "Luxury meets nature. Your comfortable escape is just ahead!",
+  "dispersed camping": "Off the beaten path and into the wild. True freedom awaits!",
+  "winter camping": "Embrace the cold and find beauty in the quiet of winter.",
+  "beach camping": "Sand, surf, and starlight. Paradise is waiting for you!",
+  "mountain camping": "The peaks are calling and you must go. Adventure awaits!",
+  "desert camping": "Under endless skies and stars. The desert has its own magic.",
+  "forest camping": "Into the woods where peace and wonder grow.",
+  "overlanding": "Your vehicle is your home, the world is your destination.",
+  "motorcycle camping": "Two wheels, endless roads, infinite possibilities.",
+  "canoe camping": "Paddle your way to serenity. The water is your highway.",
+  "kayak camping": "Glide into adventure. Remote shores are calling your name.",
+};
+
 export default function HomeScreen() {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const trips = useTripsStore((s) => s.trips);
@@ -82,6 +100,38 @@ export default function HomeScreen() {
   // User display data - show "Camper" if no user, otherwise show first name or display name
   const userFirstName = currentUser?.displayName?.split(" ")[0] || currentUser?.handle || "Camper";
   const userAvatarSource = currentUser?.photoURL ? { uri: currentUser.photoURL } : LOGOS.APP_ICON;
+
+  // Determine welcome message based on subscription and camping style
+  const getWelcomeMessage = () => {
+    if (!currentUser) {
+      return "Your camping adventure starts here";
+    }
+
+    // Check if user has paid subscription
+    const isPaidSubscriber = currentUser.membershipTier === "premium" || 
+                             currentUser.membershipTier === "isAdmin" ||
+                             currentUser.membershipTier === "isModerator";
+
+    if (isPaidSubscriber) {
+      // If they have a favorite camping style, use personalized message
+      if (currentUser.favoriteCampingStyle) {
+        const styleKey = currentUser.favoriteCampingStyle.toLowerCase();
+        return CAMPING_STYLE_MESSAGES[styleKey] || "Your camping adventure starts here";
+      }
+      return "Your camping adventure starts here";
+    }
+
+    // Free users get the default message
+    return "Your camping adventure starts here";
+  };
+
+  const welcomeMessage = getWelcomeMessage();
+  const welcomeGreeting = currentUser && 
+    (currentUser.membershipTier === "premium" || 
+     currentUser.membershipTier === "isAdmin" ||
+     currentUser.membershipTier === "isModerator")
+    ? `Welcome back, ${userFirstName}!`
+    : `Welcome, ${userFirstName}!`;
 
   const bottomSpacer = 50 + Math.max(insets.bottom, 18) + 12;
 
@@ -133,10 +183,10 @@ export default function HomeScreen() {
                   </View>
                   <View className="flex-1">
                     <Text className="text-3xl" style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
-                      Welcome, {userFirstName}!
+                      {welcomeGreeting}
                     </Text>
                     <Text className="mt-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}>
-                      Your camping adventure starts here
+                      {welcomeMessage}
                     </Text>
                   </View>
                 </View>
