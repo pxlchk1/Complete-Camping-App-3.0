@@ -306,6 +306,75 @@ export async function getAuditLogs(limit: number = 50): Promise<AuditLog[]> {
   ).slice(0, limit);
 }
 
+// ==================== Email Subscribers ====================
+
+export async function createEmailSubscriber(data: {
+  userId: string;
+  emailAddress: string;
+  firstname: string;
+  subscriptionStatus?: string;
+}): Promise<void> {
+  const subscriberRef = doc(db, "emailSubscribers", data.userId);
+  
+  await setDoc(subscriberRef, {
+    emailAddress: data.emailAddress,
+    firstname: data.firstname,
+    subscribedAt: new Date().toISOString(),
+    subscriptionStatus: data.subscriptionStatus || "subscribed",
+  });
+}
+
+export async function updateEmailSubscriberStatus(
+  userId: string,
+  status: string
+): Promise<void> {
+  const subscriberRef = doc(db, "emailSubscribers", userId);
+  await updateDoc(subscriberRef, {
+    subscriptionStatus: status,
+  });
+}
+
+export async function createUserProfile(data: {
+  userId: string;
+  email: string;
+  displayName: string;
+  handle: string;
+}): Promise<void> {
+  const userRef = doc(db, "profiles", data.userId);
+  
+  // Create profile
+  await setDoc(userRef, {
+    email: data.email,
+    displayName: data.displayName,
+    handle: data.handle,
+    joinedAt: serverTimestamp(),
+    membershipTier: "free",
+    stats: {
+      gearReviewsCount: 0,
+      photosCount: 0,
+      questionsCount: 0,
+      tipsCount: 0,
+      tripsCount: 0,
+    },
+    avatarUrl: null,
+    backgroundUrl: null,
+    bio: null,
+    campingStyle: null,
+    location: null,
+  });
+
+  // Extract first name from display name
+  const firstname = data.displayName.split(' ')[0] || data.displayName;
+
+  // Create email subscriber record
+  await createEmailSubscriber({
+    userId: data.userId,
+    emailAddress: data.email,
+    firstname,
+    subscriptionStatus: "subscribed",
+  });
+}
+
 // ==================== Permission Checks ====================
 
 export function canModerateContent(user: User): boolean {
