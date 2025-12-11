@@ -33,12 +33,12 @@ export const useUserStore = create<UserState>()(
 
       isModerator: () => {
         const user = get().currentUser;
-        return user?.role === "moderator" || user?.role === "administrator";
+        return user?.role === "moderator" || user?.role === "administrator" || user?.membershipTier === "isModerator";
       },
 
       isAdministrator: () => {
         const user = get().currentUser;
-        return user?.role === "administrator";
+        return user?.role === "administrator" || user?.membershipTier === "isAdmin";
       },
     }),
     {
@@ -58,12 +58,12 @@ export const useIsAdministrator = () => useUserStore((s) => s.isAdministrator())
 export function createTestUser(role: User["role"] = "administrator"): User {
   return {
     id: "test_user_1",
-    email: "admin@tentandlantern.com",
-    handle: "campingadmin",
-    displayName: "Camping Admin",
+    email: "alana@tentandlantern.com",
+    handle: "tentandlantern",
+    displayName: "Alana Waters Piper",
     photoURL: undefined,
     role,
-    membershipTier: "premium",
+    membershipTier: "isAdmin",
     membershipExpiresAt: undefined,
     isBanned: false,
     createdAt: new Date().toISOString(),

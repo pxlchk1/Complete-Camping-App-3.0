@@ -177,7 +177,7 @@ export default function AccountScreen() {
   }
 
   const getMembershipBadge = () => {
-    if (isAdministrator) {
+    if (currentUser?.membershipTier === "isAdmin" || isAdministrator) {
       return (
         <View className="flex-row items-center px-3 py-1 rounded-full ml-2" style={{ backgroundColor: "#dc2626" }}>
           <Ionicons name="shield-checkmark" size={14} color={PARCHMENT} />
@@ -186,6 +186,19 @@ export default function AccountScreen() {
             style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
           >
             ADMIN
+          </Text>
+        </View>
+      );
+    }
+    if (currentUser?.membershipTier === "isModerator" || isModerator) {
+      return (
+        <View className="flex-row items-center px-3 py-1 rounded-full ml-2" style={{ backgroundColor: SIERRA_SKY }}>
+          <Ionicons name="shield" size={14} color={PARCHMENT} />
+          <Text
+            className="text-xs ml-1"
+            style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+          >
+            MODERATOR
           </Text>
         </View>
       );
@@ -203,7 +216,16 @@ export default function AccountScreen() {
         </View>
       );
     }
-    return null;
+    return (
+      <View className="flex-row items-center px-3 py-1 rounded-full ml-2" style={{ backgroundColor: EARTH_GREEN }}>
+        <Text
+          className="text-xs"
+          style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+        >
+          FREE
+        </Text>
+      </View>
+    );
   };
 
   const getRoleBadge = () => {
@@ -566,17 +588,52 @@ export default function AccountScreen() {
                 </Text>
               </View>
 
-              {isPro && (
-                <View className="flex-row items-start">
-                  <Ionicons name="star" size={20} color={GRANITE_GOLD} style={{ marginTop: 2 }} />
-                  <Text
-                    className="ml-3 flex-1"
-                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 15, color: DEEP_FOREST }}
-                  >
-                    Pro Member
-                  </Text>
-                </View>
-              )}
+              <View className="flex-row items-start">
+                {(currentUser.membershipTier === "isAdmin" || isAdministrator) && (
+                  <>
+                    <Ionicons name="shield-checkmark" size={20} color="#dc2626" style={{ marginTop: 2 }} />
+                    <Text
+                      className="ml-3 flex-1"
+                      style={{ fontFamily: "SourceSans3_400Regular", fontSize: 15, color: DEEP_FOREST }}
+                    >
+                      Admin - Full Access
+                    </Text>
+                  </>
+                )}
+                {(currentUser.membershipTier === "isModerator" || (isModerator && !isAdministrator)) && (
+                  <>
+                    <Ionicons name="shield" size={20} color={SIERRA_SKY} style={{ marginTop: 2 }} />
+                    <Text
+                      className="ml-3 flex-1"
+                      style={{ fontFamily: "SourceSans3_400Regular", fontSize: 15, color: DEEP_FOREST }}
+                    >
+                      Moderator
+                    </Text>
+                  </>
+                )}
+                {isPro && !isAdministrator && !isModerator && (
+                  <>
+                    <Ionicons name="star" size={20} color={GRANITE_GOLD} style={{ marginTop: 2 }} />
+                    <Text
+                      className="ml-3 flex-1"
+                      style={{ fontFamily: "SourceSans3_400Regular", fontSize: 15, color: DEEP_FOREST }}
+                    >
+                      Pro Member
+                    </Text>
+                  </>
+                )}
+                {!isPro && !isAdministrator && !isModerator && (
+                  <>
+                    <Ionicons name="person-outline" size={20} color={EARTH_GREEN} style={{ marginTop: 2 }} />
+                    <Text
+                      className="ml-3 flex-1"
+                      style={{ fontFamily: "SourceSans3_400Regular", fontSize: 15, color: DEEP_FOREST }}
+                    >
+                      Free Member
+                    </Text>
+                  </>
+                )}
+              </View>
             </View>
 
             {/* Camping Stats */}
