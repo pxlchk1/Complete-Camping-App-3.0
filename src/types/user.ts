@@ -15,8 +15,7 @@ export interface User {
   coverPhotoURL?: string; // Background photo for profile
   about?: string; // User bio/about section
   favoriteCampingStyle?: string; // Favorite camping style
-  favoriteGear?: string[]; // Array of favorite gear categories
-  favoriteGearDetails?: string; // Details about their favorite gear item
+  favoriteGear?: Record<string, string>; // Object with gear category as key, details as value
   role: UserRole;
   membershipTier: MembershipTier;
   membershipExpiresAt?: string; // ISO string, undefined for lifetime or free

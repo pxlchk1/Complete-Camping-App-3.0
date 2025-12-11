@@ -81,10 +81,9 @@ export default function EditProfileScreen() {
   const [favoriteCampingStyle, setFavoriteCampingStyle] = useState<CampingStyle | undefined>(
     currentUser?.favoriteCampingStyle as CampingStyle | undefined
   );
-  const [favoriteGear, setFavoriteGear] = useState<GearCategory[]>(
-    (currentUser?.favoriteGear as GearCategory[]) || []
+  const [favoriteGear, setFavoriteGear] = useState<Record<GearCategory, string>>(
+    (currentUser?.favoriteGear as Record<GearCategory, string>) || {} as Record<GearCategory, string>
   );
-  const [favoriteGearDetails, setFavoriteGearDetails] = useState(currentUser?.favoriteGearDetails || "");
   const [photoURL, setPhotoURL] = useState(currentUser?.photoURL);
   const [coverPhotoURL, setCoverPhotoURL] = useState(currentUser?.coverPhotoURL);
 
@@ -100,11 +99,19 @@ export default function EditProfileScreen() {
 
       // Update profiles collection with correct field names
       const profileRef = doc(db, "profiles", user.uid);
+      
+      // Filter out empty gear entries
+      const gearToSave = Object.entries(favoriteGear).reduce((acc, [key, value]) => {
+        if (value && value.trim()) {
+          acc[key] = value.trim();
+        }
+        return acc;
+      }, {} as Record<string, string>);
+      
       await updateDoc(profileRef, {
         about: about.trim() || null,
         favoriteCampingStyle: favoriteCampingStyle || null,
-        favoriteGear: favoriteGear.length > 0 ? favoriteGear : null,
-        favoriteGearDetails: favoriteGearDetails.trim() || null,
+        favoriteGear: Object.keys(gearToSave).length > 0 ? gearToSave : null,
         avatarUrl: photoURL || null,
         backgroundUrl: coverPhotoURL || null,
         updatedAt: serverTimestamp(),
@@ -114,8 +121,7 @@ export default function EditProfileScreen() {
       updateCurrentUser({
         about: about.trim() || undefined,
         favoriteCampingStyle: favoriteCampingStyle || undefined,
-        favoriteGear: favoriteGear.length > 0 ? favoriteGear : undefined,
-        favoriteGearDetails: favoriteGearDetails.trim() || undefined,
+        favoriteGear: Object.keys(gearToSave).length > 0 ? gearToSave : undefined,
         photoURL: photoURL || undefined,
         coverPhotoURL: coverPhotoURL || undefined,
       });
@@ -202,15 +208,6 @@ export default function EditProfileScreen() {
       console.error("[EditProfile] Error uploading cover photo:", error);
     } finally {
       setUploadingCover(false);
-    }
-  };
-
-  const toggleGear = (gear: GearCategory) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (favoriteGear.includes(gear)) {
-      setFavoriteGear(favoriteGear.filter((g) => g !== gear));
-    } else {
-      setFavoriteGear([...favoriteGear, gear]);
     }
   };
 
@@ -424,78 +421,53 @@ export default function EditProfileScreen() {
             >
               Favorite Gear
             </Text>
+            <Text
+              className="mb-3 text-sm"
+              style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}
+            >
+              Tell us about your favorite gear for each category
+            </Text>
 
-            <View className="mb-6">
-              <View className="flex-row flex-wrap gap-2">
-                {GEAR_CATEGORIES.map((category) => (
-                  <Pressable
-                    key={category.value}
-                    onPress={() => toggleGear(category.value)}
+            <View className="mb-6 space-y-3">
+              {GEAR_CATEGORIES.map((category) => (
+                <View key={category.value} className="mb-3">
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons
+                      name={GEAR_ICONS[category.value]}
+                      size={18}
+                      color={EARTH_GREEN}
+                    />
+                    <Text
+                      className="ml-2"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                    >
+                      {category.label}
+                    </Text>
+                  </View>
+                  <TextInput
+                    value={favoriteGear[category.value] || ""}
+                    onChangeText={(text) => setFavoriteGear({ ...favoriteGear, [category.value]: text })}
+                    placeholder={`e.g., ${
+                      category.value === "shelter" ? "REI Co-op Half Dome SL 2+" :
+                      category.value === "sleep" ? "Therm-a-Rest NeoAir XLite" :
+                      category.value === "kitchen" ? "Tent and Lantern BaseCamp Box" :
+                      category.value === "clothing" ? "Patagonia Down Sweater" :
+                      category.value === "bags" ? "Osprey Atmos AG 65" :
+                      category.value === "lighting" ? "Black Diamond Spot 400" :
+                      "Nalgene 32oz Bottle"
+                    }`}
+                    placeholderTextColor={TEXT_MUTED}
                     className="px-4 py-3 rounded-xl border"
                     style={{
-                      backgroundColor: favoriteGear.includes(category.value)
-                        ? DEEP_FOREST
-                        : CARD_BACKGROUND_LIGHT,
-                      borderColor: favoriteGear.includes(category.value)
-                        ? DEEP_FOREST
-                        : BORDER_SOFT,
+                      backgroundColor: PARCHMENT,
+                      borderColor: BORDER_SOFT,
+                      fontFamily: "SourceSans3_400Regular",
+                      color: TEXT_PRIMARY_STRONG,
                     }}
-                  >
-                    <View className="items-center flex-row">
-                      <Ionicons
-                        name={GEAR_ICONS[category.value]}
-                        size={18}
-                        color={
-                          favoriteGear.includes(category.value) ? PARCHMENT : TEXT_PRIMARY_STRONG
-                        }
-                      />
-                      <Text
-                        className="ml-2 text-sm"
-                        style={{
-                          fontFamily: "SourceSans3_600SemiBold",
-                          color: favoriteGear.includes(category.value)
-                            ? PARCHMENT
-                            : TEXT_PRIMARY_STRONG,
-                        }}
-                      >
-                        {category.label}
-                      </Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </View>
+                  />
+                </View>
+              ))}
             </View>
-
-            {/* Favorite Gear Details */}
-            {favoriteGear.length > 0 && (
-              <View className="mb-6">
-                <Text
-                  className="mb-2"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
-                >
-                  Tell us about your favorite gear
-                </Text>
-                <Text
-                  className="mb-2 text-sm"
-                  style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}
-                >
-                  Example: "Tent and Lantern BaseCamp Box" or "MSR Hubba Hubba NX 2-Person Tent"
-                </Text>
-                <TextInput
-                  value={favoriteGearDetails}
-                  onChangeText={setFavoriteGearDetails}
-                  placeholder="Enter your favorite gear details..."
-                  placeholderTextColor={TEXT_MUTED}
-                  className="px-4 py-3 rounded-xl border"
-                  style={{
-                    backgroundColor: PARCHMENT,
-                    borderColor: BORDER_SOFT,
-                    fontFamily: "SourceSans3_400Regular",
-                    color: TEXT_PRIMARY_STRONG,
-                  }}
-                />
-              </View>
-            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
