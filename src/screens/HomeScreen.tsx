@@ -131,7 +131,9 @@ export default function HomeScreen() {
      currentUser.membershipTier === "isAdmin" ||
      currentUser.membershipTier === "isModerator")
     ? `Welcome back, ${userFirstName}!`
-    : `Welcome, ${userFirstName}!`;
+    : currentUser
+    ? `Welcome, ${userFirstName}!`
+    : "Welcome, Camper!";
 
   const bottomSpacer = 50 + Math.max(insets.bottom, 18) + 12;
 
