@@ -152,8 +152,9 @@ export async function getAnswers(
     return {
       id: doc.id,
       ...data,
-      content: data.body, // Legacy alias
-      upvotes: data.upvoteCount, // Legacy alias
+      body: data.text || data.body || '',
+      content: data.text || data.body || '', // Legacy alias
+      upvotes: data.upvoteCount || 0, // Legacy alias
     } as Answer;
   });
 }
@@ -168,6 +169,7 @@ export async function createAnswer(data: {
 
   const docRef = await addDoc(answersRef, {
     questionId: data.questionId,
+    text: data.body,
     body: data.body,
     authorId: data.authorId,
     authorHandle: data.authorHandle,

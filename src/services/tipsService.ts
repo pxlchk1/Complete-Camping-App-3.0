@@ -157,10 +157,14 @@ export async function getTipComments(
   );
 
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as TipComment[];
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      body: data.text || data.body || '',
+    };
+  }) as TipComment[];
 }
 
 export async function addTipComment(data: {
@@ -172,6 +176,7 @@ export async function addTipComment(data: {
 
   const docRef = await addDoc(commentsRef, {
     tipId: data.tipId,
+    text: data.body,
     body: data.body,
     authorId: data.authorId,
     createdAt: serverTimestamp(),
