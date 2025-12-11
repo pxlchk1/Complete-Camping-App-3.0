@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tentlanternchild.completecampingcompanion",
-      "buildNumber": "18",
+      "buildNumber": "19",
       "googleServicesFile": "./GoogleService-Info.plist",
       "usesAppleSignIn": true,
       "entitlements": {
