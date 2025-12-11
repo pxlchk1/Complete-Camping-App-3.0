@@ -9,7 +9,7 @@ export const EARTH_GREEN = "#828872";          // Secondary text, muted labels, 
 export const GRANITE_GOLD = "#AC9A6D";         // Accents, highlight text, decorative moments (use sparingly)
 
 // TEXT COLORS
-export const TEXT_PRIMARY_STRONG = "#35413B";  // Darker primary text for body content (better contrast)
+export const TEXT_PRIMARY_STRONG = "#3D2817";  // Dark brown - primary body text (AA contrast compliant)
 export const TEXT_SECONDARY = "#4F655F";       // Secondary text, labels
 export const TEXT_ON_DARK = "#FDF7E8";         // Text on dark backgrounds (hero overlays, dark headers)
 export const TEXT_MUTED = "#7A8A82";           // Muted text, timestamps, subtle labels

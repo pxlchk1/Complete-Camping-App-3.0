@@ -20,6 +20,7 @@ export const colors = {
   riverRock: "#607A77",    // Status badges, card accents
   sierraSky: "#92AFB1",    // Soft backgrounds, dividers
   parchment: "#F4EBD0",    // Universal background
+  darkBrown: "#3D2817",    // Primary body text (AA contrast)
 
   // Derived neutrals
   borderSoft: "#D5C8A2",   // Card borders, dividers
@@ -127,7 +128,7 @@ export const textStyles = StyleSheet.create({
     fontFamily: fonts.bodyRegular,
     fontSize: fontSizes.sm,
     lineHeight: 22,
-    color: colors.deepForest,
+    color: colors.darkBrown,
   },
 
   // Secondary body (subtle text, helper copy)
@@ -143,7 +144,7 @@ export const textStyles = StyleSheet.create({
     fontFamily: fonts.bodySemibold,
     fontSize: fontSizes.xs,
     letterSpacing: 0.13,
-    color: colors.deepForest,
+    color: colors.darkBrown,
   },
 
   // Small muted labels
@@ -171,14 +172,14 @@ export const textStyles = StyleSheet.create({
   buttonSecondary: {
     fontFamily: fonts.bodySemibold,
     fontSize: fontSizes.sm,
-    color: colors.deepForest,
+    color: colors.darkBrown,
   },
 
   // Button text - text link
   buttonText: {
     fontFamily: fonts.bodySemibold,
     fontSize: fontSizes.sm,
-    color: colors.deepForest,
+    color: colors.darkBrown,
   },
 });
 

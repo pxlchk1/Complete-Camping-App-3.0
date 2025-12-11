@@ -211,63 +211,8 @@ export default function MyTripsScreen() {
   }
 
   return (
-    <View className="flex-1 bg-forest">
-      <View className="flex-1 bg-parchment">
-        {/* Hero Image - full bleed */}
-        <View style={{ height: 200 + insets.top }}>
-          <ImageBackground
-            source={HERO_IMAGES.PLAN_TRIP}
-            style={{ flex: 1 }}
-            resizeMode="cover"
-            accessibilityLabel="Trip planning scene"
-          >
-            <View className="flex-1" style={{ paddingTop: insets.top }}>
-              {/* Account Button - Top Right */}
-              <AccountButtonHeader color={PARCHMENT} />
-
-              {/* Title at bottom left */}
-              <View className="flex-1 justify-end px-6 pb-4">
-                <LinearGradient
-                  colors={["transparent", "rgba(0,0,0,0.4)"]}
-                  style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: 100,
-                  }}
-                />
-                <Text className="text-parchment text-3xl" style={{ fontFamily: "JosefinSlab_700Bold", textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, zIndex: 1 }}>
-                  Plan
-                </Text>
-                <Text className="text-parchment mt-2" style={{ fontFamily: "SourceSans3_400Regular", textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3, zIndex: 1 }}>
-                  Organize and manage your camping trips
-                </Text>
-              </View>
-            </View>
-          </ImageBackground>
-        </View>
-
-        {/* Header */}
-        <View className="bg-forest" style={{ paddingVertical: 12 }}>
-          <View className="flex-row items-center" style={{ paddingHorizontal: 16, minHeight: 44 }}>
-            <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "JosefinSlab_700Bold" }}>
-              My Trips
-            </Text>
-            <Pressable
-              onPress={handleCreateTrip}
-              className="ml-3 active:opacity-70"
-              accessibilityLabel="Create new trip"
-              accessibilityRole="button"
-            >
-              <Ionicons name="add-circle" size={28} color={PARCHMENT} />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Top Navigation */}
-        <PlanTopNav activeTab={activePlanTab} onTabChange={setActivePlanTab} />
-
+    <View className="flex-1 bg-parchment">
+      <View className="flex-1">
         {/* Segments */}
         <View className="px-4 pt-2 pb-2 flex-row gap-2">
           {(["active", "completed", "all"] as TripSegment[]).map((seg) => (
@@ -355,6 +300,24 @@ export default function MyTripsScreen() {
             ) : null
           }
         />
+
+        {/* Floating Action Button - Create Trip */}
+        <Pressable
+          onPress={handleCreateTrip}
+          className="absolute bottom-6 right-6 w-14 h-14 rounded-full items-center justify-center active:opacity-90"
+          style={{ 
+            backgroundColor: DEEP_FOREST,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 4,
+            elevation: 5,
+          }}
+          accessibilityLabel="Create new trip"
+          accessibilityRole="button"
+        >
+          <Ionicons name="add" size={32} color={PARCHMENT} />
+        </Pressable>
 
         {/* Modals */}
         <CreateTripModal

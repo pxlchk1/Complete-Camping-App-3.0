@@ -19,6 +19,7 @@ module.exports = {
         sierraSky: "#92AFB1",     // Soft Sierra Sky - soft backgrounds, dividers
         parchment: "#F4EBD0",     // Parchment Cream - universal background
         parchmentDark: "#D5C8A2", // Derived border color
+        brown: "#3D2817",         // Dark brown - primary body text (AA contrast)
       },
       fontFamily: {
         display: ["JosefinSlab_400Regular", "JosefinSlab_600SemiBold", "JosefinSlab_700Bold"],

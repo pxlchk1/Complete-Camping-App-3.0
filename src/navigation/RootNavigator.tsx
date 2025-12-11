@@ -10,6 +10,7 @@ import HomeScreen from "../screens/HomeScreen";
 import LearnScreen from "../screens/LearnScreen";
 import MyTripsScreen from "../screens/MyTripsScreen";
 import CommunityTopTabsNavigator from "./CommunityTopTabsNavigator";
+import PlanTopTabsNavigator from "./PlanTopTabsNavigator";
 import FirstAidScreen from "../screens/FirstAidScreen";
 import CreateTripScreen from "../screens/CreateTripScreen";
 import TripDetailScreen from "../screens/TripDetailScreen";
@@ -77,7 +78,7 @@ function PlanStackNavigator() {
         headerShown: false,
       }}
     >
-      <PlanStack.Screen name="MyTrips" component={MyTripsScreen} />
+      <PlanStack.Screen name="MyTrips" component={PlanTopTabsNavigator} />
       <PlanStack.Screen name="ParksBrowse" component={ParksBrowseScreen} />
     </PlanStack.Navigator>
   );

@@ -3,7 +3,7 @@
  * Backed by Firestore profiles collection
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   Dimensions,
   Alert,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -54,6 +55,7 @@ type UserProfile = {
   backgroundUrl: string | null;
   membershipTier: MembershipTier;
   bio: string | null;
+  about?: string | null;
   location: string | null;
   campingStyle: string | null;
   favoriteCampingStyle?: string;
@@ -65,7 +67,7 @@ type UserProfile = {
 type ActivityTab = "trips" | "gear" | "photos" | "questions";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const COVER_HEIGHT = 200;
+const COVER_HEIGHT = 260;
 const PROFILE_SIZE = 120;
 const PROFILE_OVERLAP = 60;
 
@@ -77,15 +79,17 @@ export default function MyCampsiteScreen({ navigation }: any) {
   const [restoring, setRestoring] = useState(false);
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) {
-      navigation.replace("Auth");
-      return;
-    }
+  useFocusEffect(
+    useCallback(() => {
+      const user = auth.currentUser;
+      if (!user) {
+        navigation.replace("Auth");
+        return;
+      }
 
-    loadProfile(user.uid);
-  }, [navigation]);
+      loadProfile(user.uid);
+    }, [navigation])
+  );
 
   const loadProfile = async (userId: string) => {
     try {
@@ -382,76 +386,82 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 <Ionicons name="create-outline" size={24} color={PARCHMENT} />
               </Pressable>
             </View>
-          </ImageBackground>
-        </View>
 
-        {/* Profile Section with Avatar Overlap */}
-        <View className="px-5" style={{ marginTop: -PROFILE_OVERLAP }}>
-          {/* Avatar */}
-          <View
-            style={{
-              width: PROFILE_SIZE,
-              height: PROFILE_SIZE,
-              borderRadius: PROFILE_SIZE / 2,
-              borderWidth: 4,
-              borderColor: PARCHMENT,
-              backgroundColor: PARCHMENT,
-              marginBottom: 12,
-            }}
-          >
-            {profile.avatarUrl ? (
-              <Image
-                source={{ uri: profile.avatarUrl }}
-                style={{
-                  width: PROFILE_SIZE - 8,
-                  height: PROFILE_SIZE - 8,
-                  borderRadius: (PROFILE_SIZE - 8) / 2,
-                }}
-              />
-            ) : (
+            {/* Centered Avatar and User Identity */}
+            <View
+              style={{
+                position: "absolute",
+                top: 20,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingTop: 20,
+              }}
+            >
+              {/* Avatar */}
               <View
                 style={{
-                  width: PROFILE_SIZE - 8,
-                  height: PROFILE_SIZE - 8,
-                  borderRadius: (PROFILE_SIZE - 8) / 2,
-                  backgroundColor: DEEP_FOREST,
-                  alignItems: "center",
-                  justifyContent: "center",
+                  width: PROFILE_SIZE,
+                  height: PROFILE_SIZE,
+                  borderRadius: PROFILE_SIZE / 2,
+                  borderWidth: 4,
+                  borderColor: PARCHMENT,
+                  backgroundColor: PARCHMENT,
                 }}
               >
-                <Text
-                  style={{
-                    fontFamily: "SourceSans3_700Bold",
-                    fontSize: 40,
-                    color: PARCHMENT,
-                  }}
-                >
-                  {initials}
-                </Text>
+                {profile.avatarUrl ? (
+                  <Image
+                    source={{ uri: profile.avatarUrl }}
+                    style={{
+                      width: PROFILE_SIZE - 8,
+                      height: PROFILE_SIZE - 8,
+                      borderRadius: (PROFILE_SIZE - 8) / 2,
+                    }}
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: PROFILE_SIZE - 8,
+                      height: PROFILE_SIZE - 8,
+                      borderRadius: (PROFILE_SIZE - 8) / 2,
+                      backgroundColor: DEEP_FOREST,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: "SourceSans3_700Bold",
+                        fontSize: 40,
+                        color: PARCHMENT,
+                      }}
+                    >
+                      {initials}
+                    </Text>
+                  </View>
+                )}
               </View>
-            )}
-          </View>
 
-          {/* User Identity Block */}
-          <View className="mb-4">
-            <View className="flex-row items-center justify-between mb-2">
-              <View className="flex-1">
+              {/* User Identity */}
+              <View className="items-center mt-3">
                 <Text
                   className="text-3xl mb-1"
-                  style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+                  style={{ fontFamily: "JosefinSlab_700Bold", color: PARCHMENT, textAlign: "center" }}
                 >
                   {profile.displayName}
                 </Text>
                 <Text
                   className="text-base mb-2"
-                  style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                  style={{ fontFamily: "SourceSans3_400Regular", color: PARCHMENT, textAlign: "center" }}
                 >
                   @{profile.handle}
                 </Text>
-
+                
                 {/* Membership Badge */}
                 <View
-                  className="rounded-full px-3 py-1 self-start"
+                  className="rounded-full px-3 py-1"
                   style={{ backgroundColor: getMembershipBadgeColor(profile.membershipTier) }}
                 >
                   <Text
@@ -463,10 +473,130 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 </View>
               </View>
             </View>
+          </ImageBackground>
+        </View>
+
+        {/* Profile Section */}
+        <View className="px-5" style={{ marginTop: 16 }}>
+          {/* Merit Badges Row */}
+          <View className="flex-row items-start justify-end mb-4">
+            {/* Merit Badges */}
+            <View className="flex-row gap-2">
+                {/* Weekend Camper Badge */}
+                <View
+                  className="items-center"
+                  style={{ width: 70 }}
+                >
+                  <View
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      backgroundColor: "#92AFB1",
+                      borderWidth: 3,
+                      borderColor: PARCHMENT,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 3,
+                      elevation: 3,
+                    }}
+                  >
+                    <Ionicons name="bonfire" size={28} color={PARCHMENT} />
+                  </View>
+                  <Text
+                    className="text-center mt-1"
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      fontSize: 9,
+                      color: TEXT_SECONDARY,
+                      lineHeight: 11,
+                    }}
+                  >
+                    Weekend{'\n'}Camper
+                  </Text>
+                </View>
+
+                {/* Trail Leader Badge */}
+                <View
+                  className="items-center"
+                  style={{ width: 70 }}
+                >
+                  <View
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      backgroundColor: "#AC9A6D",
+                      borderWidth: 3,
+                      borderColor: PARCHMENT,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 3,
+                      elevation: 3,
+                    }}
+                  >
+                    <Ionicons name="compass" size={28} color={PARCHMENT} />
+                  </View>
+                  <Text
+                    className="text-center mt-1"
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      fontSize: 9,
+                      color: TEXT_SECONDARY,
+                      lineHeight: 11,
+                    }}
+                  >
+                    Trail{'\n'}Leader
+                  </Text>
+                </View>
+
+                {/* Backcountry Guide Badge */}
+                <View
+                  className="items-center"
+                  style={{ width: 70 }}
+                >
+                  <View
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      backgroundColor: "#485952",
+                      borderWidth: 3,
+                      borderColor: PARCHMENT,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 3,
+                      elevation: 3,
+                    }}
+                  >
+                    <Ionicons name="navigate" size={28} color={PARCHMENT} />
+                  </View>
+                  <Text
+                    className="text-center mt-1"
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      fontSize: 9,
+                      color: TEXT_SECONDARY,
+                      lineHeight: 11,
+                    }}
+                  >
+                    Backcountry{'\n'}Guide
+                  </Text>
+                </View>
+            </View>
           </View>
 
           {/* Social Stats Row */}
-          <View className="flex-row mb-6 py-4 border-y" style={{ borderColor: BORDER_SOFT }}>
+          <View className="flex-row mb-4 py-3 border-y" style={{ borderColor: BORDER_SOFT }}>
             <View className="flex-1 items-center">
               <Text
                 className="text-2xl"
@@ -553,7 +683,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
             </Text>
 
             <View className="mb-3">
-              {profile.bio ? (
+              {profile.about || profile.bio ? (
                 <Text
                   style={{
                     fontFamily: "SourceSans3_400Regular",
@@ -562,7 +692,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
                     lineHeight: 22,
                   }}
                 >
-                  {profile.bio}
+                  {profile.about || profile.bio}
                 </Text>
               ) : (
                 <Text
@@ -649,9 +779,10 @@ export default function MyCampsiteScreen({ navigation }: any) {
               </View>
             )}
           </View>
+        </View>
 
-          {/* My Activity Section */}
-          <View className="mb-6">
+        {/* My Activity Section */}
+        <View className="mb-6 px-5">
             <Text
               className="text-lg mb-3"
               style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
@@ -660,8 +791,12 @@ export default function MyCampsiteScreen({ navigation }: any) {
             </Text>
 
             {/* Activity Tabs */}
-            <View className="flex-row mb-4">
-              {(["trips", "gear", "photos", "questions"] as ActivityTab[]).map((tab) => (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              className="mb-4"
+            >
+              {(["trips", "photos", "questions"] as ActivityTab[]).map((tab) => (
                 <Pressable
                   key={tab}
                   onPress={() => {
@@ -670,8 +805,6 @@ export default function MyCampsiteScreen({ navigation }: any) {
                     // Navigate to the appropriate screen based on tab
                     if (tab === "trips") {
                       navigation.navigate("Plan");
-                    } else if (tab === "gear") {
-                      navigation.navigate("MyGearCloset");
                     } else {
                       setActiveTab(tab);
                     }
@@ -692,7 +825,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
                   </Text>
                 </Pressable>
               ))}
-            </View>
+            </ScrollView>
 
             {/* Activity Content - Placeholder */}
             <View className="p-6 rounded-xl items-center" style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}>
@@ -710,7 +843,31 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 Your {activeTab} will appear here
               </Text>
             </View>
-          </View>
+        </View>
+
+        {/* My Gear Closet */}
+        <View className="px-5">
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              navigation.navigate("MyGearCloset");
+            }}
+            className="mb-6 p-4 rounded-xl border active:opacity-70"
+            style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
+          >
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1">
+                <Ionicons name="bag-handle-outline" size={22} color={EARTH_GREEN} />
+                <Text
+                  className="ml-3"
+                  style={{ fontFamily: "SourceSans3_400Regular", fontSize: 16, color: TEXT_PRIMARY_STRONG }}
+                >
+                  My Gear Closet
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={22} color={EARTH_GREEN} />
+            </View>
+          </Pressable>
 
           {/* My Campground */}
           <Pressable
