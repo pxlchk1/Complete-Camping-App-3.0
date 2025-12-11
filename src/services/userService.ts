@@ -32,7 +32,7 @@ const db = getFirestore(firebaseApp);
 // ==================== User Profile ====================
 
 export async function getUser(userId: string): Promise<User | null> {
-  const userRef = doc(db, "users", userId);
+  const userRef = doc(db, "profiles", userId);
   const userSnap = await getDoc(userRef);
 
   if (!userSnap.exists()) {
@@ -43,7 +43,7 @@ export async function getUser(userId: string): Promise<User | null> {
 }
 
 export async function getUserByHandle(handle: string): Promise<User | null> {
-  const usersRef = collection(db, "users");
+  const usersRef = collection(db, "profiles");
   const q = query(usersRef, where("handle", "==", handle));
   const snapshot = await getDocs(q);
 
@@ -56,7 +56,7 @@ export async function getUserByHandle(handle: string): Promise<User | null> {
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
-  const usersRef = collection(db, "users");
+  const usersRef = collection(db, "profiles");
   const q = query(usersRef, where("email", "==", email));
   const snapshot = await getDocs(q);
 
@@ -72,7 +72,7 @@ export async function updateUserProfile(
   userId: string,
   updates: Partial<Pick<User, "displayName" | "photoURL" | "handle">>
 ): Promise<void> {
-  const userRef = doc(db, "users", userId);
+  const userRef = doc(db, "profiles", userId);
   await updateDoc(userRef, {
     ...updates,
     updatedAt: new Date().toISOString(),
@@ -86,7 +86,7 @@ export async function grantMembership(
   targetUserId: string,
   duration: MembershipDuration
 ): Promise<void> {
-  const userRef = doc(db, "users", targetUserId);
+  const userRef = doc(db, "profiles", targetUserId);
 
   let expiresAt: string | undefined;
   if (duration !== "lifetime") {
@@ -137,7 +137,7 @@ export async function banUser(
   targetUserId: string,
   reason: string
 ): Promise<void> {
-  const userRef = doc(db, "users", targetUserId);
+  const userRef = doc(db, "profiles", targetUserId);
 
   await updateDoc(userRef, {
     isBanned: true,
@@ -160,7 +160,7 @@ export async function unbanUser(
   adminId: string,
   targetUserId: string
 ): Promise<void> {
-  const userRef = doc(db, "users", targetUserId);
+  const userRef = doc(db, "profiles", targetUserId);
 
   await updateDoc(userRef, {
     isBanned: false,
@@ -253,7 +253,7 @@ export async function updateUserRole(
   targetUserId: string,
   newRole: UserRole
 ): Promise<void> {
-  const userRef = doc(db, "users", targetUserId);
+  const userRef = doc(db, "profiles", targetUserId);
 
   await updateDoc(userRef, {
     role: newRole,
