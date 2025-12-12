@@ -28,6 +28,8 @@ import { auth, db, storage } from "../config/firebase";
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { updateEmail, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
+import { useSubscriptionStore } from "../state/subscriptionStore";
+import { restorePurchases } from "../services/subscriptionService";
 import ModalHeader from "../components/ModalHeader";
 import {
   PARCHMENT,
@@ -56,9 +58,11 @@ const RESERVED_HANDLES = [
 export default function SettingsScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const isPro = useSubscriptionStore((s) => s.isPro);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [restoringPurchases, setRestoringPurchases] = useState(false);
 
   // User data
   const [displayName, setDisplayName] = useState("");
@@ -667,23 +671,78 @@ export default function SettingsScreen() {
               >
                 <View className="flex-1 mr-4">
                   <View className="flex-row items-center">
-                    <Ionicons name="star-outline" size={20} color={EARTH_GREEN} />
+                    <Ionicons 
+                      name={isPro ? "star" : "star-outline"} 
+                      size={20} 
+                      color={isPro ? GRANITE_GOLD : EARTH_GREEN} 
+                    />
                     <Text
                       className="ml-3"
                       style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
                     >
-                      Subscription
+                      {isPro ? "Pro Member" : "Upgrade to Pro"}
                     </Text>
                   </View>
                   <Text
                     className="ml-8 mt-1"
                     style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
                   >
-                    Manage your subscription
+                    {isPro ? "Manage your subscription" : "Unlock all premium features"}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={TEXT_SECONDARY} />
               </Pressable>
+
+              {/* Restore Purchases (shown for non-Pro users) */}
+              {!isPro && (
+                <Pressable
+                  onPress={async () => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setRestoringPurchases(true);
+                    try {
+                      const restored = await restorePurchases();
+                      if (restored) {
+                        Alert.alert(
+                          "Purchases Restored",
+                          "Your subscription has been restored.",
+                          [{ text: "OK" }]
+                        );
+                      } else {
+                        Alert.alert(
+                          "No Purchases Found",
+                          "No active subscriptions were found for your account.",
+                          [{ text: "OK" }]
+                        );
+                      }
+                    } catch (error) {
+                      Alert.alert("Restore Failed", "Please try again or contact support.");
+                    } finally {
+                      setRestoringPurchases(false);
+                    }
+                  }}
+                  disabled={restoringPurchases}
+                  className="flex-row items-center justify-between p-4 active:opacity-70"
+                  style={{ opacity: restoringPurchases ? 0.5 : 1 }}
+                >
+                  <View className="flex-1 mr-4">
+                    <View className="flex-row items-center">
+                      <Ionicons name="refresh-outline" size={20} color={EARTH_GREEN} />
+                      <Text
+                        className="ml-3"
+                        style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                      >
+                        {restoringPurchases ? "Restoring..." : "Restore Purchases"}
+                      </Text>
+                    </View>
+                    <Text
+                      className="ml-8 mt-1"
+                      style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                    >
+                      Already subscribed? Restore your access
+                    </Text>
+                  </View>
+                </Pressable>
+              )}
             </View>
 
             {/* Email Section */}

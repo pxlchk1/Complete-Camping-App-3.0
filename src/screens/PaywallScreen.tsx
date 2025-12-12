@@ -38,12 +38,10 @@ import {
 
 const PRO_FEATURES = [
   "Unlimited trip planning",
-  "Save as many parks as you want",
-  "Create and reuse gear sets",
-  "Custom packing list templates",
-  "Advanced search and filters",
-  "Cloud sync across devices",
-  "Future Pro features included",
+  "Unlimited saved parks",
+  "Advanced gear management",
+  "Custom packing templates",
+  "Priority support",
 ];
 
 export default function PaywallScreen() {
@@ -52,6 +50,7 @@ export default function PaywallScreen() {
 
   const [monthlyPackage, setMonthlyPackage] = useState<PurchasesPackage | null>(null);
   const [annualPackage, setAnnualPackage] = useState<PurchasesPackage | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<"annual" | "monthly">("annual");
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -204,17 +203,17 @@ export default function PaywallScreen() {
   return (
     <SafeAreaView className="flex-1 bg-parchment">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-5 py-3 border-b" style={{ borderColor: BORDER_SOFT }}>
+      <View className="flex-row items-center justify-between px-5 py-4 border-b" style={{ borderColor: BORDER_SOFT }}>
         <Text
-          className="text-xl"
+          className="text-2xl"
           style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
         >
-          Complete Camping Pro
+          Go Pro
         </Text>
         <Pressable
           onPress={() => navigation.goBack()}
           className="p-2 active:opacity-70"
-          accessibilityLabel="Close"
+          accessibilityLabel="Not now"
           accessibilityRole="button"
         >
           <Ionicons name="close" size={28} color={DEEP_FOREST} />
@@ -226,220 +225,21 @@ export default function PaywallScreen() {
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Title */}
+        {/* Value Props */}
         <View className="px-6 pt-6 pb-4">
-          <Text
-            className="text-center"
-            style={{
-              fontFamily: "JosefinSlab_700Bold",
-              fontSize: 32,
-              color: TEXT_PRIMARY_STRONG,
-              lineHeight: 38,
-            }}
-          >
-            Make every trip easier
-          </Text>
-        </View>
-
-        {/* Pricing CTAs */}
-        {error ? (
-          <View className="px-6 py-8">
-            <View className="p-6 rounded-xl" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderWidth: 1, borderColor: BORDER_SOFT }}>
-              <Ionicons name="alert-circle-outline" size={48} color={TEXT_SECONDARY} style={{ alignSelf: "center", marginBottom: 12 }} />
-              <Text
-                className="text-center mb-4"
-                style={{
-                  fontFamily: "SourceSans3_600SemiBold",
-                  fontSize: 18,
-                  color: TEXT_PRIMARY_STRONG,
-                }}
-              >
-                Subscriptions Unavailable
-              </Text>
-              <Text
-                className="text-center mb-4"
-                style={{
-                  fontFamily: "SourceSans3_400Regular",
-                  fontSize: 16,
-                  color: TEXT_SECONDARY,
-                  lineHeight: 24,
-                }}
-              >
-                {error}
-              </Text>
-              <Pressable
-                onPress={loadOfferings}
-                className="mt-2 p-4 rounded-xl active:opacity-70"
-                style={{ backgroundColor: DEEP_FOREST }}
-              >
-                <Text
-                  className="text-center"
-                  style={{
-                    fontFamily: "SourceSans3_600SemiBold",
-                    fontSize: 16,
-                    color: PARCHMENT,
-                  }}
-                >
-                  Try Again
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : (!monthlyPackage && !annualPackage) ? (
-          <View className="px-6 py-8">
-            <View className="p-6 rounded-xl" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderWidth: 1, borderColor: BORDER_SOFT }}>
-              <Ionicons name="information-circle-outline" size={48} color={TEXT_SECONDARY} style={{ alignSelf: "center", marginBottom: 12 }} />
-              <Text
-                className="text-center"
-                style={{
-                  fontFamily: "SourceSans3_400Regular",
-                  fontSize: 16,
-                  color: TEXT_SECONDARY,
-                  lineHeight: 24,
-                }}
-              >
-                No subscription options are currently available. Please check back later.
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <View className="px-6 pb-6">
-            {/* Annual Plan */}
-            {annualPackage && (
-              <Pressable
-                onPress={() => handlePurchase(annualPackage)}
-                disabled={purchasing}
-                className="mb-3 p-5 rounded-2xl border-2 active:opacity-90"
-                style={{
-                  backgroundColor: DEEP_FOREST,
-                  borderColor: DEEP_FOREST,
-                }}
-              >
-                <Text
-                  className="mb-1"
-                  style={{
-                    fontFamily: "SourceSans3_700Bold",
-                    fontSize: 20,
-                    color: PARCHMENT,
-                  }}
-                >
-                  {annualPackage.product.priceString} per year
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: "SourceSans3_400Regular",
-                    fontSize: 15,
-                    color: PARCHMENT,
-                    opacity: 0.9,
-                    lineHeight: 22,
-                  }}
-                >
-                  Best value. One simple payment for a full year.
-                </Text>
-              </Pressable>
-            )}
-
-            {/* Monthly Plan */}
-            {monthlyPackage && (
-              <Pressable
-                onPress={() => handlePurchase(monthlyPackage)}
-                disabled={purchasing}
-                className="p-5 rounded-2xl border-2 active:opacity-90"
-                style={{
-                  backgroundColor: CARD_BACKGROUND_LIGHT,
-                  borderColor: BORDER_SOFT,
-                }}
-              >
-                <Text
-                  className="mb-1"
-                  style={{
-                    fontFamily: "SourceSans3_700Bold",
-                    fontSize: 20,
-                    color: TEXT_PRIMARY_STRONG,
-                  }}
-                >
-                  {monthlyPackage.product.priceString} per month
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: "SourceSans3_400Regular",
-                    fontSize: 15,
-                    color: TEXT_SECONDARY,
-                    lineHeight: 22,
-                  }}
-                >
-                  Start planning with flexible billing.
-                </Text>
-              </Pressable>
-            )}
-
-            {purchasing && (
-              <View className="mt-4 items-center">
-                <ActivityIndicator size="small" color={DEEP_FOREST} />
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Hero Illustration */}
-        <View className="px-6 py-8">
-          <View 
-            className="rounded-2xl overflow-hidden items-center justify-center"
-            style={{ 
-              backgroundColor: DEEP_FOREST,
-              height: 200,
-            }}
-          >
-            {/* Placeholder for tent & lantern illustration */}
-            <Ionicons name="bonfire" size={80} color={GRANITE_GOLD} />
-            <Text
-              className="mt-4"
-              style={{
-                fontFamily: "JosefinSlab_700Bold",
-                fontSize: 18,
-                color: PARCHMENT,
-              }}
-            >
-              🏕️ ⛺ 🔦
-            </Text>
-          </View>
-        </View>
-
-        {/* Subtitle */}
-        <View className="px-6 pb-4">
-          <Text
-            className="text-center"
-            style={{
-              fontFamily: "SourceSans3_400Regular",
-              fontSize: 17,
-              color: TEXT_SECONDARY,
-              lineHeight: 26,
-            }}
-          >
-            Unlock the full planning toolkit and keep your trips organized in one place.
-          </Text>
-        </View>
-
-        {/* Feature List */}
-        <View className="px-6 pb-6">
           {PRO_FEATURES.map((feature, index) => (
-            <View key={index} className="flex-row items-start mb-3">
-              <Text
-                style={{
-                  fontFamily: "SourceSans3_400Regular",
-                  fontSize: 20,
-                  color: EARTH_GREEN,
-                  marginRight: 12,
-                }}
+            <View key={index} className="flex-row items-center mb-3">
+              <View
+                className="w-6 h-6 rounded-full items-center justify-center mr-3"
+                style={{ backgroundColor: EARTH_GREEN }}
               >
-                •
-              </Text>
+                <Ionicons name="checkmark" size={16} color={PARCHMENT} />
+              </View>
               <Text
                 style={{
                   fontFamily: "SourceSans3_400Regular",
                   fontSize: 16,
                   color: TEXT_PRIMARY_STRONG,
-                  lineHeight: 24,
                   flex: 1,
                 }}
               >
@@ -449,23 +249,238 @@ export default function PaywallScreen() {
           ))}
         </View>
 
-        {/* Footer Legal */}
-        <View className="px-6 pb-4">
-          <Text
-            className="text-center"
-            style={{
-              fontFamily: "SourceSans3_400Regular",
-              fontSize: 13,
-              color: TEXT_MUTED,
-              lineHeight: 20,
-            }}
-          >
-            Payment is handled through the App Store. Your subscription renews automatically until canceled. You can manage your plan in your App Store settings.
-          </Text>
-        </View>
+        {/* Error/Empty State */}
+        {error ? (
+          <View className="px-6 py-4">
+            <View className="p-6 rounded-xl" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderWidth: 1, borderColor: BORDER_SOFT }}>
+              <Ionicons name="alert-circle-outline" size={48} color={TEXT_SECONDARY} style={{ alignSelf: "center", marginBottom: 12 }} />
+              <Text
+                className="text-center mb-4"
+                style={{
+                  fontFamily: "SourceSans3_600SemiBold",
+                  fontSize: 16,
+                  color: TEXT_PRIMARY_STRONG,
+                }}
+              >
+                Subscriptions Temporarily Unavailable
+              </Text>
+              <Text
+                className="text-center mb-4"
+                style={{
+                  fontFamily: "SourceSans3_400Regular",
+                  fontSize: 14,
+                  color: TEXT_SECONDARY,
+                  lineHeight: 20,
+                }}
+              >
+                {error}
+              </Text>
+              <Pressable
+                onPress={loadOfferings}
+                className="mt-2 p-3 rounded-xl active:opacity-70"
+                style={{ backgroundColor: DEEP_FOREST }}
+              >
+                <Text
+                  className="text-center"
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    fontSize: 15,
+                    color: PARCHMENT,
+                  }}
+                >
+                  Try Again
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (!monthlyPackage && !annualPackage) ? (
+          <View className="px-6 py-4">
+            <View className="p-6 rounded-xl" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderWidth: 1, borderColor: BORDER_SOFT }}>
+              <Ionicons name="information-circle-outline" size={48} color={TEXT_SECONDARY} style={{ alignSelf: "center", marginBottom: 12 }} />
+              <Text
+                className="text-center"
+                style={{
+                  fontFamily: "SourceSans3_400Regular",
+                  fontSize: 14,
+                  color: TEXT_SECONDARY,
+                  lineHeight: 20,
+                }}
+              >
+                No subscription options are currently available. Please check back later.
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View className="px-6 pb-6">
+            {/* Annual Plan Card */}
+            {annualPackage && (
+              <Pressable
+                onPress={() => setSelectedPlan("annual")}
+                disabled={purchasing}
+                className="mb-3 p-5 rounded-xl border-2 active:opacity-90 relative"
+                style={{
+                  backgroundColor: selectedPlan === "annual" ? DEEP_FOREST + "15" : CARD_BACKGROUND_LIGHT,
+                  borderColor: selectedPlan === "annual" ? DEEP_FOREST : BORDER_SOFT,
+                }}
+              >
+                {/* Best Value Badge */}
+                <View
+                  className="absolute top-0 right-0 px-3 py-1 rounded-bl-lg rounded-tr-lg"
+                  style={{ backgroundColor: GRANITE_GOLD }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      fontSize: 11,
+                      color: "#fff",
+                    }}
+                  >
+                    BEST VALUE
+                  </Text>
+                </View>
+
+                <View className="flex-row items-center justify-between mt-3">
+                  <View className="flex-1">
+                    <Text
+                      style={{
+                        fontFamily: "JosefinSlab_700Bold",
+                        fontSize: 18,
+                        color: TEXT_PRIMARY_STRONG,
+                        marginBottom: 2,
+                      }}
+                    >
+                      Annual
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: "SourceSans3_700Bold",
+                        fontSize: 24,
+                        color: TEXT_PRIMARY_STRONG,
+                        marginBottom: 2,
+                      }}
+                    >
+                      {annualPackage.product.priceString}
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: "SourceSans3_400Regular",
+                        fontSize: 14,
+                        color: TEXT_SECONDARY,
+                      }}
+                    >
+                      per year
+                    </Text>
+                  </View>
+
+                  {/* Radio Button */}
+                  <View
+                    className="w-6 h-6 rounded-full border-2 items-center justify-center"
+                    style={{
+                      borderColor: selectedPlan === "annual" ? DEEP_FOREST : BORDER_SOFT,
+                      backgroundColor: selectedPlan === "annual" ? DEEP_FOREST : "transparent",
+                    }}
+                  >
+                    {selectedPlan === "annual" && (
+                      <View className="w-3 h-3 rounded-full" style={{ backgroundColor: PARCHMENT }} />
+                    )}
+                  </View>
+                </View>
+              </Pressable>
+            )}
+
+            {/* Monthly Plan Card */}
+            {monthlyPackage && (
+              <Pressable
+                onPress={() => setSelectedPlan("monthly")}
+                disabled={purchasing}
+                className="mb-3 p-5 rounded-xl border-2 active:opacity-90"
+                style={{
+                  backgroundColor: selectedPlan === "monthly" ? DEEP_FOREST + "15" : CARD_BACKGROUND_LIGHT,
+                  borderColor: selectedPlan === "monthly" ? DEEP_FOREST : BORDER_SOFT,
+                }}
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1">
+                    <Text
+                      style={{
+                        fontFamily: "JosefinSlab_700Bold",
+                        fontSize: 18,
+                        color: TEXT_PRIMARY_STRONG,
+                        marginBottom: 2,
+                      }}
+                    >
+                      Monthly
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: "SourceSans3_700Bold",
+                        fontSize: 24,
+                        color: TEXT_PRIMARY_STRONG,
+                        marginBottom: 2,
+                      }}
+                    >
+                      {monthlyPackage.product.priceString}
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: "SourceSans3_400Regular",
+                        fontSize: 14,
+                        color: TEXT_SECONDARY,
+                      }}
+                    >
+                      per month
+                    </Text>
+                  </View>
+
+                  {/* Radio Button */}
+                  <View
+                    className="w-6 h-6 rounded-full border-2 items-center justify-center"
+                    style={{
+                      borderColor: selectedPlan === "monthly" ? DEEP_FOREST : BORDER_SOFT,
+                      backgroundColor: selectedPlan === "monthly" ? DEEP_FOREST : "transparent",
+                    }}
+                  >
+                    {selectedPlan === "monthly" && (
+                      <View className="w-3 h-3 rounded-full" style={{ backgroundColor: PARCHMENT }} />
+                    )}
+                  </View>
+                </View>
+              </Pressable>
+            )}
+
+            {/* Primary CTA */}
+            <Pressable
+              onPress={() => {
+                const pkg = selectedPlan === "annual" ? annualPackage : monthlyPackage;
+                if (pkg) handlePurchase(pkg);
+              }}
+              disabled={purchasing || (!annualPackage && !monthlyPackage)}
+              className="mt-2 p-4 rounded-xl active:opacity-90"
+              style={{
+                backgroundColor: DEEP_FOREST,
+                opacity: purchasing ? 0.6 : 1,
+              }}
+            >
+              {purchasing ? (
+                <ActivityIndicator size="small" color={PARCHMENT} />
+              ) : (
+                <Text
+                  className="text-center"
+                  style={{
+                    fontFamily: "SourceSans3_700Bold",
+                    fontSize: 17,
+                    color: PARCHMENT,
+                  }}
+                >
+                  {selectedPlan === "annual" ? "Start Annual" : "Start Monthly"}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        )}
 
         {/* Restore Purchases */}
-        <View className="px-6 pb-4">
+        <View className="px-6 pb-2">
           <Pressable
             onPress={handleRestore}
             disabled={restoring}
@@ -475,13 +490,28 @@ export default function PaywallScreen() {
               className="text-center"
               style={{
                 fontFamily: "SourceSans3_600SemiBold",
-                fontSize: 16,
-                color: TEXT_SECONDARY,
+                fontSize: 15,
+                color: restoring ? TEXT_MUTED : DEEP_FOREST,
               }}
             >
               {restoring ? "Restoring..." : "Restore Purchases"}
             </Text>
           </Pressable>
+        </View>
+
+        {/* Footer Microcopy */}
+        <View className="px-6 pb-6">
+          <Text
+            className="text-center"
+            style={{
+              fontFamily: "SourceSans3_400Regular",
+              fontSize: 13,
+              color: TEXT_MUTED,
+              lineHeight: 18,
+            }}
+          >
+            Cancel anytime. Manage in Apple subscriptions.
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
