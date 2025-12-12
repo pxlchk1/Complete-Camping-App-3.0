@@ -754,32 +754,45 @@ export default function MyCampsiteScreen({ navigation }: any) {
               </View>
             )}
 
-            {profile.favoriteGear && Object.keys(profile.favoriteGear).length > 0 && (
-              <View className="mb-2">
-                <View className="flex-row items-start mb-1">
-                  <Ionicons name="bag-handle-outline" size={18} color={EARTH_GREEN} style={{ marginTop: 2 }} />
-                  <Text
-                    className="ml-2"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: EARTH_GREEN }}
-                  >
-                    Favorite Gear
-                  </Text>
+            {profile.favoriteGear && Object.keys(profile.favoriteGear).length > 0 && (() => {
+              // Filter out invalid entries (numeric keys, non-string values)
+              const validCategories = ["shelter", "sleep", "kitchen", "clothing", "bags", "lighting", "misc"];
+              const validEntries = Object.entries(profile.favoriteGear).filter(
+                ([category, details]) => 
+                  validCategories.includes(category) && 
+                  typeof details === "string" && 
+                  details.trim().length > 0
+              );
+              
+              if (validEntries.length === 0) return null;
+              
+              return (
+                <View className="mb-2">
+                  <View className="flex-row items-start mb-1">
+                    <Ionicons name="bag-handle-outline" size={18} color={EARTH_GREEN} style={{ marginTop: 2 }} />
+                    <Text
+                      className="ml-2"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: EARTH_GREEN }}
+                    >
+                      Favorite Gear
+                    </Text>
+                  </View>
+                  <View className="ml-7">
+                    {validEntries.map(([category, details]) => (
+                      <View key={category} className="mb-1">
+                        <Text
+                          style={{ fontFamily: "SourceSans3_400Regular", fontSize: 15, color: TEXT_PRIMARY_STRONG }}
+                        >
+                          <Text style={{ fontFamily: "SourceSans3_600SemiBold" }}>
+                            {category.charAt(0).toUpperCase() + category.slice(1)}:
+                          </Text> {details}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-                <View className="ml-7">
-                  {Object.entries(profile.favoriteGear).map(([category, details]) => (
-                    <View key={category} className="mb-1">
-                      <Text
-                        style={{ fontFamily: "SourceSans3_400Regular", fontSize: 15, color: TEXT_PRIMARY_STRONG }}
-                      >
-                        <Text style={{ fontFamily: "SourceSans3_600SemiBold" }}>
-                          {category.charAt(0).toUpperCase() + category.slice(1)}:
-                        </Text> {details}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
+              );
+            })()}
           </View>
         </View>
 
