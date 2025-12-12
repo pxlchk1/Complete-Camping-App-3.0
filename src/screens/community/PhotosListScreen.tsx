@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, Pressable, FlatList, Image, ActivityIndicator, Dimensions } from "react-native";
+import { View, Text, Pressable, FlatList, Image, ActivityIndicator, Dimensions, Modal, ScrollView } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -42,6 +42,7 @@ export default function PhotosListScreen() {
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   const loadStories = async (refresh = false) => {
     try {
@@ -198,42 +199,120 @@ export default function PhotosListScreen() {
       </View>
     );
   }
-
   return (
     <View className="flex-1 bg-parchment">
-      {/* Header */}
-      <CommunitySectionHeader
-        title="Community Photos"
-        onAddPress={handleUploadPhoto}
-      />
+      {/* Header with Filter Button */}
+      <View style={{ backgroundColor: DEEP_FOREST }}>
+        <View className="px-5 py-3">
+          <View className="flex-row items-center justify-between">
+            <Text
+              className="text-xl"
+              style={{ fontFamily: "JosefinSlab_700Bold", color: PARCHMENT }}
+            >
+              Community Photos
+            </Text>
+            <View className="flex-row items-center gap-3">
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowFilterModal(true);
+                }}
+                className="active:opacity-70"
+              >
+                <Ionicons name="funnel-outline" size={24} color={PARCHMENT} />
+              </Pressable>
+              <Pressable
+                onPress={handleUploadPhoto}
+                className="active:opacity-70"
+              >
+                <Ionicons name="add-circle" size={32} color={PARCHMENT} />
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </View>
 
-      {/* Filter Tags */}
-      <View className="px-5 py-3 border-b" style={{ borderColor: BORDER_SOFT }}>
-        <View className="flex-row gap-2">
-          {FILTER_TAGS.map(tag => (
+      {/* Filter Modal */}
+      <Modal
+        visible={showFilterModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View className="flex-1 bg-parchment">
+          {/* Modal Header */}
+          <View className="px-5 py-4 border-b flex-row items-center justify-between" style={{ borderColor: BORDER_SOFT }}>
+            <Text
+              className="text-xl"
+              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+            >
+              Filter Photos
+            </Text>
             <Pressable
-              key={tag}
+              onPress={() => setShowFilterModal(false)}
+              className="active:opacity-70"
+            >
+              <Ionicons name="close" size={28} color={TEXT_PRIMARY_STRONG} />
+            </Pressable>
+          </View>
+
+          {/* Filter Options */}
+          <ScrollView className="flex-1 px-5 py-4">
+            <Text
+              className="mb-3 text-sm"
+              style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_SECONDARY }}
+            >
+              FILTER BY TAG
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {FILTER_TAGS.map(tag => (
+                <Pressable
+                  key={tag}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectedTag(tag);
+                  }}
+                  className="px-5 py-3 rounded-xl"
+                  style={{
+                    backgroundColor: selectedTag === tag ? DEEP_FOREST : CARD_BACKGROUND_LIGHT,
+                    borderWidth: 1,
+                    borderColor: selectedTag === tag ? DEEP_FOREST : BORDER_SOFT,
+                  }}
+                >
+                  <Text
+                    className="text-base capitalize"
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      color: selectedTag === tag ? PARCHMENT : TEXT_PRIMARY_STRONG
+                    }}
+                  >
+                    {tag}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
+
+          {/* Apply Button */}
+          <View className="px-5 py-4 border-t" style={{ borderColor: BORDER_SOFT }}>
+            <Pressable
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setSelectedTag(tag);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setShowFilterModal(false);
               }}
-              className={`px-4 py-2 rounded-full ${
-                selectedTag === tag ? "bg-forest" : "bg-white border"
-              }`}
-              style={selectedTag !== tag ? { borderColor: BORDER_SOFT } : undefined}
+              className="py-4 rounded-xl active:opacity-90"
+              style={{ backgroundColor: DEEP_FOREST }}
             >
               <Text
-                className="text-sm capitalize"
-                style={{
-                  fontFamily: "SourceSans3_600SemiBold",
-                  color: selectedTag === tag ? PARCHMENT : TEXT_PRIMARY_STRONG
-                }}
+                className="text-center text-base"
+                style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
               >
-                {tag}
+                Apply Filter
               </Text>
             </Pressable>
-          ))}
+          </View>
         </View>
+      </Modal>w>
       </View>
 
       {/* Content removed - coming soon message */}
