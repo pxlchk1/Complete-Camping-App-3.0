@@ -88,12 +88,15 @@ export default function PaywallScreen() {
       const pkgs = offering.availablePackages;
 
       // Find monthly and annual packages
+      // Products: cca_monthly_sub_399, cca_annual_sub_2499
       const monthly = pkgs.find((p) => 
+        p.product.identifier === "cca_monthly_sub_399" ||
         p.identifier.toLowerCase().includes("monthly") ||
         p.packageType === PACKAGE_TYPE.MONTHLY
       );
       
       const annual = pkgs.find((p) => 
+        p.product.identifier === "cca_annual_sub_2499" ||
         p.identifier.toLowerCase().includes("annual") || 
         p.identifier.toLowerCase().includes("yearly") ||
         p.packageType === PACKAGE_TYPE.ANNUAL
@@ -102,7 +105,18 @@ export default function PaywallScreen() {
       setMonthlyPackage(monthly || null);
       setAnnualPackage(annual || null);
       
-      console.log("[Paywall] Loaded packages - Monthly:", monthly?.identifier, "Annual:", annual?.identifier);
+      console.log("[Paywall] Loaded packages:", {
+        monthly: monthly ? {
+          identifier: monthly.identifier,
+          productId: monthly.product.identifier,
+          price: monthly.product.priceString,
+        } : null,
+        annual: annual ? {
+          identifier: annual.identifier,
+          productId: annual.product.identifier,
+          price: annual.product.priceString,
+        } : null,
+      });
       
       if (!monthly && !annual) {
         setError("Subscription options are not available right now. Please check back later or contact support.");

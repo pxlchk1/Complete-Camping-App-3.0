@@ -37,6 +37,7 @@ export const useSubscriptionStore = create<SubscriptionState>()(
       lastChecked: null,
 
       // Update subscription info from CustomerInfo
+      // CRITICAL: isPro is determined by entitlement "Pro" (case-sensitive)
       setSubscriptionInfo: (customerInfo: CustomerInfo | null) => {
         if (!customerInfo) {
           set({
@@ -49,7 +50,14 @@ export const useSubscriptionStore = create<SubscriptionState>()(
         }
 
         const entitlements = Object.keys(customerInfo.entitlements.active);
-        const hasPro = entitlements.length > 0; // User is Pro if they have any active entitlement
+        // Check for exact entitlement "Pro" (case-sensitive)
+        const hasPro = Boolean(customerInfo.entitlements.active["Pro"]);
+
+        console.log("[SubscriptionStore] Updated subscription info:", {
+          isPro: hasPro,
+          activeEntitlements: entitlements,
+          originalAppUserId: customerInfo.originalAppUserId,
+        });
 
         set({
           isPro: hasPro,

@@ -8,12 +8,14 @@ import * as RevenueCat from "../lib/revenuecatClient";
 import { useSubscriptionStore } from "../state/subscriptionStore";
 import { useAuthStore } from "../state/authStore";
 import { auth, db } from "../config/firebase";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { SUBSCRIPTIONS_ENABLED } from "../config/subscriptions";
 
 /**
  * Safely fetch offerings with proper error handling
  * Returns null if offerings are unavailable or misconfigured
+ * Products: cca_monthly_sub_399, cca_annual_sub_2499
+ * Entitlement: "Pro" (case-sensitive)
  */
 export async function fetchOfferingsSafe() {
   if (!SUBSCRIPTIONS_ENABLED) {
@@ -29,22 +31,56 @@ export async function fetchOfferingsSafe() {
   try {
     const offerings = await Purchases.getOfferings();
 
-    if (!offerings.current || !offerings.current.availablePackages.length) {
-      console.warn("[SubscriptionService] No offerings available - check App Store Connect configuration");
+    // Detailed logging for troubleshooting Apple product availability
+    console.log("[SubscriptionService] Offerings response:", {
+      currentOffering: offerings.current?.identifier || "none",
+      allOfferingsCount: Object.keys(offerings.all).length,
+      packagesInCurrent: offerings.current?.availablePackages.length || 0,
+    });
+
+    if (!offerings.current) {
+      console.warn("[SubscriptionService] No current offering - check RevenueCat dashboard offering configuration");
       return null;
     }
 
+    if (!offerings.current.availablePackages.length) {
+      console.warn("[SubscriptionService] No packages in current offering", {
+        offeringId: offerings.current.identifier,
+        possibleCauses: [
+          "Products 'Waiting for Review' in App Store Connect",
+          "Products not available in tester's storefront country (check availability: should be more than 1/175 countries)",
+          "Products not linked to offering in RevenueCat",
+          "Subscription group not configured correctly",
+        ],
+      });
+      return null;
+    }
+
+    // Log available packages for debugging
+    offerings.current.availablePackages.forEach((pkg) => {
+      console.log("[SubscriptionService] Package available:", {
+        identifier: pkg.identifier,
+        productId: pkg.product.identifier,
+        price: pkg.product.priceString,
+        period: pkg.packageType,
+      });
+    });
+
     console.log("[SubscriptionService] Offerings loaded successfully:", offerings.current.availablePackages.length, "packages");
     return offerings;
-  } catch (error) {
-    console.error("[SubscriptionService] Error fetching offerings:", error);
+  } catch (error: any) {
+    console.error("[SubscriptionService] Error fetching offerings:", {
+      message: error.message,
+      code: error.code,
+      underlyingErrorMessage: error.underlyingErrorMessage,
+    });
     return null;
   }
 }
 
 /**
  * Initialize the subscription system
- * Call this once when the app starts, after Firebase auth is ready
+ * Call this once when the app starts, BEFORE auth state is known
  */
 export const initSubscriptions = async (): Promise<void> => {
   if (!SUBSCRIPTIONS_ENABLED) {
@@ -53,32 +89,59 @@ export const initSubscriptions = async (): Promise<void> => {
   }
 
   try {
-    console.log("[SubscriptionService] Initializing subscriptions");
+    console.log("[SubscriptionService] Initializing subscriptions (anonymous)");
 
-    // Get current user if logged in
-    const user = useAuthStore.getState().user;
-    
-    // Initialize RevenueCat SDK with optional user ID
-    const initialized = await RevenueCat.initRevenueCat(user?.id);
+    // Initialize RevenueCat SDK anonymously (no user ID yet)
+    const initialized = await RevenueCat.initRevenueCat();
 
     if (!initialized) {
       console.log("[SubscriptionService] RevenueCat not available on this platform");
       return;
     }
 
-    console.log("[SubscriptionService] Subscriptions initialized (entitlements will load on-demand)");
+    // Register CustomerInfo listener for automatic updates
+    RevenueCat.addCustomerInfoListener((customerInfo) => {
+      console.log("[SubscriptionService] CustomerInfo updated:", {
+        entitlements: Object.keys(customerInfo.entitlements.active),
+        originalAppUserId: customerInfo.originalAppUserId,
+      });
+      
+      // Update subscription store
+      useSubscriptionStore.getState().setSubscriptionInfo(customerInfo);
+      
+      // Sync to Firestore if user is logged in
+      syncSubscriptionToFirestore().catch((error) => {
+        console.error("[SubscriptionService] Failed to sync after listener update:", error);
+      });
+    });
+
+    console.log("[SubscriptionService] Subscriptions initialized successfully");
   } catch (error) {
     console.error("[SubscriptionService] Failed to initialize subscriptions:", error);
   }
 };
 
 /**
- * Identify user in RevenueCat
+ * Identify user in RevenueCat with Firebase uid
+ * Call this when Firebase auth state changes to signed in
  */
-export const identifyUser = async (userId: string): Promise<void> => {
+export const identifyUser = async (firebaseUid: string): Promise<void> => {
+  if (!SUBSCRIPTIONS_ENABLED) {
+    return;
+  }
+
   try {
-    await RevenueCat.identifyUser(userId);
-    console.log("[SubscriptionService] User identified (entitlements will load on-demand)");
+    console.log("[SubscriptionService] Identifying user with Firebase uid:", firebaseUid);
+    await RevenueCat.identifyUser(firebaseUid);
+    
+    // Refresh entitlements after identification
+    const customerInfo = await RevenueCat.getCustomerInfo();
+    if (customerInfo) {
+      useSubscriptionStore.getState().setSubscriptionInfo(customerInfo);
+      await syncSubscriptionToFirestore();
+    }
+    
+    console.log("[SubscriptionService] User identified and entitlements refreshed");
   } catch (error) {
     console.error("[SubscriptionService] Failed to identify user:", error);
     throw error;
@@ -198,7 +261,8 @@ export const getOfferings = async () => {
 
 /**
  * Sync RevenueCat subscription status to Firestore users/{uid}
- * Maps RevenueCat entitlements to membership tiers and subscription status
+ * Maps entitlement "Pro" to membership tiers and subscription status
+ * Only writes to Firestore when values change to minimize updates
  */
 export const syncSubscriptionToFirestore = async (): Promise<void> => {
   const user = auth.currentUser;
@@ -214,37 +278,65 @@ export const syncSubscriptionToFirestore = async (): Promise<void> => {
       return;
     }
 
-    // Determine membership tier based on entitlements
+    // Check for exact entitlement "Pro" (case-sensitive)
+    const hasPro = Boolean(customerInfo.entitlements.active["Pro"]);
+    const activeEntitlements = Object.keys(customerInfo.entitlements.active);
+    
+    // Determine membership tier and subscription status
     let membershipTier = "freeMember";
-    let subscriptionStatus = "none";
+    let subscriptionStatus: "active" | "expired" | "canceled" | "none" = "none";
 
-    const activeEntitlements = customerInfo.entitlements.active;
-
-    if (Object.keys(activeEntitlements).length > 0) {
-      // User has active subscription - set to subscribed
+    if (hasPro) {
+      // User has active Pro entitlement
       membershipTier = "subscribed";
       subscriptionStatus = "active";
     } else {
-      // Check if subscription is cancelled or expired
+      // Check if subscription existed but is now expired/canceled
       const allEntitlements = customerInfo.entitlements.all;
-      if (Object.keys(allEntitlements).length > 0) {
-        const hasExpired = Object.values(allEntitlements).some(
-          (ent: any) => ent.expirationDate && new Date(ent.expirationDate) < new Date()
-        );
-        subscriptionStatus = hasExpired ? "expired" : "canceled";
+      const proEntitlement = allEntitlements["Pro"];
+      
+      if (proEntitlement) {
+        const expirationDate = proEntitlement.expirationDate;
+        if (expirationDate) {
+          const isExpired = new Date(expirationDate) < new Date();
+          subscriptionStatus = isExpired ? "expired" : "canceled";
+        } else {
+          subscriptionStatus = "expired";
+        }
       }
     }
 
-    // Update Firestore
+    // Get current Firestore data to check if update is needed
     const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+    const currentData = userSnap.data();
+
+    // Only write if values changed
+    const needsUpdate = 
+      currentData?.membershipTier !== membershipTier ||
+      currentData?.subscriptionStatus !== subscriptionStatus ||
+      JSON.stringify(currentData?.entitlements || []) !== JSON.stringify(activeEntitlements);
+
+    if (!needsUpdate) {
+      console.log("[SubscriptionService] Firestore already up to date, skipping write");
+      return;
+    }
+
+    // Update Firestore with new subscription data
     await updateDoc(userRef, {
       membershipTier,
       subscriptionProvider: "revenuecat",
       subscriptionStatus,
+      entitlements: activeEntitlements,
       subscriptionUpdatedAt: serverTimestamp(),
     });
 
-    console.log(`[SubscriptionService] Synced to Firestore: ${membershipTier} / ${subscriptionStatus}`);
+    console.log("[SubscriptionService] Synced to Firestore:", {
+      membershipTier,
+      subscriptionStatus,
+      entitlements: activeEntitlements,
+      originalAppUserId: customerInfo.originalAppUserId,
+    });
   } catch (error) {
     console.error("[SubscriptionService] Failed to sync to Firestore:", error);
     // Don't throw - this is a background sync operation

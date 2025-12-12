@@ -26,10 +26,10 @@ export const isRevenueCatReady = (): boolean => {
 };
 
 /**
- * Initialize RevenueCat SDK
- * Should be called once when the app starts, after user auth is ready
+ * Initialize RevenueCat SDK anonymously
+ * Must be called once at app launch before any auth state is known
  */
-export const initRevenueCat = async (userId?: string): Promise<boolean> => {
+export const initRevenueCat = async (): Promise<boolean> => {
   if (isInitialized) {
     console.log("[RevenueCat] Already initialized");
     return isConfigured;
@@ -53,17 +53,15 @@ export const initRevenueCat = async (userId?: string): Promise<boolean> => {
       return false;
     }
 
-    // Configure RevenueCat with optional user ID
-    await Purchases.configure({ 
-      apiKey,
-      ...(userId && { appUserId: userId })
-    });
+    // Configure RevenueCat ANONYMOUSLY (no appUserId)
+    // User will be identified later via identifyUser() when Firebase auth resolves
+    await Purchases.configure({ apiKey });
 
     // Set debug log level for rollout phase
     Purchases.setLogLevel(LOG_LEVEL.DEBUG);
 
     isConfigured = true;
-    console.log("[RevenueCat] Successfully configured", userId ? `for user: ${userId}` : "");
+    console.log("[RevenueCat] Successfully configured anonymously");
     return true;
   } catch (error) {
     console.error("[RevenueCat] Failed to configure:", error);
@@ -73,22 +71,58 @@ export const initRevenueCat = async (userId?: string): Promise<boolean> => {
 };
 
 /**
- * Identify the user in RevenueCat
- * Should be called after Firebase auth is complete
+ * Register a listener for CustomerInfo updates
+ * Should be called once after initialization
  */
-export const identifyUser = async (userId: string): Promise<void> => {
+export const addCustomerInfoListener = (callback: (info: CustomerInfo) => void): void => {
+  if (!isRevenueCatReady()) {
+    console.log("[RevenueCat] Not configured - cannot add listener");
+    return;
+  }
+
+  try {
+    Purchases.addCustomerInfoUpdateListener(callback);
+    console.log("[RevenueCat] CustomerInfo listener registered");
+  } catch (error) {
+    console.error("[RevenueCat] Failed to add listener:", error);
+  }
+}
+
+let currentIdentifiedUserId: string | null = null;
+
+/**
+ * Identify the user in RevenueCat using Firebase uid
+ * CRITICAL: Must use Firebase Auth uid, NOT email
+ * Only call once per uid change to avoid duplicate login calls
+ */
+export const identifyUser = async (firebaseUid: string): Promise<void> => {
   if (!isRevenueCatReady()) {
     console.log("[RevenueCat] Not configured - skipping user identification");
     return;
   }
 
+  // Prevent duplicate identification
+  if (currentIdentifiedUserId === firebaseUid) {
+    console.log("[RevenueCat] User already identified:", firebaseUid);
+    return;
+  }
+
   try {
-    await Purchases.logIn(userId);
-    console.log("[RevenueCat] User identified:", userId);
+    const { customerInfo } = await Purchases.logIn(firebaseUid);
+    currentIdentifiedUserId = firebaseUid;
+    console.log("[RevenueCat] User identified with Firebase uid:", firebaseUid);
+    console.log("[RevenueCat] Active entitlements:", Object.keys(customerInfo.entitlements.active));
   } catch (error) {
     console.error("[RevenueCat] Failed to identify user:", error);
     throw error;
   }
+};
+
+/**
+ * Get the currently identified user ID
+ */
+export const getCurrentUserId = (): string | null => {
+  return currentIdentifiedUserId;
 };
 
 /**
@@ -240,6 +274,7 @@ export const logOut = async (): Promise<void> => {
 
   try {
     await Purchases.logOut();
+    currentIdentifiedUserId = null;
     console.log("[RevenueCat] User logged out");
   } catch (error) {
     console.error("[RevenueCat] Failed to log out:", error);

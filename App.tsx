@@ -18,8 +18,10 @@ import { ToastProvider } from "./src/components/ToastManager";
 import { FireflyTimeProvider } from "./src/context/FireflyTimeContext";
 import { View, ImageBackground } from "react-native";
 import { useEffect, useState } from "react";
-import { initSubscriptions } from "./src/services/subscriptionService";
+import { initSubscriptions, identifyUser } from "./src/services/subscriptionService";
 import { useAuthStore } from "./src/state/authStore";
+import { auth } from "./src/config/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 /*
 IMPORTANT NOTICE: DO NOT REMOVE
@@ -56,16 +58,48 @@ export default function App() {
   });
 
   const [appReady, setAppReady] = useState(false);
-  const user = useAuthStore((s) => s.user);
+  const [subscriptionsInitialized, setSubscriptionsInitialized] = useState(false);
 
-  // Initialize subscriptions when fonts are loaded and auth is ready
+  // Initialize subscriptions ONCE at app launch (anonymous, before auth)
   useEffect(() => {
-    if (fontsLoaded) {
-      initSubscriptions().catch((error) => {
-        console.error("[App] Failed to initialize subscriptions:", error);
-      });
+    if (fontsLoaded && !subscriptionsInitialized) {
+      console.log("[App] Initializing subscriptions anonymously");
+      initSubscriptions()
+        .then(() => {
+          setSubscriptionsInitialized(true);
+          console.log("[App] Subscriptions initialized");
+        })
+        .catch((error) => {
+          console.error("[App] Failed to initialize subscriptions:", error);
+          setSubscriptionsInitialized(true); // Continue even if init fails
+        });
     }
-  }, [fontsLoaded, user]);
+  }, [fontsLoaded, subscriptionsInitialized]);
+
+  // Listen for Firebase auth state changes and identify user in RevenueCat
+  useEffect(() => {
+    if (!subscriptionsInitialized) {
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        console.log("[App] Firebase user signed in:", firebaseUser.uid);
+        try {
+          // Identify user in RevenueCat with Firebase uid
+          await identifyUser(firebaseUser.uid);
+          console.log("[App] User identified in RevenueCat");
+        } catch (error) {
+          console.error("[App] Failed to identify user in RevenueCat:", error);
+        }
+      } else {
+        console.log("[App] Firebase user signed out");
+        // User remains anonymous in RevenueCat or call logOut if needed
+      }
+    });
+
+    return () => unsubscribe();
+  }, [subscriptionsInitialized]);
 
   // Show splash screen for minimum 2 seconds
   useEffect(() => {
