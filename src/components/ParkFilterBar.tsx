@@ -14,6 +14,7 @@ interface ParkFilterBarProps {
   onModeChange: (mode: FilterMode) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onSearchSubmit?: () => void;
   driveTime: DriveTime;
   onDriveTimeChange: (time: DriveTime) => void;
   parkType: ParkType;
@@ -42,6 +43,7 @@ export default function ParkFilterBar({
   onModeChange,
   searchQuery,
   onSearchChange,
+  onSearchSubmit,
   driveTime,
   onDriveTimeChange,
   parkType,
@@ -239,6 +241,8 @@ export default function ParkFilterBar({
             <TextInput
               value={searchQuery}
               onChangeText={onSearchChange}
+              onSubmitEditing={onSearchSubmit}
+              returnKeyType="search"
               placeholder="Search parks"
               placeholderTextColor={EARTH_GREEN}
               style={{

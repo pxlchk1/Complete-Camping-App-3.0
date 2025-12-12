@@ -23,7 +23,7 @@ import { RootStackParamList } from "../navigation/types";
 
 // Theme
 import { colors, spacing, radius, fonts, fontSizes } from "../theme/theme";
-import { DEEP_FOREST, EARTH_GREEN, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_SECONDARY } from "../constants/colors";
+import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_SECONDARY } from "../constants/colors";
 import { HERO_IMAGES } from "../constants/images";
 
 type ParksBrowseScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -51,6 +51,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPark, setSelectedPark] = useState<Park | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   // Calculate distance between two coordinates (Haversine formula) - returns distance in miles
   const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -69,9 +70,22 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
 
   // Fetch parks based on current filters
   const fetchParks = useCallback(async () => {
-    // If we are in "near" mode but still waiting on location, do nothing yet
+    // Only fetch if user has actively searched
+    if (!hasSearched) {
+      console.log("[ParksBrowse] Waiting for user to initiate search");
+      return;
+    }
+
+    // If in "near" mode but no location, don't fetch yet
     if (mode === "near" && !userLocation) {
-      console.log("[ParksBrowse] Skipping fetch, waiting for location");
+      console.log("[ParksBrowse] Near mode requires location");
+      return;
+    }
+
+    // If in search mode but query is too short, don't fetch
+    if (mode === "search" && searchQuery.trim().length < 2) {
+      console.log("[ParksBrowse] Search query too short");
+      setParks([]);
       return;
     }
 
@@ -80,8 +94,9 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
 
     try {
       const parksCollection = collection(db, "parks");
-      // Simple, index friendly query: get up to 2500 parks
-      const q = query(parksCollection, firestoreLimit(2500));
+      // Load all parks - we'll filter client-side for now
+      // Future optimization: add server-side filtering with indexes
+      const q = query(parksCollection, firestoreLimit(3000));
       const querySnapshot = await getDocs(q);
 
       let fetchedParks: Park[] = [];
@@ -102,11 +117,12 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
         });
       });
 
-      // Search by name (only if at least 2 characters, but we still fetched everything)
+      // Search by name
       if (mode === "search" && searchQuery.trim().length >= 2) {
         const lower = searchQuery.toLowerCase();
         fetchedParks = fetchedParks.filter((park) =>
-          park.name.toLowerCase().includes(lower)
+          park.name.toLowerCase().includes(lower) ||
+          park.state.toLowerCase().includes(lower)
         );
       }
 
@@ -115,7 +131,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
         fetchedParks = fetchedParks.filter((park) => park.filter === parkType);
       }
 
-      // "Near me" filtering and sorting by distance, using drive time
+      // "Near me" filtering and sorting by distance
       if (mode === "near" && userLocation) {
         const parksWithDistance = fetchedParks.map((park) => ({
           ...park,
@@ -127,7 +143,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
           ),
         }));
 
-        const maxDistanceMiles = driveTime * 55; // simple mph approximation
+        const maxDistanceMiles = driveTime * 55; // mph approximation
 
         fetchedParks = parksWithDistance
           .filter((p) => p.distance <= maxDistanceMiles)
@@ -140,7 +156,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
           driveTime,
           "hours (",
           maxDistanceMiles,
-          "mi )"
+          "mi)"
         );
       }
 
@@ -148,12 +164,12 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
       setParks(fetchedParks);
     } catch (err: any) {
       console.error("Error fetching parks:", err?.code, err?.message, err);
-      setError("Failed to load parks. Please try again.");
+      setError("Failed to load parks. Please check your connection and try again.");
       setParks([]);
     } finally {
       setIsLoading(false);
     }
-  }, [mode, searchQuery, userLocation, driveTime, parkType]);
+  }, [hasSearched, mode, searchQuery, userLocation, driveTime, parkType]);
 
   // Fetch parks when filters change
   useEffect(() => {
@@ -170,11 +186,20 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
     setMode(newMode);
     setSearchQuery("");
     setError(null);
+    setParks([]);
+    setHasSearched(false);
   };
 
   const handleLocationRequest = (location: { latitude: number; longitude: number }) => {
     console.log("[ParksBrowseScreen] Location received:", location);
     setUserLocation(location);
+    setHasSearched(true);
+  };
+
+  const handleSearchSubmit = () => {
+    if (searchQuery.trim().length >= 2) {
+      setHasSearched(true);
+    }
   };
 
   const handleLocationError = (errorMsg: string) => {
@@ -191,8 +216,9 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
     // In full app, this would open a modal to add custom campground directly to a trip
   };
 
-  const showEmptyState = !isLoading && parks.length === 0;
+  const showEmptyState = !isLoading && parks.length === 0 && hasSearched;
   const showLocationPrompt = mode === "near" && !userLocation && !isLoading;
+  const showInitialState = !hasSearched && !isLoading && parks.length === 0;
 
   return (
     <View style={styles.root}>
@@ -215,6 +241,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
             onModeChange={handleModeChange}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            onSearchSubmit={handleSearchSubmit}
             driveTime={driveTime}
             onDriveTimeChange={setDriveTime}
             parkType={parkType}
@@ -367,8 +394,75 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
             </View>
           )}
 
+          {/* Initial Welcome State */}
+          {showInitialState && (
+            <View
+              style={{
+                backgroundColor: CARD_BACKGROUND_LIGHT,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: BORDER_SOFT,
+                padding: spacing.xl,
+                alignItems: "center",
+                marginTop: spacing.xl,
+              }}
+            >
+              <View
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
+                  backgroundColor: DEEP_FOREST + "15",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: spacing.md,
+                }}
+              >
+                <Ionicons name="compass-outline" size={40} color={DEEP_FOREST} />
+              </View>
+              <Text
+                style={{
+                  fontFamily: fonts.displayBold,
+                  fontSize: fontSizes.lg,
+                  color: DEEP_FOREST,
+                  marginBottom: spacing.sm,
+                  textAlign: "center",
+                }}
+              >
+                Discover Your Next Adventure
+              </Text>
+              <Text
+                style={{
+                  fontFamily: fonts.bodyRegular,
+                  fontSize: fontSizes.md,
+                  color: EARTH_GREEN,
+                  textAlign: "center",
+                  marginBottom: spacing.md,
+                }}
+              >
+                {mode === "near"
+                  ? "Tap 'Near me' above to find parks and campgrounds nearby"
+                  : "Enter a park name or location to start searching"}
+              </Text>
+              <View style={{ flexDirection: "row", gap: spacing.xs, flexWrap: "wrap", justifyContent: "center" }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Ionicons name="location" size={16} color={GRANITE_GOLD} />
+                  <Text style={{ fontFamily: fonts.bodyRegular, fontSize: fontSizes.sm, color: TEXT_SECONDARY, marginLeft: 4 }}>Find nearby</Text>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Ionicons name="search" size={16} color={GRANITE_GOLD} />
+                  <Text style={{ fontFamily: fonts.bodyRegular, fontSize: fontSizes.sm, color: TEXT_SECONDARY, marginLeft: 4 }}>Search by name</Text>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Ionicons name="filter" size={16} color={GRANITE_GOLD} />
+                  <Text style={{ fontFamily: fonts.bodyRegular, fontSize: fontSizes.sm, color: TEXT_SECONDARY, marginLeft: 4 }}>Filter by type</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* Map - only show in map view mode */}
-          {viewMode === "map" && !showLocationPrompt && (mode !== "near" || userLocation) && (
+          {viewMode === "map" && !showLocationPrompt && !showInitialState && (mode !== "near" || userLocation) && (
             <View style={{ marginBottom: spacing.md }}>
               <ParksMap parks={parks} userLocation={userLocation} mode={mode} onParkPress={handleParkPress} />
             </View>
@@ -410,8 +504,8 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
             </View>
           )}
 
-          {/* Empty State */}
-          {showEmptyState && !showLocationPrompt && (
+          {/* Empty State - No Results */}
+          {showEmptyState && !showLocationPrompt && !showInitialState && (
             <View
               style={{
                 backgroundColor: CARD_BACKGROUND_LIGHT,
@@ -437,8 +531,8 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
               </View>
               <Text
                 style={{
-                  fontFamily: fonts.displayRegular,
-                  fontSize: fontSizes.md,
+                  fontFamily: fonts.displaySemibold,
+                  fontSize: fontSizes.lg,
                   color: DEEP_FOREST,
                   marginBottom: spacing.xs,
                 }}
@@ -448,12 +542,15 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
               <Text
                 style={{
                   fontFamily: fonts.bodyRegular,
-                  fontSize: fontSizes.sm,
+                  fontSize: fontSizes.md,
                   color: EARTH_GREEN,
                   textAlign: "center",
+                  marginBottom: spacing.sm,
                 }}
               >
-                Try adjusting your filters or increasing your drive time.
+                {mode === "near"
+                  ? "Try increasing your drive time or changing the park type filter."
+                  : "Try a different search term or adjust your filters."}
               </Text>
             </View>
           )}
