@@ -295,26 +295,74 @@ export default function FeedbackListScreen() {
       {/* List */}
       {posts.length === 0 ? (
         <View className="flex-1 items-center justify-center px-5">
-          <Ionicons name="chatbubbles-outline" size={64} color={GRANITE_GOLD} />
-          <Text
-            className="mt-4 text-xl text-center"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
-          >
-            No feedback yet
-          </Text>
-          <Text
-            className="mt-2 text-center"
-            style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-          >
-            Be the first to share feedback and help shape the app!
-          </Text>
+          <View className="items-center mb-8">
+            <View
+              className="w-20 h-20 rounded-full items-center justify-center mb-4"
+              style={{ backgroundColor: DEEP_FOREST + "15" }}
+            >
+              <Ionicons name="chatbubbles-outline" size={48} color={DEEP_FOREST} />
+            </View>
+            <Text
+              className="text-2xl text-center mb-3"
+              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+            >
+              Share Your Feedback
+            </Text>
+            <Text
+              className="text-center text-base mb-6"
+              style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY, lineHeight: 24 }}
+            >
+              Help us improve! Share feature requests, report bugs, or suggest improvements.
+            </Text>
+          </View>
+
+          {/* Feedback Categories Preview */}
+          <View className="w-full mb-6">
+            <View className="flex-row flex-wrap gap-3 justify-center">
+              <View className="items-center" style={{ width: 100 }}>
+                <View
+                  className="w-14 h-14 rounded-full items-center justify-center mb-2"
+                  style={{ backgroundColor: "#f59e0b15" }}
+                >
+                  <Ionicons name="bulb-outline" size={28} color="#f59e0b" />
+                </View>
+                <Text className="text-xs text-center" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_SECONDARY }}>
+                  Features
+                </Text>
+              </View>
+              <View className="items-center" style={{ width: 100 }}>
+                <View
+                  className="w-14 h-14 rounded-full items-center justify-center mb-2"
+                  style={{ backgroundColor: "#ef444415" }}
+                >
+                  <Ionicons name="bug-outline" size={28} color="#ef4444" />
+                </View>
+                <Text className="text-xs text-center" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_SECONDARY }}>
+                  Bugs
+                </Text>
+              </View>
+              <View className="items-center" style={{ width: 100 }}>
+                <View
+                  className="w-14 h-14 rounded-full items-center justify-center mb-2"
+                  style={{ backgroundColor: "#3b82f615" }}
+                >
+                  <Ionicons name="trending-up-outline" size={28} color="#3b82f6" />
+                </View>
+                <Text className="text-xs text-center" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_SECONDARY }}>
+                  Improvements
+                </Text>
+              </View>
+            </View>
+          </View>
+
           <Pressable
             onPress={handleCreatePost}
-            className="mt-6 px-6 py-3 rounded-xl active:opacity-90"
+            className="px-8 py-4 rounded-xl active:opacity-90 flex-row items-center"
             style={{ backgroundColor: DEEP_FOREST }}
           >
-            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
-              Share Feedback
+            <Ionicons name="add-circle-outline" size={24} color={PARCHMENT} />
+            <Text className="ml-2 text-base" style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
+              Submit Feedback
             </Text>
           </Pressable>
         </View>
