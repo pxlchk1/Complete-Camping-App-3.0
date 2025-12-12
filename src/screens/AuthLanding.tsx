@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, Platform, ActivityIndicator, TextInput, KeyboardAvoidingView, ScrollView, Linking } from "react-native";
+import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, Platform, ActivityIndicator, TextInput, KeyboardAvoidingView, ScrollView, Linking, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
-import { OAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { OAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword, fetchSignInMethodsForEmail, linkWithCredential } from "firebase/auth";
 import { auth, db } from "../config/firebase";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp, collection } from "firebase/firestore";
 import { useAuthStore } from "../state/authStore";
 import { useUserStore } from "../state/userStore";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,12 +20,18 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
   const [handle, setHandle] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
+  const [showLinkingModal, setShowLinkingModal] = useState(false);
+  const [linkingEmail, setLinkingEmail] = useState("");
+  const [linkingPassword, setLinkingPassword] = useState("");
+  const [pendingAppleCredential, setPendingAppleCredential] = useState<any>(null);
+  const [linkingError, setLinkingError] = useState("");
   const setUser = useAuthStore((s) => s.setUser);
   const setCurrentUser = useUserStore((s) => s.setCurrentUser);
 
   const handleAppleSignIn = async () => {
     try {
       setLoading(true);
+      setError("");
 
       // Check if Apple Authentication is available
       const isAvailable = await AppleAuthentication.isAvailableAsync();
@@ -42,7 +48,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       );
 
       // Request Apple credential
-      const credential = await AppleAuthentication.signInAsync({
+      const appleCredential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
@@ -50,8 +56,68 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         nonce: hashedNonce,
       });
 
-      // Sign in with Firebase
-      const { identityToken } = credential;
+      // Extract email from Apple credential
+      const appleEmail = appleCredential.email;
+      
+      if (!appleEmail) {
+        // No email from Apple - proceed with direct sign-in
+        console.log("[Apple Auth] No email from Apple, proceeding with direct sign-in");
+        await completeAppleSignIn(appleCredential, nonce);
+        return;
+      }
+
+      // Normalize email
+      const emailNormalized = appleEmail.toLowerCase().trim();
+      console.log("[Apple Auth] Checking for existing accounts with email:", emailNormalized);
+
+      // Check for existing sign-in methods for this email
+      const signInMethods = await fetchSignInMethodsForEmail(auth, emailNormalized);
+      console.log("[Apple Auth] Existing sign-in methods:", signInMethods);
+
+      // Check if password or other non-Apple methods exist
+      const hasPasswordAuth = signInMethods.includes("password");
+      const hasNonAppleAuth = signInMethods.some(method => method !== "apple.com");
+
+      if (hasNonAppleAuth) {
+        // Account exists with password - need to link
+        console.log("[Apple Auth] Account exists with password, prompting for password to link");
+        
+        // Store Apple credential for later linking
+        const { identityToken } = appleCredential;
+        if (!identityToken) {
+          throw new Error("No identity token received");
+        }
+
+        const provider = new OAuthProvider("apple.com");
+        const firebaseCredential = provider.credential({
+          idToken: identityToken,
+          rawNonce: nonce,
+        });
+
+        setPendingAppleCredential({ credential: firebaseCredential, appleInfo: appleCredential });
+        setLinkingEmail(emailNormalized);
+        setShowLinkingModal(true);
+        setLoading(false);
+        return;
+      }
+
+      // No existing password account - proceed with Apple sign-in
+      console.log("[Apple Auth] No conflicting accounts, proceeding with sign-in");
+      await completeAppleSignIn(appleCredential, nonce);
+
+    } catch (error: any) {
+      if (error.code !== "ERR_REQUEST_CANCELED") {
+        console.error("Apple Sign In Error:", error);
+        alert("Failed to sign in with Apple. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const completeAppleSignIn = async (appleCredential: any, nonce: string) => {
+    try {
+      const { identityToken } = appleCredential;
       if (!identityToken) {
         throw new Error("No identity token received");
       }
@@ -70,42 +136,120 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       
       if (!userDoc.exists()) {
         // New user - create profile
-        const rawHandle = firebaseUser.displayName || credential.fullName?.givenName || "user";
+        const rawHandle = firebaseUser.displayName || appleCredential.fullName?.givenName || "user";
         const normalizedHandle = rawHandle.toLowerCase().replace(/[^a-z0-9]/g, "");
         const displayName = firebaseUser.displayName ||
-          `${credential.fullName?.givenName || ""} ${credential.fullName?.familyName || ""}`.trim() ||
+          `${appleCredential.fullName?.givenName || ""} ${appleCredential.fullName?.familyName || ""}`.trim() ||
           "Anonymous User";
+
+        const email = firebaseUser.email || appleCredential.email || "";
 
         await createUserProfile({
           userId: firebaseUser.uid,
-          email: firebaseUser.email || credential.email || "",
+          email: email,
           displayName: displayName,
           handle: normalizedHandle,
         });
+
+        // Create email index mapping for lookup
+        if (email) {
+          const emailNormalized = email.toLowerCase().trim();
+          await setDoc(doc(db, "userEmailIndex", emailNormalized), {
+            userId: firebaseUser.uid,
+            email: email,
+            createdAt: serverTimestamp(),
+          });
+          console.log("[Apple Auth] Created email index for:", emailNormalized);
+        }
       }
 
-      // Load profile data
-      const updatedUserDoc = await getDoc(doc(db, "profiles", firebaseUser.uid));
-      const userData = updatedUserDoc.data();
+      await loadUserProfile(firebaseUser.uid);
+    } catch (error) {
+      console.error("Complete Apple Sign In Error:", error);
+      throw error;
+    }
+  };
+
+  const handlePasswordLinking = async () => {
+    try {
+      setLinkingError("");
+      
+      if (!linkingPassword.trim()) {
+        setLinkingError("Please enter your password");
+        return;
+      }
+
+      console.log("[Account Linking] Attempting password sign-in for:", linkingEmail);
+
+      // Step 1: Sign in with password
+      const passwordCredential = await signInWithEmailAndPassword(
+        auth,
+        linkingEmail,
+        linkingPassword
+      );
+
+      console.log("[Account Linking] Password sign-in successful, linking Apple account");
+
+      // Step 2: Link Apple credential to this account
+      const linkedUser = await linkWithCredential(
+        passwordCredential.user,
+        pendingAppleCredential.credential
+      );
+
+      console.log("[Account Linking] Successfully linked Apple to existing account");
+
+      // Close modal and complete sign-in
+      setShowLinkingModal(false);
+      setPendingAppleCredential(null);
+      setLinkingPassword("");
+      setLinkingEmail("");
+
+      // Load user profile
+      await loadUserProfile(linkedUser.user.uid);
+
+    } catch (error: any) {
+      console.error("Password Linking Error:", error);
+      if (error.code === "auth/wrong-password") {
+        setLinkingError("Incorrect password. Please try again.");
+      } else if (error.code === "auth/invalid-credential") {
+        setLinkingError("Incorrect password. Please try again.");
+      } else if (error.code === "auth/provider-already-linked") {
+        setLinkingError("This Apple account is already linked to another account.");
+      } else if (error.code === "auth/credential-already-in-use") {
+        setLinkingError("This Apple account is already in use by another account.");
+      } else {
+        setLinkingError("Failed to link accounts. Please try again.");
+      }
+    }
+  };
+
+  const loadUserProfile = async (userId: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, "profiles", userId));
+      const userData = userDoc.data();
+      const firebaseUser = auth.currentUser;
+
+      if (!firebaseUser) {
+        throw new Error("No current user");
+      }
 
       const userProfile = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email || credential.email || "",
+        id: userId,
+        email: firebaseUser.email || "",
         handle: userData?.handle || "user",
         displayName: userData?.displayName || "User",
         avatarUrl: userData?.avatarUrl || firebaseUser.photoURL || undefined,
         createdAt: userData?.joinedAt || new Date().toISOString(),
       };
 
-      console.log("🔐 [AuthLanding - Apple] User Profile:", JSON.stringify(userProfile, null, 2));
-      console.log("🔐 [AuthLanding - Apple] Firebase User Data:", JSON.stringify(userData, null, 2));
+      console.log("🔐 [AuthLanding] User Profile:", JSON.stringify(userProfile, null, 2));
 
       setUser(userProfile);
       
-      // Also update userStore for components that use it (like HomeScreen)
+      // Also update userStore
       const userStoreData = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email || credential.email || "",
+        id: userId,
+        email: firebaseUser.email || "",
         handle: userData?.handle || "user",
         displayName: userData?.displayName || "User",
         photoURL: userData?.avatarUrl || firebaseUser.photoURL,
@@ -120,17 +264,11 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         updatedAt: new Date().toISOString(),
       };
       
-      console.log("🔐 [AuthLanding - Apple] Setting userStore:", JSON.stringify(userStoreData, null, 2));
       setCurrentUser(userStoreData);
-      
       navigation.navigate("HomeTabs");
-    } catch (error: any) {
-      if (error.code !== "ERR_REQUEST_CANCELED") {
-        console.error("Apple Sign In Error:", error);
-        alert("Failed to sign in with Apple. Please try again.");
-      }
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error("Load User Profile Error:", error);
+      throw error;
     }
   };
 
@@ -165,6 +303,15 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
           displayName: displayName.trim(),
           handle: normalizedHandle,
         });
+
+        // Create email index mapping for account lookup
+        const emailNormalized = email.trim().toLowerCase();
+        await setDoc(doc(db, "userEmailIndex", emailNormalized), {
+          userId: userCredential.user.uid,
+          email: email.trim(),
+          createdAt: serverTimestamp(),
+        });
+        console.log("[Email Auth] Created email index for:", emailNormalized);
       } else {
         // Sign in existing user
         userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -432,6 +579,73 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
           </Text>
         </View>
       </SafeAreaView>
+
+      {/* Account Linking Modal */}
+      <Modal
+        visible={showLinkingModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowLinkingModal(false);
+          setPendingAppleCredential(null);
+          setLinkingPassword("");
+          setLinkingError("");
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Link Your Accounts</Text>
+            <Text style={styles.modalMessage}>
+              An account already exists with this email. Enter your password to link your Apple account.
+            </Text>
+
+            <View style={styles.linkingEmailContainer}>
+              <Ionicons name="mail-outline" size={20} color="#828872" />
+              <Text style={styles.linkingEmailText}>{linkingEmail}</Text>
+            </View>
+
+            {linkingError ? (
+              <View style={styles.linkingErrorContainer}>
+                <Ionicons name="alert-circle" size={20} color="#D84315" />
+                <Text style={styles.linkingErrorText}>{linkingError}</Text>
+              </View>
+            ) : null}
+
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#828872"
+              value={linkingPassword}
+              onChangeText={setLinkingPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete="current-password"
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => {
+                  setShowLinkingModal(false);
+                  setPendingAppleCredential(null);
+                  setLinkingPassword("");
+                  setLinkingError("");
+                }}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalLinkButton}
+                onPress={handlePasswordLinking}
+                disabled={!linkingPassword.trim()}
+              >
+                <Text style={styles.modalLinkText}>Link Accounts</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ImageBackground>
   );
 }
@@ -610,5 +824,111 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#F4EBD0",
     textDecorationLine: "underline",
-  }
+  },
+
+  // Account Linking Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+
+  modalContainer: {
+    backgroundColor: "#F4EBD0",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+  },
+
+  modalTitle: {
+    fontFamily: "JosefinSlab_700Bold",
+    fontSize: 24,
+    color: "#485952",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+
+  modalMessage: {
+    fontFamily: "SourceSans3_400Regular",
+    fontSize: 16,
+    color: "#485952",
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+
+  linkingEmailContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(130, 136, 114, 0.1)",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 8,
+  },
+
+  linkingEmailText: {
+    fontFamily: "SourceSans3_600SemiBold",
+    fontSize: 15,
+    color: "#485952",
+    flex: 1,
+  },
+
+  linkingErrorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(216, 67, 21, 0.1)",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    gap: 8,
+  },
+
+  linkingErrorText: {
+    fontFamily: "SourceSans3_600SemiBold",
+    fontSize: 14,
+    color: "#D84315",
+    flex: 1,
+  },
+
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#828872",
+    backgroundColor: "transparent",
+  },
+
+  modalCancelText: {
+    fontFamily: "SourceSans3_600SemiBold",
+    fontSize: 16,
+    color: "#485952",
+    textAlign: "center",
+  },
+
+  modalLinkButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: "#485952",
+  },
+
+  modalLinkText: {
+    fontFamily: "SourceSans3_600SemiBold",
+    fontSize: 16,
+    color: "#F4EBD0",
+    textAlign: "center",
+  },
 });
