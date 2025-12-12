@@ -468,23 +468,6 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
             </View>
           )}
 
-          {/* Loading State */}
-          {isLoading && (
-            <View style={{ alignItems: "center", paddingVertical: spacing.xl }}>
-              <ActivityIndicator size="large" color={DEEP_FOREST} />
-              <Text
-                style={{
-                  fontFamily: fonts.bodyRegular,
-                  fontSize: fontSizes.sm,
-                  color: EARTH_GREEN,
-                  marginTop: spacing.sm,
-                }}
-              >
-                Loading parks...
-              </Text>
-            </View>
-          )}
-
           {/* Park List - show in list view mode or below map in map view mode */}
           {!isLoading && parks.length > 0 && (
             <View>
