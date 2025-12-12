@@ -12,6 +12,7 @@ import { feedbackService, FeedbackPost } from "../../services/firestore/feedback
 import { auth } from "../../config/firebase";
 import { RootStackNavigationProp } from "../../navigation/types";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
+import { seedFeedbackIfEmpty } from "../../features/feedback/seedFeedback";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -24,7 +25,7 @@ import {
   TEXT_MUTED,
 } from "../../constants/colors";
 
-type CategoryFilter = 'feature' | 'bug' | 'improvement' | 'question' | 'other' | 'all';
+type CategoryFilter = 'Feature Request' | 'Bug Report' | 'Improvement' | 'Question' | 'Other' | 'all';
 
 export default function FeedbackListScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
@@ -35,20 +36,36 @@ export default function FeedbackListScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("all");
 
+  // Seed on mount
+  useEffect(() => {
+    console.log("[FeedbackList] Mounting feedback screen, running seed check.");
+    seedFeedbackIfEmpty().catch(err => {
+      console.error("[FeedbackList] Seed failed:", err);
+    });
+  }, []);
+
   const loadPosts = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      console.log("[FeedbackList] Loading posts from Firestore...");
       const allPosts = await feedbackService.getFeedback();
+      console.log(`[FeedbackList] Loaded ${allPosts.length} posts from Firestore.`);
+
+      if (allPosts.length === 0) {
+        console.log("[FeedbackList] No posts found after seed attempt.");
+      }
 
       // Filter by category if not "all"
       const filtered = selectedCategory === "all"
         ? allPosts
         : allPosts.filter(post => post.category === selectedCategory);
-
+      
+      console.log(`[FeedbackList] After filtering by "${selectedCategory}": ${filtered.length} posts`);
       setPosts(filtered);
     } catch (err: any) {
+      console.error("[FeedbackList] Error loading posts:", err);
       setError(err.message || "Failed to load feedback");
     } finally {
       setLoading(false);
@@ -68,60 +85,97 @@ export default function FeedbackListScreen() {
   const handlePostPress = (postId: string) => {
     navigation.navigate("FeedbackDetail", { postId });
   };
-
   const handleCreatePost = () => {
     if (!currentUser) {
-      // TODO: Show auth dialog
+      // Navigate to paywall for non-signed-in users
+      navigation.navigate("Paywall");
       return;
     }
+    
+    // Firestore rules will check subscription status
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     navigation.navigate("CreateFeedback");
   };
 
   const handleUpvote = async (postId: string) => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      navigation.navigate("Paywall");
+      return;
+    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await feedbackService.upvoteFeedback(postId);
       setPosts(prev =>
-        prev.map(p => (p.id === postId ? { ...p, upvotes: p.upvotes + 1 } : p))
+        prev.map(p => (p.id === postId ? { ...p, karmaScore: p.karmaScore + 1 } : p))
       );
     } catch (err) {
       // Silently fail
     }
   };
 
+  const handleDownvote = async (postId: string) => {
+    if (!currentUser) {
+      navigation.navigate("Paywall");
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await feedbackService.adjustKarma(postId, -1);
+      setPosts(prev =>
+        prev.map(p => (p.id === postId ? { ...p, karmaScore: p.karmaScore - 1 } : p))
+      );
+    } catch (err) {
+      // Silently fail
+    }
+  };
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "open": return "#6b7280";
-      case "planned": return "#3b82f6";
-      case "in-progress": return "#f59e0b";
-      case "completed": return "#10b981";
-      case "declined": return "#ef4444";
-      default: return "#6b7280";
+      case "open":
+        return "#6b7280";
+      case "planned":
+        return "#3b82f6";
+      case "in-progress":
+        return "#f59e0b";
+      case "completed":
+        return "#10b981";
+      case "declined":
+        return "#ef4444";
+      default:
+        return "#6b7280";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "open": return "Open";
-      case "planned": return "Planned";
-      case "in-progress": return "In Progress";
-      case "completed": return "Completed";
-      case "declined": return "Declined";
-      default: return status;
+      case "open":
+        return "Open";
+      case "in_progress":
+        return "In Progress";
+      case "resolved":
+        return "Resolved";
+      case "declined":
+        return "Declined";
+      default:
+        return status;
     }
   };
 
   const getCategoryLabel = (category: string) => {
     switch (category) {
-      case "feature": return "Feature";
-      case "bug": return "Bug";
-      case "improvement": return "Improvement";
-      case "question": return "Question";
-      case "other": return "Other";
-      default: return category;
+      case "Feature Request":
+        return "Feature Request";
+      case "Bug Report":
+        return "Bug Report";
+      case "Improvement":
+        return "Improvement";
+      case "Question":
+        return "Question";
+      case "Other":
+        return "Other";
+      default:
+        return category;
     }
   };
 
@@ -153,7 +207,7 @@ export default function FeedbackListScreen() {
         style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
       >
         <View className="flex-row items-start justify-between mb-2">
-          <View className="flex-row flex-wrap gap-2 flex-1">
+          <View className="flex-row items-center gap-2 flex-1">
             <View className="px-3 py-1 rounded-full bg-amber-100">
               <Text className="text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: "#92400e" }}>
                 {getCategoryLabel(item.category)}
@@ -187,19 +241,35 @@ export default function FeedbackListScreen() {
             {formatTimeAgo(item.createdAt)}
           </Text>
 
-          <Pressable
-            onPress={(e) => {
-              e.stopPropagation();
-              handleUpvote(item.id);
-            }}
-            className="flex-row items-center px-3 py-1 rounded-lg bg-white border active:opacity-70"
-            style={{ borderColor: BORDER_SOFT }}
-          >
-            <Ionicons name="arrow-up-circle-outline" size={18} color={EARTH_GREEN} />
-            <Text className="ml-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-              {item.upvotes}
-            </Text>
-          </Pressable>
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                handleDownvote(item.id);
+              }}
+              className="flex-row items-center px-2 py-1 rounded-lg bg-white border active:opacity-70"
+              style={{ borderColor: BORDER_SOFT }}
+            >
+              <Ionicons name="arrow-down-circle-outline" size={18} color="#6b7280" />
+            </Pressable>
+            
+            <View className="px-3 py-1 rounded-lg bg-white border" style={{ borderColor: BORDER_SOFT }}>
+              <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+                {item.karmaScore}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                handleUpvote(item.id);
+              }}
+              className="flex-row items-center px-2 py-1 rounded-lg bg-white border active:opacity-70"
+              style={{ borderColor: BORDER_SOFT }}
+            >
+              <Ionicons name="arrow-up-circle-outline" size={18} color={EARTH_GREEN} />
+            </Pressable>
+          </View>
         </View>
       </Pressable>
     );
@@ -377,3 +447,4 @@ export default function FeedbackListScreen() {
     </View>
   );
 }
+

@@ -312,8 +312,7 @@ export default function PhotosListScreen() {
             </Pressable>
           </View>
         </View>
-      </Modal>w>
-      </View>
+      </Modal>
 
       {/* Content removed - coming soon message */}
       <View className="flex-1 items-center justify-center px-5">

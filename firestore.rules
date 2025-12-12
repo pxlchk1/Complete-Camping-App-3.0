@@ -16,6 +16,12 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
+    function isSubscribed() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'active';
+    }
+
     // Users collection
     match /users/{userId} {
       allow read: if isSignedIn();
@@ -98,14 +104,14 @@ service cloud.firestore {
 
     // Feedback
     match /feedbackPosts/{id} {
-      allow read: if true; // Public read
-      allow create: if isSignedIn();
+      allow read: if true; // Public read - all users can view feedback
+      allow create: if isSubscribed() || isAdmin(); // Only subscribed users can create feedback
       allow update, delete: if isOwner() || isAdmin();
     }
 
     match /feedbackComments/{id} {
-      allow read: if true; // Public read
-      allow create: if isSignedIn();
+      allow read: if true; // Public read - all users can view comments
+      allow create: if isSubscribed() || isAdmin(); // Only subscribed users can comment
       allow update, delete: if isOwner() || isAdmin();
     }
 

@@ -15,16 +15,13 @@ import { db, auth } from '../../config/firebase';
 
 export interface FeedbackPost {
   id: string;
-  userId: string;
-  userName: string;
-  userAvatar?: string;
   title: string;
   description: string;
-  category: 'feature' | 'bug' | 'improvement' | 'question' | 'other';
+  category: 'Feature Request' | 'Bug Report' | 'Improvement' | 'Question' | 'Other';
   status: 'open' | 'planned' | 'in-progress' | 'completed' | 'declined';
-  upvotes: number;
+  karmaScore: number;
   createdAt: Timestamp;
-  updatedAt?: Timestamp;
+  createdByUserId: string;
 }
 
 export const feedbackService = {
@@ -32,21 +29,19 @@ export const feedbackService = {
   async createFeedback(data: {
     title: string;
     description: string;
-    category: 'feature' | 'bug' | 'improvement' | 'question' | 'other';
+    category: 'Feature Request' | 'Bug Report' | 'Improvement' | 'Question' | 'Other';
   }): Promise<string> {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to create feedback');
 
     const feedbackData = {
-      userId: user.uid,
-      userName: user.displayName || 'Anonymous',
-      userAvatar: user.photoURL || null,
       title: data.title,
       description: data.description,
       category: data.category,
       status: 'open' as const,
-      upvotes: 0,
+      karmaScore: 1,
       createdAt: serverTimestamp(),
+      createdByUserId: user.uid,
     };
 
     const docRef = await addDoc(collection(db, 'feedbackPosts'), feedbackData);
@@ -62,14 +57,10 @@ export const feedbackService = {
 
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        body: data.body || data.description || '',
-      };
-    }) as FeedbackPost[];
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as FeedbackPost[];
   },
 
   // Get feedback by ID
@@ -94,7 +85,7 @@ export const feedbackService = {
     data: {
       title?: string;
       description?: string;
-      category?: 'feature' | 'bug' | 'improvement' | 'question' | 'other';
+      category?: 'Feature Request' | 'Bug Report' | 'Improvement' | 'Question' | 'Other';
     }
   ): Promise<void> {
     const user = auth.currentUser;
@@ -104,14 +95,13 @@ export const feedbackService = {
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) throw new Error('Feedback not found');
-    if (docSnap.data().userId !== user.uid) {
+    
+    // Check if the current user created this feedback
+    if (docSnap.data().createdByUserId !== user.uid) {
       throw new Error('You can only edit your own feedback');
     }
 
-    await updateDoc(docRef, {
-      ...data,
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(docRef, data);
   },
 
   // Delete feedback (admin only)
@@ -127,38 +117,25 @@ export const feedbackService = {
     await deleteDoc(doc(db, 'feedbackPosts', feedbackId));
   },
 
-  // Upvote feedback
-  async upvoteFeedback(feedbackId: string): Promise<void> {
+  // Upvote/downvote feedback (adjust karma score)
+  async adjustKarma(feedbackId: string, delta: 1 | -1): Promise<void> {
     const user = auth.currentUser;
-    if (!user) throw new Error('Must be signed in to upvote');
+    if (!user) throw new Error('Must be signed in to vote');
 
     const docRef = doc(db, 'feedbackPosts', feedbackId);
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) throw new Error('Feedback not found');
 
-    const currentUpvotes = docSnap.data().upvotes || 0;
+    const currentKarma = docSnap.data().karmaScore || 0;
     await updateDoc(docRef, {
-      upvotes: currentUpvotes + 1,
+      karmaScore: currentKarma + delta,
     });
   },
 
-  // Update status (admin only)
-  async updateStatus(
-    feedbackId: string,
-    status: 'open' | 'planned' | 'in-progress' | 'completed' | 'declined'
-  ): Promise<void> {
-    const user = auth.currentUser;
-    if (!user) throw new Error('Must be signed in');
-
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
-    const isAdmin = userDoc.exists() && userDoc.data().role === 'admin';
-
-    if (!isAdmin) throw new Error('Only admins can update status');
-
-    await updateDoc(doc(db, 'feedbackPosts', feedbackId), {
-      status,
-      updatedAt: serverTimestamp(),
-    });
+  // Legacy method for compatibility
+  async upvoteFeedback(feedbackId: string): Promise<void> {
+    return this.adjustKarma(feedbackId, 1);
   },
 };
+
