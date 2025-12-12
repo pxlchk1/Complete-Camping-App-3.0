@@ -18,36 +18,25 @@ const REVENUECAT_API_KEY_ANDROID = ""; // Add when Android is needed
 let isInitialized = false;
 let isConfigured = false;
 
-// Store original console.error to filter RevenueCat configuration errors
-const originalConsoleError = console.error;
-console.error = (...args: any[]) => {
-  // Suppress expected RevenueCat configuration errors
-  const errorString = args.join(' ');
-  if (
-    errorString.includes('[RevenueCat]') &&
-    (errorString.includes('Error fetching offerings') ||
-     errorString.includes('products registered') ||
-     errorString.includes('why-are-offerings-empty'))
-  ) {
-    // Silently ignore - this is expected until App Store Connect API is configured
-    return;
-  }
-  // Pass through all other errors
-  originalConsoleError.apply(console, args);
-};
-
 /**
  * Check if RevenueCat is properly configured
  */
-export const isRevenueCatEnabled = (): boolean => {
-  return isConfigured && isInitialized;
+export const isRevenueCatReady = (): boolean => {
+  return isConfigured;
 };
 
 /**
  * Initialize RevenueCat SDK
  * Should be called once when the app starts, after user auth is ready
  */
-export const initializeRevenueCat = async (): Promise<boolean> => {
+export const initRevenueCat = async (userId?: string): Promise<boolean> => {
+  if (isInitialized) {
+    console.log("[RevenueCat] Already initialized");
+    return isConfigured;
+  }
+
+  isInitialized = true;
+
   try {
     // Check if we're on web - RevenueCat doesn't work on web
     if (Platform.OS === "web") {
@@ -64,24 +53,20 @@ export const initializeRevenueCat = async (): Promise<boolean> => {
       return false;
     }
 
-    if (isInitialized) {
-      console.log("[RevenueCat] Already initialized");
-      return true;
-    }
+    // Configure RevenueCat with optional user ID
+    await Purchases.configure({ 
+      apiKey,
+      ...(userId && { appUserId: userId })
+    });
 
-    // Set log level to suppress configuration warnings BEFORE configuring
-    // These errors are expected until App Store Connect API credentials are configured
-    // Setting to WARN level will hide offering fetch errors but show important warnings
-    Purchases.setLogLevel(LOG_LEVEL.WARN);
+    // Set debug log level for rollout phase
+    Purchases.setLogLevel(LOG_LEVEL.DEBUG);
 
-    await Purchases.configure({ apiKey });
-
-    isInitialized = true;
     isConfigured = true;
-    console.log("[RevenueCat] Successfully initialized");
+    console.log("[RevenueCat] Successfully configured", userId ? `for user: ${userId}` : "");
     return true;
   } catch (error) {
-    console.error("[RevenueCat] Failed to initialize:", error);
+    console.error("[RevenueCat] Failed to configure:", error);
     isConfigured = false;
     return false;
   }
@@ -92,7 +77,7 @@ export const initializeRevenueCat = async (): Promise<boolean> => {
  * Should be called after Firebase auth is complete
  */
 export const identifyUser = async (userId: string): Promise<void> => {
-  if (!isRevenueCatEnabled()) {
+  if (!isRevenueCatReady()) {
     console.log("[RevenueCat] Not configured - skipping user identification");
     return;
   }
@@ -110,7 +95,7 @@ export const identifyUser = async (userId: string): Promise<void> => {
  * Get current customer info including entitlements
  */
 export const getCustomerInfo = async (): Promise<CustomerInfo | null> => {
-  if (!isRevenueCatEnabled()) {
+  if (!isRevenueCatReady()) {
     console.log("[RevenueCat] Not configured - returning null customer info");
     return null;
   }
@@ -119,11 +104,6 @@ export const getCustomerInfo = async (): Promise<CustomerInfo | null> => {
     const customerInfo = await Purchases.getCustomerInfo();
     return customerInfo;
   } catch (error: any) {
-    // Suppress configuration errors - these are expected until App Store Connect API is configured
-    if (error?.message?.includes("configuration") || error?.message?.includes("products registered")) {
-      console.log("[RevenueCat] Customer info not available yet - configure App Store Connect API credentials");
-      return null;
-    }
     console.error("[RevenueCat] Failed to get customer info:", error);
     return null;
   }
@@ -133,7 +113,7 @@ export const getCustomerInfo = async (): Promise<CustomerInfo | null> => {
  * Check if user has a specific entitlement
  */
 export const hasEntitlement = async (entitlementId: string): Promise<boolean> => {
-  if (!isRevenueCatEnabled()) {
+  if (!isRevenueCatReady()) {
     return false;
   }
 
@@ -153,7 +133,7 @@ export const hasEntitlement = async (entitlementId: string): Promise<boolean> =>
  * Check if user has any active subscription
  */
 export const hasActiveSubscription = async (): Promise<boolean> => {
-  if (!isRevenueCatEnabled()) {
+  if (!isRevenueCatReady()) {
     return false;
   }
 
@@ -169,10 +149,10 @@ export const hasActiveSubscription = async (): Promise<boolean> => {
 };
 
 /**
- * Get available offerings
+ * Get available offerings (DEPRECATED - use fetchOfferingsSafe instead)
  */
 export const getOfferings = async (): Promise<PurchasesOffering | null> => {
-  if (!isRevenueCatEnabled()) {
+  if (!isRevenueCatReady()) {
     console.log("[RevenueCat] Not configured - returning null offerings");
     return null;
   }
@@ -181,11 +161,6 @@ export const getOfferings = async (): Promise<PurchasesOffering | null> => {
     const offerings = await Purchases.getOfferings();
     return offerings.current;
   } catch (error: any) {
-    // Suppress configuration errors - these are expected until App Store Connect API is configured
-    if (error?.message?.includes("configuration") || error?.message?.includes("products registered")) {
-      console.log("[RevenueCat] Offerings not available yet - configure App Store Connect API credentials in RevenueCat dashboard");
-      return null;
-    }
     console.error("[RevenueCat] Failed to get offerings:", error);
     return null;
   }
@@ -195,7 +170,7 @@ export const getOfferings = async (): Promise<PurchasesOffering | null> => {
  * Get a specific package by identifier
  */
 export const getPackage = async (packageIdentifier: string): Promise<PurchasesPackage | null> => {
-  if (!isRevenueCatEnabled()) {
+  if (!isRevenueCatReady()) {
     return null;
   }
 
@@ -219,7 +194,7 @@ export const getPackage = async (packageIdentifier: string): Promise<PurchasesPa
 export const purchasePackage = async (
   pkg: PurchasesPackage
 ): Promise<CustomerInfo | null> => {
-  if (!isRevenueCatEnabled()) {
+  if (!isRevenueCatReady()) {
     throw new Error("RevenueCat is not configured. Please check your API keys.");
   }
 
@@ -241,7 +216,7 @@ export const purchasePackage = async (
  * Restore purchases
  */
 export const restorePurchases = async (): Promise<CustomerInfo | null> => {
-  if (!isRevenueCatEnabled()) {
+  if (!isRevenueCatReady()) {
     throw new Error("RevenueCat is not configured. Please check your API keys.");
   }
 
@@ -259,7 +234,7 @@ export const restorePurchases = async (): Promise<CustomerInfo | null> => {
  * Log out the current user
  */
 export const logOut = async (): Promise<void> => {
-  if (!isRevenueCatEnabled()) {
+  if (!isRevenueCatReady()) {
     return;
   }
 

@@ -20,7 +20,7 @@ import * as Haptics from "expo-haptics";
 import Purchases, { PurchasesPackage, PACKAGE_TYPE } from "react-native-purchases";
 
 // Services
-import { getOfferings, subscribeToPlan, restorePurchases, syncSubscriptionToFirestore } from "../services/subscriptionService";
+import { fetchOfferingsSafe, subscribeToPlan, restorePurchases, syncSubscriptionToFirestore } from "../services/subscriptionService";
 import { useSubscriptionStore } from "../state/subscriptionStore";
 
 // Constants
@@ -65,38 +65,51 @@ export default function PaywallScreen() {
     try {
       setLoading(true);
       setError(null);
-      const offering = await getOfferings();
+      
+      console.log("[Paywall] Fetching offerings...");
+      const offerings = await fetchOfferingsSafe();
 
-      if (offering && offering.availablePackages.length > 0) {
-        const pkgs = offering.availablePackages;
+      if (!offerings) {
+        console.warn("[Paywall] No offerings returned - RevenueCat may not be configured");
+        setError("Subscription options are not available right now. Please check back later or contact support.");
+        setLoading(false);
+        return;
+      }
 
-        // Find monthly and annual packages
-        const monthly = pkgs.find((p) => 
-          p.identifier.toLowerCase().includes("monthly") ||
-          p.packageType === PACKAGE_TYPE.MONTHLY
-        );
-        
-        const annual = pkgs.find((p) => 
-          p.identifier.toLowerCase().includes("annual") || 
-          p.identifier.toLowerCase().includes("yearly") ||
-          p.packageType === PACKAGE_TYPE.ANNUAL
-        );
+      const offering = offerings.current;
+      
+      if (!offering || !offering.availablePackages.length) {
+        console.warn("[Paywall] No packages available in current offering");
+        setError("Subscription options are not available right now. Please check back later or contact support.");
+        setLoading(false);
+        return;
+      }
 
-        setMonthlyPackage(monthly || null);
-        setAnnualPackage(annual || null);
-        
-        console.log("[Paywall] Loaded packages - Monthly:", monthly?.identifier, "Annual:", annual?.identifier);
-        
-        if (!monthly && !annual) {
-          setError("Unable to load subscription options. Check your connection and try again.");
-        }
-      } else {
-        console.log("[Paywall] No packages available");
-        setError("Unable to load subscription options. Check your connection and try again.");
+      const pkgs = offering.availablePackages;
+
+      // Find monthly and annual packages
+      const monthly = pkgs.find((p) => 
+        p.identifier.toLowerCase().includes("monthly") ||
+        p.packageType === PACKAGE_TYPE.MONTHLY
+      );
+      
+      const annual = pkgs.find((p) => 
+        p.identifier.toLowerCase().includes("annual") || 
+        p.identifier.toLowerCase().includes("yearly") ||
+        p.packageType === PACKAGE_TYPE.ANNUAL
+      );
+
+      setMonthlyPackage(monthly || null);
+      setAnnualPackage(annual || null);
+      
+      console.log("[Paywall] Loaded packages - Monthly:", monthly?.identifier, "Annual:", annual?.identifier);
+      
+      if (!monthly && !annual) {
+        setError("Subscription options are not available right now. Please check back later or contact support.");
       }
     } catch (error) {
       console.error("[Paywall] Failed to load offerings:", error);
-      setError("Unable to load subscription options. Check your connection and try again.");
+      setError("An error occurred while loading subscription options. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -217,8 +230,51 @@ export default function PaywallScreen() {
         {/* Pricing CTAs */}
         {error ? (
           <View className="px-6 py-8">
-            <View className="p-6 rounded-xl" style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}>
+            <View className="p-6 rounded-xl" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderWidth: 1, borderColor: BORDER_SOFT }}>
               <Ionicons name="alert-circle-outline" size={48} color={TEXT_SECONDARY} style={{ alignSelf: "center", marginBottom: 12 }} />
+              <Text
+                className="text-center mb-4"
+                style={{
+                  fontFamily: "SourceSans3_600SemiBold",
+                  fontSize: 18,
+                  color: TEXT_PRIMARY_STRONG,
+                }}
+              >
+                Subscriptions Unavailable
+              </Text>
+              <Text
+                className="text-center mb-4"
+                style={{
+                  fontFamily: "SourceSans3_400Regular",
+                  fontSize: 16,
+                  color: TEXT_SECONDARY,
+                  lineHeight: 24,
+                }}
+              >
+                {error}
+              </Text>
+              <Pressable
+                onPress={loadOfferings}
+                className="mt-2 p-4 rounded-xl active:opacity-70"
+                style={{ backgroundColor: DEEP_FOREST }}
+              >
+                <Text
+                  className="text-center"
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    fontSize: 16,
+                    color: PARCHMENT,
+                  }}
+                >
+                  Try Again
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (!monthlyPackage && !annualPackage) ? (
+          <View className="px-6 py-8">
+            <View className="p-6 rounded-xl" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderWidth: 1, borderColor: BORDER_SOFT }}>
+              <Ionicons name="information-circle-outline" size={48} color={TEXT_SECONDARY} style={{ alignSelf: "center", marginBottom: 12 }} />
               <Text
                 className="text-center"
                 style={{
@@ -228,7 +284,7 @@ export default function PaywallScreen() {
                   lineHeight: 24,
                 }}
               >
-                {error}
+                No subscription options are currently available. Please check back later.
               </Text>
             </View>
           </View>

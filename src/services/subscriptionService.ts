@@ -3,36 +3,69 @@
  * High-level service for managing subscriptions throughout the app
  */
 
+import Purchases from "react-native-purchases";
 import * as RevenueCat from "../lib/revenuecatClient";
 import { useSubscriptionStore } from "../state/subscriptionStore";
 import { useAuthStore } from "../state/authStore";
 import { auth, db } from "../config/firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { SUBSCRIPTIONS_ENABLED } from "../config/subscriptions";
+
+/**
+ * Safely fetch offerings with proper error handling
+ * Returns null if offerings are unavailable or misconfigured
+ */
+export async function fetchOfferingsSafe() {
+  if (!SUBSCRIPTIONS_ENABLED) {
+    console.log("[SubscriptionService] Subscriptions disabled via feature flag");
+    return null;
+  }
+
+  if (!RevenueCat.isRevenueCatReady()) {
+    console.warn("[SubscriptionService] RevenueCat not ready");
+    return null;
+  }
+
+  try {
+    const offerings = await Purchases.getOfferings();
+
+    if (!offerings.current || !offerings.current.availablePackages.length) {
+      console.warn("[SubscriptionService] No offerings available - check App Store Connect configuration");
+      return null;
+    }
+
+    console.log("[SubscriptionService] Offerings loaded successfully:", offerings.current.availablePackages.length, "packages");
+    return offerings;
+  } catch (error) {
+    console.error("[SubscriptionService] Error fetching offerings:", error);
+    return null;
+  }
+}
 
 /**
  * Initialize the subscription system
  * Call this once when the app starts, after Firebase auth is ready
  */
 export const initSubscriptions = async (): Promise<void> => {
+  if (!SUBSCRIPTIONS_ENABLED) {
+    console.log("[SubscriptionService] Subscriptions disabled via feature flag");
+    return;
+  }
+
   try {
     console.log("[SubscriptionService] Initializing subscriptions");
 
-    // Initialize RevenueCat SDK
-    const initialized = await RevenueCat.initializeRevenueCat();
+    // Get current user if logged in
+    const user = useAuthStore.getState().user;
+    
+    // Initialize RevenueCat SDK with optional user ID
+    const initialized = await RevenueCat.initRevenueCat(user?.id);
 
     if (!initialized) {
       console.log("[SubscriptionService] RevenueCat not available on this platform");
       return;
     }
 
-    // Identify user if logged in
-    const user = useAuthStore.getState().user;
-    if (user) {
-      await identifyUser(user.id);
-    }
-
-    // Don't refresh entitlements on init to avoid triggering offering errors
-    // Entitlements will be checked when user actually tries to use premium features
     console.log("[SubscriptionService] Subscriptions initialized (entitlements will load on-demand)");
   } catch (error) {
     console.error("[SubscriptionService] Failed to initialize subscriptions:", error);
@@ -155,10 +188,12 @@ export const logOutSubscriptions = async (): Promise<void> => {
 };
 
 /**
- * Get available offerings
+ * Get available offerings (DEPRECATED - use fetchOfferingsSafe instead)
  */
 export const getOfferings = async () => {
-  return await RevenueCat.getOfferings();
+  console.warn("[SubscriptionService] getOfferings is deprecated, use fetchOfferingsSafe instead");
+  const offerings = await fetchOfferingsSafe();
+  return offerings?.current || null;
 };
 
 /**

@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { RootStackParamList } from "./types";
 import CustomBottomTabBar from "../components/CustomBottomTabBar";
 import { useAuthStore } from "../state/authStore";
+import { PAYWALL_ENABLED } from "../config/subscriptions";
 
 // Screens
 import HomeScreen from "../screens/HomeScreen";
@@ -132,14 +133,16 @@ export default function RootNavigator() {
       <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
 
       {/* Subscription */}
-      <Stack.Screen
-        name="Paywall"
-        component={PaywallScreen}
-        options={{
-          presentation: 'modal',
-          headerShown: false,
-        }}
-      />
+      {PAYWALL_ENABLED && (
+        <Stack.Screen
+          name="Paywall"
+          component={PaywallScreen}
+          options={{
+            presentation: 'modal',
+            headerShown: false,
+          }}
+        />
+      )}
 
       {/* Trip Planning screens */}
       <Stack.Screen name="PackingList" component={PackingListScreen} />
