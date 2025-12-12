@@ -8,7 +8,6 @@ import { createMaterialTopTabNavigator } from "@react-navigation/material-top-ta
 import { View, ImageBackground, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigationState } from "@react-navigation/native";
 import MyTripsScreen from "../screens/MyTripsScreen";
 import ParksBrowseScreen from "../screens/ParksBrowseScreen";
 import WeatherScreen from "../screens/WeatherScreen";
@@ -56,17 +55,11 @@ const getHeroContent = (routeName: string) => {
   }
 };
 
-function HeroHeader() {
+function HeroHeader({ activeTab }: { activeTab: string }) {
   const insets = useSafeAreaInsets();
-  const navigationState = useNavigationState(state => state);
   
-  // Get the active tab route name
-  const activeRouteName = navigationState?.routes[navigationState.index]?.state?.routes?.[
-    navigationState?.routes[navigationState.index]?.state?.index ?? 0
-  ]?.name || "Trips";
-  
-  const heroImage = getHeroImage(activeRouteName);
-  const { title, description } = getHeroContent(activeRouteName);
+  const heroImage = getHeroImage(activeTab);
+  const { title, description } = getHeroContent(activeTab);
 
   return (
     <View style={{ height: 200 + insets.top }}>
@@ -123,13 +116,23 @@ function HeroHeader() {
 }
 
 export default function PlanTopTabsNavigator() {
+  const [activeTab, setActiveTab] = useState("Trips");
+
   return (
     <View className="flex-1 bg-parchment">
       {/* Hero Header */}
-      <HeroHeader />
+      <HeroHeader activeTab={activeTab} />
 
       {/* Material Top Tabs */}
       <Tab.Navigator
+        screenListeners={{
+          state: (e) => {
+            // Get the active route name from the tab navigator
+            const state = e.data.state;
+            const route = state.routes[state.index];
+            setActiveTab(route.name);
+          },
+        }}
         screenOptions={{
           tabBarStyle: {
             backgroundColor: PARCHMENT,
