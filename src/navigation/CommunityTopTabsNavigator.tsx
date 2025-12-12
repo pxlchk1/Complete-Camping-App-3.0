@@ -9,6 +9,7 @@ import { View, ImageBackground } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Text } from "react-native";
+import { useNavigationState } from "@react-navigation/native";
 import TipsListScreen from "../screens/community/TipsListScreen";
 import GearReviewsListScreen from "../screens/community/GearReviewsListScreen";
 import QuestionsListScreen from "../screens/community/QuestionsListScreen";
@@ -20,62 +21,112 @@ import { HERO_IMAGES } from "../constants/images";
 
 const Tab = createMaterialTopTabNavigator();
 
-export default function CommunityTopTabsNavigator() {
+// Map tab routes to hero images
+const getHeroImage = (routeName: string) => {
+  switch (routeName) {
+    case "Tips":
+      return HERO_IMAGES.COMMUNITY;
+    case "Gear":
+      return HERO_IMAGES.COMMUNITY;
+    case "Ask":
+      return HERO_IMAGES.COMMUNITY;
+    case "Photos":
+      return HERO_IMAGES.COMMUNITY;
+    case "Feedback":
+      return HERO_IMAGES.COMMUNITY;
+    default:
+      return HERO_IMAGES.COMMUNITY;
+  }
+};
+
+// Map tab routes to titles and descriptions
+const getHeroContent = (routeName: string) => {
+  switch (routeName) {
+    case "Tips":
+      return { title: "Camping Tips", description: "Discover expert advice and helpful camping tips" };
+    case "Gear":
+      return { title: "Gear Reviews", description: "Read and share honest gear reviews from fellow campers" };
+    case "Ask":
+      return { title: "Ask the Community", description: "Get answers to your camping questions" };
+    case "Photos":
+      return { title: "Camping Photos", description: "Share and explore beautiful camping moments" };
+    case "Feedback":
+      return { title: "Feedback", description: "Help us improve with your suggestions" };
+    default:
+      return { title: "Community", description: "Share tips, gear reviews, and connect with fellow campers" };
+  }
+};
+
+function HeroHeader({ activeTab }: { activeTab: string }) {
   const insets = useSafeAreaInsets();
+  
+  const heroImage = getHeroImage(activeTab);
+  const { title, description } = getHeroContent(activeTab);
+
+  return (
+    <View style={{ height: 200 + insets.top }}>
+      <ImageBackground
+        source={heroImage}
+        style={{ flex: 1 }}
+        resizeMode="cover"
+        accessibilityLabel="Community camping scene"
+      >
+        <View className="flex-1" style={{ paddingTop: insets.top }}>
+          {/* Account Button - Top Right */}
+          <AccountButtonHeader color={TEXT_ON_DARK} />
+
+          <View className="flex-1 justify-end px-6 pb-4">
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.4)"]}
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 100,
+              }}
+            />
+            <Text
+              className="text-parchment text-3xl"
+              style={{
+                fontFamily: "JosefinSlab_700Bold",
+                textShadowColor: "rgba(0, 0, 0, 0.5)",
+                textShadowOffset: { width: 0, height: 1 },
+                textShadowRadius: 4,
+                zIndex: 1,
+              }}
+            >
+              {title}
+            </Text>
+            <Text
+              className="text-parchment mt-2"
+              style={{
+                fontFamily: "SourceSans3_400Regular",
+                textShadowColor: "rgba(0, 0, 0, 0.5)",
+                textShadowOffset: { width: 0, height: 1 },
+                textShadowRadius: 3,
+                zIndex: 1,
+              }}
+            >
+              {description}
+            </Text>
+          </View>
+        </View>
+      </ImageBackground>
+    </View>
+  );
+}
+
+export default function CommunityTopTabsNavigator() {
+  // Use navigation state to track active tab
+  const activeTabIndex = useNavigationState(state => state?.index ?? 0);
+  const tabNames = ["Tips", "Gear", "Ask", "Photos", "Feedback"];
+  const activeTab = tabNames[activeTabIndex] || "Tips";
 
   return (
     <View className="flex-1 bg-parchment">
       {/* Hero Header */}
-      <View style={{ height: 200 + insets.top }}>
-        <ImageBackground
-          source={HERO_IMAGES.COMMUNITY}
-          style={{ flex: 1 }}
-          resizeMode="cover"
-          accessibilityLabel="Community camping scene"
-        >
-          <View className="flex-1" style={{ paddingTop: insets.top }}>
-            {/* Account Button - Top Right */}
-            <AccountButtonHeader color={TEXT_ON_DARK} />
-
-            <View className="flex-1 justify-end px-6 pb-4">
-              <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.4)"]}
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: 100,
-                }}
-              />
-              <Text
-                className="text-parchment text-3xl"
-                style={{
-                  fontFamily: "JosefinSlab_700Bold",
-                  textShadowColor: "rgba(0, 0, 0, 0.5)",
-                  textShadowOffset: { width: 0, height: 1 },
-                  textShadowRadius: 4,
-                  zIndex: 1,
-                }}
-              >
-                Community
-              </Text>
-              <Text
-                className="text-parchment mt-2"
-                style={{
-                  fontFamily: "SourceSans3_400Regular",
-                  textShadowColor: "rgba(0, 0, 0, 0.5)",
-                  textShadowOffset: { width: 0, height: 1 },
-                  textShadowRadius: 3,
-                  zIndex: 1,
-                }}
-              >
-                Share tips, gear reviews, and connect with fellow campers
-              </Text>
-            </View>
-          </View>
-        </ImageBackground>
-      </View>
+      <HeroHeader activeTab={activeTab} />
 
       {/* Material Top Tabs */}
       <Tab.Navigator
