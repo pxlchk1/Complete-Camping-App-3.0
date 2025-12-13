@@ -423,7 +423,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
               <Text
                 style={{
                   fontFamily: fonts.displayBold,
-                  fontSize: fontSizes.lg,
+                  fontSize: 20,
                   color: DEEP_FOREST,
                   marginBottom: spacing.sm,
                   textAlign: "center",
@@ -434,7 +434,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
               <Text
                 style={{
                   fontFamily: fonts.bodyRegular,
-                  fontSize: fontSizes.md,
+                  fontSize: 16,
                   color: EARTH_GREEN,
                   textAlign: "center",
                   marginBottom: spacing.md,
