@@ -353,6 +353,7 @@ export async function createUserProfile(data: {
     handle: data.handle,
     joinedAt: serverTimestamp(),
     membershipTier: isAdmin ? "isAdmin" : "freeMember",
+    role: isAdmin ? "administrator" : "user",
     stats: {
       gearReviewsCount: 0,
       photosCount: 0,

@@ -25,6 +25,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { signOut } from "firebase/auth";
 import { restorePurchases, syncSubscriptionToFirestore } from "../services/subscriptionService";
 import { useUserStatus } from "../utils/authHelper";
+import { useIsModerator, useIsAdministrator } from "../state/userStore";
 import { HERO_IMAGES } from "../constants/images";
 import {
   DEEP_FOREST,
@@ -54,6 +55,7 @@ type UserProfile = {
   avatarUrl: string | null;
   backgroundUrl: string | null;
   membershipTier: MembershipTier;
+  role?: "user" | "moderator" | "administrator";
   bio: string | null;
   about?: string | null;
   location: string | null;
@@ -73,6 +75,8 @@ const PROFILE_OVERLAP = 60;
 
 export default function MyCampsiteScreen({ navigation }: any) {
   const { isGuest } = useUserStatus();
+  const isModerator = useIsModerator();
+  const isAdministrator = useIsAdministrator();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActivityTab>("trips");
@@ -859,6 +863,190 @@ export default function MyCampsiteScreen({ navigation }: any) {
               </Text>
             </View>
         </View>
+
+        {/* Admin Panel Section */}
+        {(profile.membershipTier === "isAdmin" || isAdministrator) && (
+          <View className="px-5 mb-6">
+            <View className="p-4 rounded-xl border-2" style={{ backgroundColor: "#EAF4F5", borderColor: "#92AFB1" }}>
+              <View className="flex-row items-center mb-3">
+                <Ionicons name="shield-checkmark" size={24} color="#92AFB1" />
+                <Text
+                  className="ml-2 text-lg"
+                  style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  Admin & Founder
+                </Text>
+              </View>
+              <Text
+                className="mb-4"
+                style={{ fontFamily: "SourceSans3_400Regular", fontSize: 14, color: TEXT_SECONDARY }}
+              >
+                Full app access and moderation tools
+              </Text>
+
+              {/* Admin Dashboard Button */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("AdminDashboard");
+                }}
+                className="mb-2 p-3 rounded-lg active:opacity-70"
+                style={{ backgroundColor: DEEP_FOREST }}
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Ionicons name="stats-chart" size={20} color={PARCHMENT} />
+                    <Text
+                      className="ml-3"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: PARCHMENT }}
+                    >
+                      Admin Dashboard
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={PARCHMENT} />
+                </View>
+              </Pressable>
+
+              {/* User Management Button */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("AdminUsers");
+                }}
+                className="mb-2 p-3 rounded-lg active:opacity-70"
+                style={{ backgroundColor: DEEP_FOREST }}
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Ionicons name="people" size={20} color={PARCHMENT} />
+                    <Text
+                      className="ml-3"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: PARCHMENT }}
+                    >
+                      User Management
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={PARCHMENT} />
+                </View>
+              </Pressable>
+
+              {/* Content Moderation Button */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("AdminPhotos");
+                }}
+                className="mb-2 p-3 rounded-lg active:opacity-70"
+                style={{ backgroundColor: DEEP_FOREST }}
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Ionicons name="images" size={20} color={PARCHMENT} />
+                    <Text
+                      className="ml-3"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: PARCHMENT }}
+                    >
+                      Content Moderation
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={PARCHMENT} />
+                </View>
+              </Pressable>
+
+              {/* Reports Button */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("AdminReports");
+                }}
+                className="p-3 rounded-lg active:opacity-70"
+                style={{ backgroundColor: DEEP_FOREST }}
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Ionicons name="flag" size={20} color={PARCHMENT} />
+                    <Text
+                      className="ml-3"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: PARCHMENT }}
+                    >
+                      Reports & Flags
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={PARCHMENT} />
+                </View>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {/* Moderator Panel Section */}
+        {(profile.membershipTier === "isModerator" || (isModerator && !isAdministrator)) && (
+          <View className="px-5 mb-6">
+            <View className="p-4 rounded-xl border-2" style={{ backgroundColor: "#F5F2ED", borderColor: "#AC9A6D" }}>
+              <View className="flex-row items-center mb-3">
+                <Ionicons name="eye" size={24} color="#AC9A6D" />
+                <Text
+                  className="ml-2 text-lg"
+                  style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  Moderator
+                </Text>
+              </View>
+              <Text
+                className="mb-4"
+                style={{ fontFamily: "SourceSans3_400Regular", fontSize: 14, color: TEXT_SECONDARY }}
+              >
+                Remove offensive content and enforce community guidelines
+              </Text>
+
+              {/* Content Moderation Button */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("AdminPhotos");
+                }}
+                className="mb-2 p-3 rounded-lg active:opacity-70"
+                style={{ backgroundColor: "#AC9A6D" }}
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Ionicons name="images" size={20} color={PARCHMENT} />
+                    <Text
+                      className="ml-3"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: PARCHMENT }}
+                    >
+                      Review Content
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={PARCHMENT} />
+                </View>
+              </Pressable>
+
+              {/* Reports Button */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("AdminReports");
+                }}
+                className="p-3 rounded-lg active:opacity-70"
+                style={{ backgroundColor: "#AC9A6D" }}
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Ionicons name="flag" size={20} color={PARCHMENT} />
+                    <Text
+                      className="ml-3"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: PARCHMENT }}
+                    >
+                      Review Reports
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={PARCHMENT} />
+                </View>
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         {/* My Gear Closet */}
         <View className="px-5">
