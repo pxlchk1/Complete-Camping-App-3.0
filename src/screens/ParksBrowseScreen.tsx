@@ -183,11 +183,15 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
 
   const handleModeChange = (newMode: FilterMode) => {
     console.log("[ParksBrowseScreen] Mode changed to:", newMode);
-    setMode(newMode);
-    setSearchQuery("");
-    setError(null);
-    setParks([]);
-    setHasSearched(false);
+    
+    // Only reset if actually changing modes
+    if (newMode !== mode) {
+      setMode(newMode);
+      setSearchQuery("");
+      setError(null);
+      setParks([]);
+      setHasSearched(false);
+    }
   };
 
   const handleLocationRequest = (location: { latitude: number; longitude: number }) => {
