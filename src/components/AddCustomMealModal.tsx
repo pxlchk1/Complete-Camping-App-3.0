@@ -89,7 +89,7 @@ export default function AddCustomMealModal({ visible, onClose, onSave }: AddCust
           style={{ flex: 1, justifyContent: "flex-end" }}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          <View className="bg-parchment rounded-t-3xl" style={{ maxHeight: "90%" }}>
+          <View className="bg-parchment rounded-t-3xl" style={{ height: "85%" }}>
             {/* Header */}
             <View className="flex-row items-center justify-between px-6 py-4 border-b border-parchmentDark">
               <Text className="text-xl font-bold" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
