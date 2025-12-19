@@ -21,6 +21,8 @@ import ModalHeader from "../../components/ModalHeader";
 import * as Haptics from "expo-haptics";
 import { tipsService } from "../../services/firestore/tipsService";
 import { auth } from "../../config/firebase";
+import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { requireAuth } from "../../utils/gating";
 import { RootStackNavigationProp } from "../../navigation/types";
 import {
   DEEP_FOREST,
@@ -47,6 +49,7 @@ const CATEGORIES = [
 export default function CreateTipScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const currentUser = auth.currentUser;
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -54,21 +57,17 @@ export default function CreateTipScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!currentUser) {
-      Alert.alert("Error", "Please sign in to create tips");
+    if (!requireAuth(() => setShowLoginModal(true))) {
       return;
     }
-
     if (!title.trim()) {
       Alert.alert("Missing Title", "Please enter a title for your tip");
       return;
     }
-
     if (!content.trim()) {
       Alert.alert("Missing Content", "Please enter the tip content");
       return;
     }
-
     try {
       setSubmitting(true);
       const tipId = await tipsService.createTip({
@@ -76,7 +75,6 @@ export default function CreateTipScreen() {
         content: content.trim(),
         category,
       });
-
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.goBack();
     } catch (error: any) {
@@ -211,6 +209,14 @@ export default function CreateTipScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+      <AccountRequiredModal
+        visible={showLoginModal}
+        onCreateAccount={() => {
+          setShowLoginModal(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowLoginModal(false)}
+      />
     </View>
   );
 }

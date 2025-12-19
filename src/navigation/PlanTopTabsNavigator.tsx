@@ -3,7 +3,9 @@
  * Material top tabs for Trips, Parks, Weather, Packing, Meals
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useRef } from "react";
+// ...existing imports...
+import { usePlanTabStore } from "../state/planTabStore";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { View, ImageBackground, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,16 +25,16 @@ const Tab = createMaterialTopTabNavigator();
 // Map tab routes to hero images
 const getHeroImage = (routeName: string) => {
   switch (routeName) {
-    case "Trips":
+    case "Plan":
       return HERO_IMAGES.PLAN_TRIP;
-    case "Parks":
+    case "Campgrounds":
       return HERO_IMAGES.HEADER;
-    case "Weather":
-      return HERO_IMAGES.WEATHER;
-    case "Packing":
-      return HERO_IMAGES.PACKING;
     case "Meals":
       return HERO_IMAGES.MEALS;
+    case "Pack":
+      return HERO_IMAGES.PACKING;
+    case "Weather":
+      return HERO_IMAGES.WEATHER;
     default:
       return HERO_IMAGES.PLAN_TRIP;
   }
@@ -41,18 +43,18 @@ const getHeroImage = (routeName: string) => {
 // Map tab routes to titles and descriptions
 const getHeroContent = (routeName: string) => {
   switch (routeName) {
-    case "Trips":
-      return { title: "Plan", description: "Organize trips, explore parks, and prepare for adventure" };
-    case "Parks":
-      return { title: "Find a Place to Camp", description: "Discover campgrounds and parks for your next adventure" };
-    case "Weather":
-      return { title: "Weather Forecast", description: "Check conditions for your camping destination" };
-    case "Packing":
-      return { title: "Packing", description: "Build and organize your gear list for every trip" };
+    case "Plan":
+      return { title: "Plan your trip", description: "Organize trips, explore parks, and prepare for adventure" };
+    case "Campgrounds":
+      return { title: "Find a campground", description: "Discover campgrounds and parks for your next adventure" };
     case "Meals":
-      return { title: "Meals", description: "Plan delicious meals for your camping adventure" };
+      return { title: "Meal Planner", description: "Plan delicious meals for your camping adventure" };
+    case "Pack":
+      return { title: "Packing List", description: "Build and organize your gear list for every trip" };
+    case "Weather":
+      return { title: "Weather", description: "Check conditions for your camping destination" };
     default:
-      return { title: "Plan", description: "Organize trips, explore parks, and prepare for adventure" };
+      return { title: "Plan your trip", description: "Organize trips, explore parks, and prepare for adventure" };
   }
 };
 
@@ -117,18 +119,44 @@ function HeroHeader({ activeTab }: { activeTab: string }) {
 }
 
 export default function PlanTopTabsNavigator() {
-  // Use navigation state to track active tab
-  const activeTabIndex = useNavigationState(state => state?.index ?? 0);
-  const tabNames = ["Trips", "Parks", "Weather", "Packing", "Meals"];
-  const activeTab = tabNames[activeTabIndex] || "Trips";
+  // Zustand store for tab state
+  const activeTab = usePlanTabStore((s) => s.activeTab);
+  const setActiveTab = usePlanTabStore((s) => s.setActiveTab);
+  const tabNames = ["Plan", "Campgrounds", "Meals", "Pack", "Weather"];
+  const tabKeyToRoute: Record<string, string> = {
+    plan: "Plan",
+    campgrounds: "Campgrounds",
+    meals: "Meals",
+    pack: "Pack",
+    weather: "Weather",
+  };
+  const routeToTabKey: Record<string, string> = {
+    Plan: "plan",
+    Campgrounds: "campgrounds",
+    Meals: "meals",
+    Pack: "pack",
+    Weather: "weather",
+  };
+
+  // Ref to prevent initial tab reset on every render
+  const isFirstRender = useRef(true);
+  const [initialTab, setInitialTab] = React.useState(tabKeyToRoute[activeTab] || "Plan");
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      setInitialTab(tabKeyToRoute[activeTab] || "Plan");
+      isFirstRender.current = false;
+    }
+  }, [activeTab]);
 
   return (
     <View className="flex-1 bg-parchment">
       {/* Hero Header */}
-      <HeroHeader activeTab={activeTab} />
+      <HeroHeader activeTab={tabKeyToRoute[activeTab] || "Plan"} />
 
       {/* Material Top Tabs */}
       <Tab.Navigator
+        initialRouteName={initialTab}
         screenOptions={{
           tabBarStyle: {
             backgroundColor: PARCHMENT,
@@ -154,12 +182,21 @@ export default function PlanTopTabsNavigator() {
             minWidth: 80,
           },
         }}
+        screenListeners={{
+          state: (e) => {
+            const routeName = e.data.state.routes[e.data.state.index].name;
+            const tabKey = routeToTabKey[routeName];
+            if (tabKey && tabKey !== activeTab) {
+              setActiveTab(tabKey);
+            }
+          },
+        }}
       >
-        <Tab.Screen name="Trips" component={MyTripsScreen} />
-        <Tab.Screen name="Parks" component={ParksBrowseScreen} />
-        <Tab.Screen name="Weather" component={WeatherScreen} />
-        <Tab.Screen name="Packing" component={PackingTabScreen} />
+        <Tab.Screen name="Plan" component={MyTripsScreen} />
+        <Tab.Screen name="Campgrounds" component={ParksBrowseScreen} />
         <Tab.Screen name="Meals" component={MealsScreen} />
+        <Tab.Screen name="Pack" component={PackingTabScreen} />
+        <Tab.Screen name="Weather" component={WeatherScreen} />
       </Tab.Navigator>
     </View>
   );

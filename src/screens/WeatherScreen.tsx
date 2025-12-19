@@ -140,9 +140,14 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
       setIsSearchingLocation(false);
     }
   };
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.parchment }}>
+      {/* Page Title Header */}
+      <View style={{ paddingTop: insets.top + 12, paddingBottom: 12, backgroundColor: '#F4EBD0', paddingHorizontal: 20 }}>
+        <Text style={{ fontFamily: 'JosefinSlab_700Bold', fontSize: 24, color: '#16492f' }}>Weather</Text>
+      </View>
 
       <ScrollView
         style={{ flex: 1 }}

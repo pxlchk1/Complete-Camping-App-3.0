@@ -5,6 +5,8 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { RootStackNavigationProp } from "../../navigation/types";
 import { getQuestions, type Question } from "../../api/qa-service";
 import { useAuthStore } from "../../state/authStore";
+import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { requireAuth } from "../../utils/gating";
 import { useToast } from "../../components/ToastManager";
 import VoteButtons from "../../components/VoteButtons";
 import * as Haptics from "expo-haptics";
@@ -20,6 +22,7 @@ const toDateString = (date: Timestamp | string): string => {
 export default function ConnectAskScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const { user } = useAuthStore();
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const { showError } = useToast();
 
   const [loading, setLoading] = useState(false);
@@ -65,8 +68,7 @@ export default function ConnectAskScreen() {
     : questions).filter((q) => (q.score || 0) > -5); // Hide items with score less than -5
 
   const handleQuestionVote = async (questionId: string, voteType: "up" | "down") => {
-    if (!user) {
-      showError("Please sign in to vote");
+    if (!requireAuth(() => setShowLoginModal(true))) {
       return;
     }
     // TODO: Implement question voting in Firebase
@@ -107,7 +109,7 @@ export default function ConnectAskScreen() {
                 style={{ fontFamily: "SourceSans3_400Regular" }}
               />
               {searchQuery.length > 0 && (
-                <Pressable onPress={() => setSearchQuery("")}>
+                <Pressable onPress={() => setSearchQuery("")}> 
                   <Ionicons name="close-circle" size={18} color="#9ca3af" />
                 </Pressable>
               )}
@@ -115,7 +117,7 @@ export default function ConnectAskScreen() {
           </View>
           <Pressable
             onPress={() => {
-              if (!user) {
+              if (!requireAuth(() => setShowLoginModal(true))) {
                 return;
               }
               navigation.navigate("CreateQuestion");
@@ -128,91 +130,82 @@ export default function ConnectAskScreen() {
       </View>
 
       <View className="px-4 mt-4">
-      {/* Questions List */}
-      {!user ? (
-        <View className="flex-1 items-center justify-center py-12">
-          <Ionicons name="lock-closed" size={64} color={DEEP_FOREST} />
-          <Text className="mt-4 text-base" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-            Sign in to ask questions
-          </Text>
-          <Text className="mt-2 text-center px-8" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-            Join the community to get answers from experienced campers
-          </Text>
-          <Pressable
-            onPress={() => navigation.navigate("Auth")}
-            className="bg-forest-800 rounded-xl px-6 py-3 mt-6 active:opacity-70"
-          >
-            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>Sign In</Text>
-          </Pressable>
-        </View>
-      ) : loading ? (
-        <View className="flex-1 items-center justify-center py-12">
-          <ActivityIndicator size="large" color={DEEP_FOREST} />
-          <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>Loading questions...</Text>
-        </View>
-      ) : filteredQuestions.length === 0 ? (
-        <View className="flex-1 items-center justify-center py-12">
-          <Ionicons name="chatbubble-ellipses-outline" size={64} color="#9ca3af" />
-          <Text className="mt-4 text-base" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-            {searchQuery.trim() ? "No matching questions" : "No questions yet"}
-          </Text>
-          <Text className="mt-2 text-center px-8" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-            {searchQuery.trim()
-              ? "Try adjusting your search"
-              : "Be the first to ask a question!"}
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredQuestions}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => navigation.navigate("ThreadDetail", { questionId: item.id })}
-              className="rounded-xl p-4 border mb-3 active:opacity-70"
-              style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
-            >
-              <View className="flex-row items-start">
-                <View className="mr-3">
-                  <VoteButtons
-                    score={item.score || (item.upvotes || 0)}
-                    userVote={item.userVote}
-                    onVote={(voteType) => handleQuestionVote(item.id, voteType)}
-                    size="small"
-                    layout="vertical"
-                  />
-                </View>
-                <View className="flex-1">
-                  {/* Question */}
-                  <Text className="text-base mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                    {item.question}
-                  </Text>
+        {loading ? (
+          <View className="flex-1 items-center justify-center py-12">
+            <ActivityIndicator size="large" color={DEEP_FOREST} />
+            <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>Loading questions...</Text>
+          </View>
+        ) : filteredQuestions.length === 0 ? (
+          <View className="flex-1 items-center justify-center py-12">
+            <Ionicons name="chatbubble-ellipses-outline" size={64} color="#9ca3af" />
+            <Text className="mt-4 text-base" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+              {searchQuery.trim() ? "No matching questions" : "No questions yet"}
+            </Text>
+            <Text className="mt-2 text-center px-8" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+              {searchQuery.trim()
+                ? "Try adjusting your search"
+                : "Be the first to ask a question!"}
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredQuestions}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => navigation.navigate("ThreadDetail", { questionId: item.id })}
+                className="rounded-xl p-4 border mb-3 active:opacity-70"
+                style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
+              >
+                <View className="flex-row items-start">
+                  <View className="mr-3">
+                    <VoteButtons
+                      score={item.score || (item.upvotes || 0)}
+                      userVote={item.userVote}
+                      onVote={(voteType) => handleQuestionVote(item.id, voteType)}
+                      size="small"
+                      layout="vertical"
+                    />
+                  </View>
+                  <View className="flex-1">
+                    {/* Question */}
+                    <Text className="text-base mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+                      {item.question}
+                    </Text>
 
-                  {/* Details Preview */}
-                  <Text className="text-sm mb-3" numberOfLines={2} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                    {item.details}
-                  </Text>
+                    {/* Details Preview */}
+                    <Text className="text-sm mb-3" numberOfLines={2} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+                      {item.details}
+                    </Text>
 
-                  {/* Footer */}
-                  <View className="flex-row items-center justify-between pt-3 border-t" style={{ borderColor: BORDER_SOFT }}>
-                    <View className="flex-row items-center">
-                      <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                        by {item.userId}
-                      </Text>
-                      <Text className="mx-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>•</Text>
-                      <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                        {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : ""}
-                      </Text>
+                    {/* Footer */}
+                    <View className="flex-row items-center justify-between pt-3 border-t" style={{ borderColor: BORDER_SOFT }}>
+                      <View className="flex-row items-center">
+                        <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                          by {item.userId}
+                        </Text>
+                        <Text className="mx-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>•</Text>
+                        <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                          {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : ""}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </View>
-              </View>
-            </Pressable>
-          )}
-        />
-      )}
+              </Pressable>
+            )}
+          />
+        )}
       </View>
+      <AccountRequiredModal
+        visible={showLoginModal}
+        onCreateAccount={() => {
+          setShowLoginModal(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowLoginModal(false)}
+      />
     </View>
   );
 }

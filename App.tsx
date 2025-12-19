@@ -22,6 +22,8 @@ import { initSubscriptions, identifyUser } from "./src/services/subscriptionServ
 import { useAuthStore } from "./src/state/authStore";
 import { auth } from "./src/config/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { getDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "./src/config/firebase";
 
 /*
 IMPORTANT NOTICE: DO NOT REMOVE
@@ -89,8 +91,34 @@ export default function App() {
           // Identify user in RevenueCat with Firebase uid
           await identifyUser(firebaseUser.uid);
           console.log("[App] User identified in RevenueCat");
+
+          // --- Bootstrap: Ensure Firestore user profile doc exists ---
+          const userRef = doc(db, "profiles", firebaseUser.uid);
+          const userSnap = await getDoc(userRef);
+          if (!userSnap.exists()) {
+            // Create with minimum fields, handling Apple edge cases
+            const email = firebaseUser.email || "";
+            const displayName = firebaseUser.displayName || "Camper";
+            const photoURL = firebaseUser.photoURL || "";
+            await setDoc(userRef, {
+              email,
+              displayName,
+              photoURL,
+              handle: "", // Optionally generate a unique handle here
+              role: "user",
+              membershipTier: "free",
+              isBanned: false,
+              notificationsEnabled: true,
+              emailSubscribed: false,
+              profilePublic: true,
+              showUsernamePublicly: true,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+            console.log(`[App] Created Firestore user profile for uid: ${firebaseUser.uid}`);
+          }
         } catch (error) {
-          console.error("[App] Failed to identify user in RevenueCat:", error);
+          console.error("[App] Failed to identify user in RevenueCat or create profile:", error);
         }
       } else {
         console.log("[App] Firebase user signed out");
@@ -127,7 +155,14 @@ export default function App() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <ToastProvider>
-            <NavigationContainer>
+            <NavigationContainer
+              onStateChange={(state) => {
+                console.log('[Navigation] State changed:', state);
+              }}
+              onUnhandledAction={(action) => {
+                console.error('[Navigation] Unhandled action:', action);
+              }}
+            >
               <RootNavigator />
               <StatusBar style="auto" />
             </NavigationContainer>

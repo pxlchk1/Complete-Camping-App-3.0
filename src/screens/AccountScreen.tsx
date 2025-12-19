@@ -3,7 +3,7 @@
  * Facebook-inspired profile layout with cover photo, stats, and activity feed
  */
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,9 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useCurrentUser, useIsModerator, useIsAdministrator } from "../state/userStore";
+import { useCurrentUser, useIsModerator, useIsAdministrator, useUserStore } from "../state/userStore";
+import { auth, db } from "../config/firebase";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useIsPro } from "../state/subscriptionStore";
 import { RootStackParamList } from "../navigation/types";
 import AdminPanel from "../components/AdminPanel";
@@ -42,12 +44,108 @@ const PROFILE_SIZE = 120;
 const PROFILE_OVERLAP = 40;
 
 export default function AccountScreen() {
+        // Step 4: Error UI and Retry/Sign out actions
+        const handleRetry = () => {
+          setLoadError(null);
+          setHasTimedOut(false);
+          setIsLoading(true);
+          // Re-run profile fetch by resetting effect
+          // (simulate by incrementing a key or using a state toggle if needed)
+          // For now, just reload the screen
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          window.location.reload();
+        };
+
+        const handleSignOut = async () => {
+          try {
+            await auth.signOut();
+          } catch (err) {
+            setLoadError("Failed to sign out");
+          }
+        };
+      // Step 3: Fetch profile by uid, create if missing
+      useEffect(() => {
+        const fetchProfile = async () => {
+          setIsLoading(true);
+          setLoadError(null);
+          setHasTimedOut(false);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          const user = auth.currentUser;
+          if (!user) {
+            setIsLoading(false);
+            return;
+          }
+          try {
+            const userRef = doc(db, "profiles", user.uid);
+            let userSnap = await getDoc(userRef);
+            if (!userSnap.exists()) {
+              // Defensive: create doc with safe defaults
+              const email = user.email || "";
+              const displayName = user.displayName || "Camper";
+              const photoURL = user.photoURL || "";
+              await setDoc(userRef, {
+                email,
+                displayName,
+                photoURL,
+                handle: "", // Optionally generate a unique handle here
+                role: "user",
+                membershipTier: "free",
+                isBanned: false,
+                notificationsEnabled: true,
+                emailSubscribed: false,
+                profilePublic: true,
+                showUsernamePublicly: true,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+              }, { merge: true });
+              userSnap = await getDoc(userRef);
+            }
+            if (userSnap.exists()) {
+              setCurrentUser({ id: user.uid, ...userSnap.data() });
+            }
+            setIsLoading(false);
+          } catch (err) {
+            setLoadError("Failed to load profile");
+            setIsLoading(false);
+          }
+        };
+        fetchProfile();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+    // Step 2: Loading timeout logic
+    useEffect(() => {
+      if (!isLoading) return;
+      // Start timeout
+      timeoutRef.current = setTimeout(() => {
+        setHasTimedOut(true);
+        setIsLoading(false);
+        setLoadError("Loading timed out. Please try again.");
+        // Log debug info
+        const user = auth.currentUser;
+        console.error("[AccountScreen] Loading timed out", {
+          uid: user?.uid,
+          providerData: user?.providerData,
+        });
+      }, 10000);
+      // Cleanup on unmount or load
+      return () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      };
+    }, [isLoading]);
   const navigation = useNavigation<AccountScreenNavigationProp>();
   const currentUser = useCurrentUser();
+  // Defensive: allow partial profile data
+  const safeProfile = currentUser || {};
   const isModerator = useIsModerator();
   const isAdministrator = useIsAdministrator();
   const isPro = useIsPro();
+  const setCurrentUser = useUserStore((s) => s.setCurrentUser);
   const [activeTab, setActiveTab] = useState<TabType>("posts");
+  // Step 1: Loading/error/timeout state
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [hasTimedOut, setHasTimedOut] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   if (!currentUser) {
     return (
@@ -85,7 +183,7 @@ export default function AccountScreen() {
   }
 
   const getMembershipBadge = () => {
-    if (currentUser?.membershipTier === "isAdmin" || isAdministrator) {
+    if (safeProfile.membershipTier === "isAdmin" || isAdministrator) {
       return (
         <View className="flex-row items-center px-3 py-1 rounded-full ml-2" style={{ backgroundColor: "#dc2626" }}>
           <Ionicons name="shield-checkmark" size={14} color={PARCHMENT} />
@@ -98,7 +196,7 @@ export default function AccountScreen() {
         </View>
       );
     }
-    if (currentUser?.membershipTier === "isModerator" || isModerator) {
+    if (safeProfile.membershipTier === "isModerator" || isModerator) {
       return (
         <View className="flex-row items-center px-3 py-1 rounded-full ml-2" style={{ backgroundColor: SIERRA_SKY }}>
           <Ionicons name="shield" size={14} color={PARCHMENT} />
@@ -137,7 +235,7 @@ export default function AccountScreen() {
   };
 
   const getRoleBadge = () => {
-    if (currentUser.role === "administrator") {
+    if (safeProfile.role === "administrator") {
       return (
         <View className="flex-row items-center px-3 py-1 rounded-full ml-2" style={{ backgroundColor: "#dc2626" }}>
           <Ionicons name="shield-checkmark" size={14} color={PARCHMENT} />
@@ -150,7 +248,7 @@ export default function AccountScreen() {
         </View>
       );
     }
-    if (currentUser.role === "moderator") {
+    if (safeProfile.role === "moderator") {
       return (
         <View className="flex-row items-center px-3 py-1 rounded-full ml-2" style={{ backgroundColor: SIERRA_SKY }}>
           <Ionicons name="shield" size={14} color={PARCHMENT} />
@@ -172,7 +270,7 @@ export default function AccountScreen() {
         {/* Cover Photo */}
         <View style={{ height: COVER_HEIGHT, width: SCREEN_WIDTH }}>
           <ImageBackground
-            source={currentUser.coverPhotoURL ? { uri: currentUser.coverPhotoURL } : require("../../assets/images/splash-screen.png")}
+            source={safeProfile.coverPhotoURL ? { uri: safeProfile.coverPhotoURL } : require("../../assets/images/splash-screen.png")}
             style={{ width: "100%", height: "100%", justifyContent: "space-between" }}
             resizeMode="cover"
           >
@@ -203,9 +301,9 @@ export default function AccountScreen() {
                 backgroundColor: "white",
               }}
             >
-              {currentUser.photoURL ? (
+              {safeProfile.photoURL ? (
                 <Image
-                  source={{ uri: currentUser.photoURL }}
+                  source={{ uri: safeProfile.photoURL }}
                   style={{
                     width: PROFILE_SIZE - 8,
                     height: PROFILE_SIZE - 8,
@@ -213,19 +311,19 @@ export default function AccountScreen() {
                   }}
                 />
               ) : (
-                <View
-                  style={{
-                    width: PROFILE_SIZE - 8,
-                    height: PROFILE_SIZE - 8,
-                    borderRadius: (PROFILE_SIZE - 8) / 2,
-                    backgroundColor: DEEP_FOREST,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Ionicons name="person" size={56} color={PARCHMENT} />
-                </View>
-              )}
+                  <View
+                    style={{
+                      width: PROFILE_SIZE - 8,
+                      height: PROFILE_SIZE - 8,
+                      borderRadius: (PROFILE_SIZE - 8) / 2,
+                      backgroundColor: DEEP_FOREST,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Ionicons name="person" size={56} color={PARCHMENT} />
+                  </View>
+                )}
             </View>
 
             {/* Edit Profile Button */}
@@ -245,24 +343,33 @@ export default function AccountScreen() {
                 }}
               >
                 Edit Profile
+              <Text
+                className="text-2xl font-bold mt-2"
+                style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+              >
+                {safeProfile.displayName || "Camper"}
               </Text>
-            </Pressable>
-          </View>
-
-          {/* User Info */}
-          <View className="mb-3">
             <View className="flex-row items-center flex-wrap mb-1">
               <Text
                 className="text-2xl"
                 style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
               >
                 {currentUser.displayName}
-              </Text>
-              {getMembershipBadge()}
-              {getRoleBadge()}
-            </View>
-            <Text
-              className="text-base mb-2"
+              {safeProfile.email ? (
+                <Text
+                  className="text-base text-gray-600 mt-1"
+                  style={{ fontFamily: "SourceSans3_400Regular" }}
+                >
+                  {safeProfile.email}
+                </Text>
+              ) : (
+                <Text
+                  className="text-base text-gray-600 mt-1"
+                  style={{ fontFamily: "SourceSans3_400Regular", fontStyle: "italic" }}
+                >
+                  Email not available
+                </Text>
+              )}
               style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
             >
               @{currentUser.handle?.replace(/^@+/, "") || "user"}
@@ -274,58 +381,57 @@ export default function AccountScreen() {
                 className="text-base mb-3"
                 style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST }}
               >
-                {currentUser.about}
-              </Text>
-            )}
+                if (!auth.currentUser) {
+                  return (
+                    <SafeAreaView className="flex-1 bg-parchment" edges={["top"]}>
+                      <View className="flex-1 items-center justify-center px-5">
+                        <Ionicons name="person-circle-outline" size={80} color={EARTH_GREEN} />
+                        <Text className="mt-4 text-xl text-center" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>Not Signed In</Text>
+                        <Text className="mt-2 text-center" style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}>Please sign in to view your account</Text>
+                      </View>
+                    </SafeAreaView>
+                  );
+                }
 
-            {/* Stats Row */}
-            <View className="flex-row items-center mb-4">
-              <Pressable className="mr-6 active:opacity-70">
-                <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: DEEP_FOREST }}>
-                  <Text style={{ fontFamily: "SourceSans3_700Bold" }}>24</Text> Posts
-                </Text>
-              </Pressable>
-              <Pressable className="mr-6 active:opacity-70">
-                <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: DEEP_FOREST }}>
-                  <Text style={{ fontFamily: "SourceSans3_700Bold" }}>156</Text> Friends
-                </Text>
-              </Pressable>
-              <Pressable className="active:opacity-70">
-                <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: DEEP_FOREST }}>
-                  <Text style={{ fontFamily: "SourceSans3_700Bold" }}>89</Text> Followers
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
+                if (isLoading) {
+                  return (
+                    <SafeAreaView className="flex-1 bg-parchment" edges={["top"]}>
+                      <View className="flex-1 items-center justify-center px-5">
+                        <Ionicons name="hourglass" size={60} color={EARTH_GREEN} />
+                        <Text className="mt-4 text-lg text-center" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>Loading your account...</Text>
+                      </View>
+                    </SafeAreaView>
+                  );
+                }
 
-        {/* Divider */}
-        <View className="h-2 bg-neutral-200" />
-
-        {/* Tab Navigation */}
-        <View className="bg-white border-b border-neutral-200">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16 }}
-          >
-            {tabs.map((tab) => (
-              <Pressable
-                key={tab.key}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setActiveTab(tab.key);
-                }}
-                className="mr-6 py-3"
-                style={{
-                  borderBottomWidth: 3,
-                  borderBottomColor: activeTab === tab.key ? DEEP_FOREST : "transparent",
-                }}
-              >
-                <View className="flex-row items-center">
-                  <Ionicons
-                    name={tab.icon}
-                    size={20}
+                if (hasTimedOut || loadError) {
+                  // Log debug info
+                  const user = auth.currentUser;
+                  console.error("[AccountScreen] Profile load failed", {
+                    uid: user?.uid,
+                    providerData: user?.providerData,
+                    error: loadError,
+                  });
+                  return (
+                    <SafeAreaView className="flex-1 bg-parchment" edges={["top"]}>
+                      <View className="flex-1 items-center justify-center px-5">
+                        <Ionicons name="alert-circle-outline" size={60} color={EARTH_GREEN} />
+                        <Text className="mt-4 text-lg text-center" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>Unable to load your account</Text>
+                        <Text className="mt-2 text-center" style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}>
+                          {hasTimedOut ? "Loading timed out. Please try again." : loadError}
+                        </Text>
+                        <View className="flex-row mt-6 space-x-4">
+                          <Pressable onPress={handleRetry} className="px-6 py-2 rounded-lg" style={{ backgroundColor: EARTH_GREEN }}>
+                            <Text style={{ color: PARCHMENT, fontFamily: "SourceSans3_600SemiBold" }}>Retry</Text>
+                          </Pressable>
+                          <Pressable onPress={handleSignOut} className="px-6 py-2 rounded-lg" style={{ backgroundColor: DEEP_FOREST }}>
+                            <Text style={{ color: PARCHMENT, fontFamily: "SourceSans3_600SemiBold" }}>Sign Out</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    </SafeAreaView>
+                  );
+                }
                     color={activeTab === tab.key ? DEEP_FOREST : EARTH_GREEN}
                   />
                   <Text

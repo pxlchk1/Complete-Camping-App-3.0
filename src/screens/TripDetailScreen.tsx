@@ -14,6 +14,13 @@ import { ParticipantRole } from "../types/campground";
 import { Heading2, BodyText } from "../components/Typography";
 import Button from "../components/Button";
 import EditTripModal from "../components/EditTripModal";
+import DetailsCard, { DetailsLink } from "../components/DetailsCard";
+import EditNotesModal from "../components/EditNotesModal";
+import AddLinkModal from "../components/AddLinkModal";
+import * as WebBrowser from "expo-web-browser";
+import { v4 as uuidv4 } from "uuid";
+import { updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import { db } from "../config/firebase";
 import { RootStackParamList } from "../navigation/types";
 import { format } from "date-fns";
 import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY } from "../constants/colors";
@@ -55,6 +62,11 @@ export default function TripDetailScreen() {
   const [editingParticipant, setEditingParticipant] = useState<{ id: string; name: string; role: ParticipantRole } | null>(null);
   const [savingRole, setSavingRole] = useState(false);
   const [showEditTripModal, setShowEditTripModal] = useState(false);
+  // Details state
+  const [showEditNotes, setShowEditNotes] = useState(false);
+  const [showAddLink, setShowAddLink] = useState(false);
+  const [detailsNotes, setDetailsNotes] = useState(trip?.detailsNotes || "");
+  const [detailsLinks, setDetailsLinks] = useState<DetailsLink[]>(trip?.detailsLinks || []);
 
   const loadParticipants = async () => {
     try {
@@ -95,7 +107,10 @@ export default function TripDetailScreen() {
   useEffect(() => {
     if (!trip) {
       navigation.goBack();
+      return;
     }
+    setDetailsNotes(trip.detailsNotes || "");
+    setDetailsLinks(trip.detailsLinks || []);
   }, [trip, navigation]);
 
   if (!trip) {
@@ -156,6 +171,74 @@ export default function TripDetailScreen() {
     }
   };
 
+  // --- DetailsCard handlers ---
+  function handleEditNotes() {
+    setShowEditNotes(true);
+  }
+  async function handleSaveNotes(newNotes: string) {
+    setDetailsNotes(newNotes);
+    if (trip) {
+      setDetailsNotes(newNotes);
+      setTimeout(async () => {
+        await updateDoc(doc(db, "trips", trip.id), {
+          detailsNotes: newNotes,
+          updatedAt: serverTimestamp(),
+        });
+      }, 0);
+    }
+  }
+  function handleAddLink() {
+    setShowAddLink(true);
+  }
+  async function handleSaveLink(title: string, url: string) {
+    // Source detection
+    let source: DetailsLink["source"] = "other";
+    if (url.includes("alltrails.com")) source = "alltrails";
+    else if (url.includes("onxmaps.com") || url.includes("onxoffroad.app")) source = "onx";
+    else if (url.includes("gaiagps.com")) source = "gaia";
+    else if (url.includes("google.com/maps") || url.includes("maps.google.")) source = "google_maps";
+    // Prevent duplicate by url
+    if (detailsLinks.some(l => l.url === url)) {
+      Alert.alert("Duplicate Link", "This link already exists.");
+      return;
+    }
+    const newLink: DetailsLink = {
+      id: uuidv4(),
+      title,
+      url,
+      source,
+    };
+    const newLinks = [...detailsLinks, newLink];
+    setDetailsLinks(newLinks);
+    if (trip) {
+      setTimeout(async () => {
+        await updateDoc(doc(db, "trips", trip.id), {
+          detailsLinks: newLinks,
+          updatedAt: serverTimestamp(),
+        });
+      }, 0);
+    }
+  }
+  async function handleDeleteLink(id: string) {
+    const newLinks = detailsLinks.filter(l => l.id !== id);
+    setDetailsLinks(newLinks);
+    if (trip) {
+      setTimeout(async () => {
+        await updateDoc(doc(db, "trips", trip.id), {
+          detailsLinks: newLinks,
+          updatedAt: serverTimestamp(),
+        });
+      }, 0);
+    }
+  }
+  async function handleOpenLink(url: string) {
+    try {
+      await WebBrowser.openBrowserAsync(url);
+    } catch {
+      Alert.alert("Could not open link");
+    }
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-parchment" edges={["top"]}>
       {/* Header */}
@@ -173,13 +256,11 @@ export default function TripDetailScreen() {
           <Pressable
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              
               // Gate: Login required to edit trips
               if (isGuest) {
                 navigation.navigate("Auth" as any);
                 return;
               }
-              
               setShowEditTripModal(true);
             }}
             className="px-3 py-1.5 bg-[#f0f9f4] rounded-lg active:bg-[#dcf3e5] flex-row items-center gap-1"
@@ -194,6 +275,26 @@ export default function TripDetailScreen() {
       </View>
 
       <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
+        {/* Details Card (Notes + Links) */}
+        <DetailsCard
+          notes={detailsNotes}
+          links={detailsLinks}
+          onEditNotes={handleEditNotes}
+          onAddLink={handleAddLink}
+          onDeleteLink={handleDeleteLink}
+          onOpenLink={handleOpenLink}
+        />
+        <EditNotesModal
+          visible={showEditNotes}
+          initialValue={detailsNotes}
+          onSave={handleSaveNotes}
+          onClose={() => setShowEditNotes(false)}
+        />
+        <AddLinkModal
+          visible={showAddLink}
+          onSave={handleSaveLink}
+          onClose={() => setShowAddLink(false)}
+        />
         {/* Trip Overview */}
         <View className="py-6">
           {/* Dates */}

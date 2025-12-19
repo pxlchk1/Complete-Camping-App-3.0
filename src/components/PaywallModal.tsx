@@ -11,12 +11,10 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  Image,
   SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  DEEP_FOREST,
   EARTH_GREEN,
   GRANITE_GOLD,
   PARCHMENT,
@@ -31,16 +29,17 @@ interface PaywallModalProps {
   onClose: () => void;
 }
 
-export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
-  // Placeholder functions - will be wired to RevenueCat later
+export default function PaywallModal({
+  visible,
+  onClose,
+}: PaywallModalProps) {
+  // Placeholder functions, will be wired to RevenueCat later
   const purchasePackage = (packageType: "annual" | "monthly") => {
     console.log(`Purchase ${packageType} package`);
-    // TODO: Wire to RevenueCat
   };
 
   const restorePurchases = () => {
     console.log("Restore purchases");
-    // TODO: Wire to RevenueCat
   };
 
   return (
@@ -54,9 +53,15 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={28} color={TEXT_PRIMARY_STRONG} />
+            <Ionicons
+              name="close"
+              size={28}
+              color={TEXT_PRIMARY_STRONG}
+            />
           </Pressable>
+
           <Text style={styles.headerTitle}>Complete Camping Pro</Text>
+
           <View style={{ width: 28 }} />
         </View>
 
@@ -72,11 +77,16 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
           <View style={styles.pricingSection}>
             {/* Annual Plan */}
             <Pressable
-              style={[styles.pricingButton, styles.pricingButtonAnnual]}
+              style={[
+                styles.pricingButton,
+                styles.pricingButtonAnnual,
+              ]}
               onPress={() => purchasePackage("annual")}
             >
               <View style={styles.pricingContent}>
-                <Text style={styles.pricingLabel}>$24.99 per year</Text>
+                <Text style={styles.pricingLabel}>
+                  $24.99 per year
+                </Text>
                 <Text style={styles.pricingSubtext}>
                   Best value. One simple payment for a full year.
                 </Text>
@@ -89,7 +99,9 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
               onPress={() => purchasePackage("monthly")}
             >
               <View style={styles.pricingContent}>
-                <Text style={styles.pricingLabel}>$3.99 per month</Text>
+                <Text style={styles.pricingLabel}>
+                  $3.99 per month
+                </Text>
                 <Text style={styles.pricingSubtext}>
                   Start planning with flexible billing.
                 </Text>
@@ -97,10 +109,14 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
             </Pressable>
           </View>
 
-          {/* Hero Image */}
+          {/* Hero Placeholder */}
           <View style={styles.heroContainer}>
             <View style={styles.heroPlaceholder}>
-              <Ionicons name="moon" size={80} color={GRANITE_GOLD} />
+              <Ionicons
+                name="moon"
+                size={80}
+                color={GRANITE_GOLD}
+              />
               <Text style={styles.heroPlaceholderText}>
                 🏕️ Tent & Lantern
               </Text>
@@ -109,7 +125,8 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
 
           {/* Subtitle */}
           <Text style={styles.subtitle}>
-            Unlock the full planning toolkit and keep your trips organized in one place.
+            Unlock the full planning toolkit and keep your trips
+            organized in one place.
           </Text>
 
           {/* Feature List */}
@@ -130,21 +147,28 @@ export default function PaywallModal({ visible, onClose }: PaywallModalProps) {
                   color={EARTH_GREEN}
                   style={styles.featureIcon}
                 />
-                <Text style={styles.featureText}>{feature}</Text>
+                <Text style={styles.featureText}>
+                  {feature}
+                </Text>
               </View>
             ))}
           </View>
 
-          {/* Footer Legal */}
+          {/* Legal */}
           <Text style={styles.legalText}>
-            Payment is handled through the App Store. Your subscription renews
-            automatically until canceled. You can manage your plan in your App
-            Store settings.
+            Payment is handled through the App Store. Your
+            subscription renews automatically until canceled.
+            Manage your plan in App Store settings.
           </Text>
 
           {/* Restore Purchases */}
-          <Pressable style={styles.restoreButton} onPress={restorePurchases}>
-            <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+          <Pressable
+            style={styles.restoreButton}
+            onPress={restorePurchases}
+          >
+            <Text style={styles.restoreButtonText}>
+              Restore Purchases
+            </Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>

@@ -70,11 +70,26 @@ service cloud.firestore {
       allow update, delete: if isOwner() || isAdmin();
     }
 
+
     // Questions and Answers
     match /questions/{id} {
       allow read: if true; // Public read
       allow create: if isSignedIn();
       allow update, delete: if isOwner() || isAdmin();
+
+      // Answers subcollection
+      match /answers/{answerId} {
+        allow read: if true;
+        allow create: if isSignedIn();
+        allow update, delete: if isOwner() || isAdmin();
+      }
+
+      // Comments subcollection (if used)
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn();
+        allow update, delete: if isOwner() || isAdmin();
+      }
     }
 
     match /answers/{id} {

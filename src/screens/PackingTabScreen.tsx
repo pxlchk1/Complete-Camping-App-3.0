@@ -127,6 +127,7 @@ export default function PackingTabScreen({ onTabChange }: PackingTabScreenProps)
     // Optimistic update
     setPackingItems((prev) =>
       prev.map((i) => (i.id === item.id ? { ...i, isPacked: !i.isPacked } : i))
+      const insets = useSafeAreaInsets();
     );
 
     try {

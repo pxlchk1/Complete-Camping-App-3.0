@@ -21,6 +21,8 @@ import { getGearReviews } from "../../services/gearReviewsService";
 import { GearReview, GearCategory } from "../../types/community";
 import { RootStackNavigationProp } from "../../navigation/types";
 import { useCurrentUser } from "../../state/userStore";
+import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { requireAuth } from "../../utils/gating";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
 import {
   DEEP_FOREST,
@@ -51,6 +53,7 @@ const CATEGORIES: { value: CategoryFilter; label: string }[] = [
 export default function GearReviewsListScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const currentUser = useCurrentUser();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [reviews, setReviews] = useState<GearReview[]>([]);
   const [filteredReviews, setFilteredReviews] = useState<GearReview[]>([]);
@@ -340,10 +343,10 @@ export default function GearReviewsListScreen() {
         title="Gear Reviews"
         onAddPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          if (currentUser) {
-            navigation.navigate("CreateGearReview");
+          if (!requireAuth(() => setShowLoginModal(true))) {
+            return;
           }
-          // TODO: Show auth dialog if no user
+          navigation.navigate("CreateGearReview");
         }}
       />
 
@@ -438,6 +441,14 @@ export default function GearReviewsListScreen() {
           }
         />
       )}
+      <AccountRequiredModal
+        visible={showLoginModal}
+        onCreateAccount={() => {
+          setShowLoginModal(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowLoginModal(false)}
+      />
     </View>
   );
 }

@@ -10,6 +10,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { feedbackService, FeedbackPost } from "../../services/firestore/feedbackService";
 import { auth } from "../../config/firebase";
+import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { requireAuth } from "../../utils/gating";
 import { RootStackNavigationProp } from "../../navigation/types";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
 import { seedFeedbackIfEmpty } from "../../features/feedback/seedFeedback";
@@ -30,6 +32,7 @@ type CategoryFilter = 'Feature Request' | 'Bug Report' | 'Improvement' | 'Questi
 export default function FeedbackListScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const currentUser = auth.currentUser;
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [posts, setPosts] = useState<FeedbackPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,8 +91,7 @@ export default function FeedbackListScreen() {
   const handleCreatePost = () => {
     if (!currentUser) {
       // Navigate to paywall for non-signed-in users
-      navigation.navigate("Paywall");
-      return;
+      requireAuth(() => setShowLoginModal(true));
     }
     
     // Firestore rules will check subscription status
@@ -101,6 +103,7 @@ export default function FeedbackListScreen() {
     if (!currentUser) {
       navigation.navigate("Paywall");
       return;
+      requireAuth(() => setShowLoginModal(true));
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -118,6 +121,7 @@ export default function FeedbackListScreen() {
     if (!currentUser) {
       navigation.navigate("Paywall");
       return;
+      requireAuth(() => setShowLoginModal(true));
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -288,6 +292,14 @@ export default function FeedbackListScreen() {
       </View>
     );
   }
+    <AccountRequiredModal
+      visible={showLoginModal}
+      onCreateAccount={() => {
+        setShowLoginModal(false);
+        navigation.navigate("Auth");
+      }}
+      onMaybeLater={() => setShowLoginModal(false)}
+    />
 
   if (error) {
     return (

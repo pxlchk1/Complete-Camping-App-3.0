@@ -11,12 +11,15 @@ interface UserState {
   isAuthenticated: () => boolean;
   isModerator: () => boolean;
   isAdministrator: () => boolean;
+  hasUsedFreeTrip: boolean;
+  setHasUsedFreeTrip: (used: boolean) => void;
 }
 
 export const useUserStore = create<UserState>()(
   persist(
     (set, get) => ({
       currentUser: null,
+      hasUsedFreeTrip: false,
 
       setCurrentUser: (user) => set({ currentUser: user }),
 
@@ -40,6 +43,8 @@ export const useUserStore = create<UserState>()(
         const user = get().currentUser;
         return user?.role === "administrator" || user?.membershipTier === "isAdmin";
       },
+
+      setHasUsedFreeTrip: (used) => set({ hasUsedFreeTrip: used }),
     }),
     {
       name: "user-storage",

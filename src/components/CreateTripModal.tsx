@@ -45,6 +45,15 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
     return days;
   };
 
+  // Helper to derive season from a date
+  function getSeason(date: Date): 'winter' | 'spring' | 'summer' | 'fall' {
+    const month = date.getMonth();
+    if (month === 11 || month === 0 || month === 1) return 'winter';
+    if (month >= 2 && month <= 4) return 'spring';
+    if (month >= 5 && month <= 7) return 'summer';
+    return 'fall';
+  }
+
   const handleCreateTrip = () => {
     if (!tripName.trim()) {
       return;
@@ -58,6 +67,9 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
     if (isNaN(size) || size < 1 || size > 50) {
       return;
     }
+
+    // Derive season from start date
+    const season = getSeason(startDate);
 
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -74,6 +86,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
           name: destination.trim(),
         } : undefined,
         status: "planning",
+        season,
       });
 
       // Reset form

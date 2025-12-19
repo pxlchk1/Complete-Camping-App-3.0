@@ -348,6 +348,11 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
     <View className="flex-1 bg-parchment">
 
       {/* Toggle */}
+            {/* Page Title Header */}
+            <View style={{ paddingTop: insets.top + 12, paddingBottom: 12, backgroundColor: '#F4EBD0', paddingHorizontal: 20 }}>
+              <Text style={{ fontFamily: 'JosefinSlab_700Bold', fontSize: 24, color: '#16492f' }}>Meal Planner</Text>
+            </View>
+            {/* Toggle */}
       <View className="px-4 pt-4 pb-3">
         <View className="flex-row bg-stone-200 rounded-xl p-1">
           <Pressable

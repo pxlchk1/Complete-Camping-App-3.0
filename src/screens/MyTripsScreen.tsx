@@ -5,6 +5,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { useTrips, Trip, useCreateTrip, useDeleteTrip, useUpdateTrip } from "../state/tripsStore";
+import { useUserStore } from "../state/userStore";
+import PaywallModal from "../components/PaywallModal";
 import { useTripsListStore, TripSegment, TripSort } from "../state/tripsListStore";
 import { usePlanTabStore } from "../state/planTabStore";
 import { useSubscriptionStore } from "../state/subscriptionStore";
@@ -85,6 +87,9 @@ export default function MyTripsScreen() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showProModal, setShowProModal] = useState(false);
+  const hasUsedFreeTrip = useUserStore((s) => s.hasUsedFreeTrip);
+  const setHasUsedFreeTrip = useUserStore((s) => s.setHasUsedFreeTrip);
   const [menuTrip, setMenuTrip] = useState<Trip | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Trip | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -92,15 +97,22 @@ export default function MyTripsScreen() {
   const updateTrip = useUpdateTrip();
   const createTrip = useCreateTrip();
 
+  // Find trip in progress (planning or active)
+  const tripInProgress = trips.find((t) => {
+    const status = getStatus(t.startDate, t.endDate);
+    return t.status === "planning" || status === "In Progress";
+  });
+
+  // Filter out trip in progress from the rest
   const filtered = useMemo(() => {
     let base = trips.filter((t) => {
+      if (tripInProgress && t.id === tripInProgress.id) return false;
       const status = getStatus(t.startDate, t.endDate);
       if (segment === "active") return status === "In Progress" || status === "Upcoming";
       if (segment === "completed") return status === "Completed";
       return true;
     });
-
-    // filters
+    // ...existing filter/sort logic...
     base = base.filter((t) => {
       const s = new Date(t.startDate);
       const e = new Date(t.endDate);
@@ -121,8 +133,6 @@ export default function MyTripsScreen() {
       }
       return true;
     });
-
-    // sort
     base.sort((a, b) => {
       if (sortBy === "startSoonest") {
         return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
@@ -132,9 +142,8 @@ export default function MyTripsScreen() {
         return a.name.localeCompare(b.name);
       }
     });
-
     return base;
-  }, [trips, segment, sortBy, filters]);
+  }, [trips, segment, sortBy, filters, tripInProgress]);
 
   const page = pageBySegment[segment] || 1;
   const PAGE_SIZE = 20;
@@ -151,10 +160,16 @@ export default function MyTripsScreen() {
       return;
     }
 
-    // Gate 2: Free users limited to 2 trips
-    if (isFree && trips.length >= 2) {
-      nav.navigate("Paywall" as any);
-      return;
+    // Gate 2: Free users get one lifetime trip
+    if (isFree) {
+      if (hasUsedFreeTrip) {
+        setShowProModal(true);
+        return;
+      }
+      if (trips.length >= 1) {
+        setShowProModal(true);
+        return;
+      }
     }
 
     setShowCreate(true);
@@ -213,6 +228,33 @@ export default function MyTripsScreen() {
   return (
     <View className="flex-1 bg-parchment">
       <View className="flex-1">
+        {/* Trip in Progress Module */}
+        {tripInProgress && (
+          <View className="px-4 pt-4 pb-2">
+            <Text className="text-lg font-bold mb-2" style={{ fontFamily: 'JosefinSlab_700Bold', color: DEEP_FOREST }}>Trip in Progress</Text>
+            <TripCard
+              trip={tripInProgress}
+              onResume={() => onResume(tripInProgress)}
+              onMenu={() => onMenu(tripInProgress)}
+              onPackingPress={() => setActivePlanTab("pack")}
+              onWeatherPress={() => setActivePlanTab("weather")}
+              onMealsPress={() => setActivePlanTab("meals")}
+            />
+          </View>
+        )}
+
+        {/* Plan a New Trip CTA */}
+        <View className="px-4 pb-4">
+          <Pressable
+            onPress={handleCreateTrip}
+            className="w-full py-4 rounded-xl bg-forest items-center justify-center mb-2 active:opacity-90"
+            accessibilityLabel="Plan a new trip"
+            accessibilityRole="button"
+          >
+            <Text className="text-parchment text-lg font-semibold" style={{ fontFamily: 'SourceSans3_600SemiBold' }}>Plan a new trip</Text>
+          </Pressable>
+        </View>
+
         {/* Segments */}
         <View className="px-4 pt-2 pb-2 flex-row gap-2">
           {(["active", "completed", "all"] as TripSegment[]).map((seg) => (
@@ -281,7 +323,7 @@ export default function MyTripsScreen() {
               trip={item}
               onResume={() => onResume(item)}
               onMenu={() => onMenu(item)}
-              onPackingPress={() => setActivePlanTab("packing")}
+              onPackingPress={() => setActivePlanTab("pack")}
               onWeatherPress={() => setActivePlanTab("weather")}
               onMealsPress={() => setActivePlanTab("meals")}
             />
@@ -301,31 +343,18 @@ export default function MyTripsScreen() {
           }
         />
 
-        {/* Floating Action Button - Create Trip */}
-        <Pressable
-          onPress={handleCreateTrip}
-          className="absolute bottom-6 right-6 w-14 h-14 rounded-full items-center justify-center active:opacity-90"
-          style={{ 
-            backgroundColor: DEEP_FOREST,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 4,
-            elevation: 5,
-          }}
-          accessibilityLabel="Create new trip"
-          accessibilityRole="button"
-        >
-          <Ionicons name="add" size={32} color={PARCHMENT} />
-        </Pressable>
-
         {/* Modals */}
         <CreateTripModal
           visible={showCreate}
           onClose={() => setShowCreate(false)}
           onTripCreated={(tripId) => {
+            if (isFree) setHasUsedFreeTrip(true);
             setShowCreate(false);
           }}
+        />
+        <PaywallModal
+          visible={showProModal}
+          onClose={() => setShowProModal(false)}
         />
 
         {/* Account Required Modal */}

@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, ScrollView, ImageBackground, ActivityIndicator, Pressable, StyleSheet } from "react-native";
+import { View, Text, ScrollView, ImageBackground, ActivityIndicator, Pressable, StyleSheet, Modal, TextInput, TouchableOpacity } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { collection, query, where, getDocs, limit as firestoreLimit, orderBy } from "firebase/firestore";
 import { db } from "../config/firebase";
+import { useTripsStore } from "../state/tripsStore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useUserStore } from "../state/userStore";
 import { LinearGradient } from "expo-linear-gradient";
 
 // Components
@@ -32,26 +35,18 @@ interface ParksBrowseScreenProps {
   onTabChange?: (tab: "trips" | "parks" | "weather" | "packing" | "meals") => void;
 }
 
-export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProps = {}) {
+function ParksBrowseScreen(props: ParksBrowseScreenProps) {
+  // Add Campground Modal state
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [showAddToTrip, setShowAddToTrip] = useState(false);
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const trips = useTripsStore((s) => s.trips);
+  const currentUser = useUserStore((s) => s.currentUser);
+  const [newCampgroundName, setNewCampgroundName] = useState("");
+  const [newCampgroundAddress, setNewCampgroundAddress] = useState("");
+  const [newCampgroundNotes, setNewCampgroundNotes] = useState("");
   const navigation = useNavigation<ParksBrowseScreenNavigationProp>();
-  const insets = useSafeAreaInsets();
-
-  console.log("[ParksBrowseScreen] Component rendered");
-
-  // Filter state
-  const [mode, setMode] = useState<FilterMode>("near");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [driveTime, setDriveTime] = useState<DriveTime>(2);
-  const [parkType, setParkType] = useState<ParkType>("all");
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [viewMode, setViewMode] = useState<"map" | "list">("map");
-
-  // Data state
-  const [parks, setParks] = useState<Park[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedPark, setSelectedPark] = useState<Park | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
+  // ...existing code continues here...
 
   // Calculate distance between two coordinates (Haversine formula) - returns distance in miles
   const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -90,6 +85,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
     }
 
     setIsLoading(true);
+  const insets = useSafeAreaInsets();
     setError(null);
 
     try {
@@ -216,8 +212,66 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
   };
 
   const handleAddCampground = () => {
-    console.log("Add campground pressed – opens campground creation flow in full app.");
-    // In full app, this would open a modal to add custom campground directly to a trip
+    setAddModalVisible(true);
+  };
+
+  const handleSaveCampground = async () => {
+    if (!currentUser) {
+      alert("You must be logged in to save a campground.");
+      return;
+    }
+    if (!newCampgroundName.trim()) {
+      alert("Campground name is required.");
+      return;
+    }
+    try {
+      // Generate a new ID for the custom campground
+      const campgroundId = `${currentUser.id}_${Date.now()}`;
+      const campgroundData = {
+        id: campgroundId,
+        name: newCampgroundName.trim(),
+        address: newCampgroundAddress.trim(),
+        notes: newCampgroundNotes.trim(),
+        createdBy: currentUser.id,
+        createdAt: serverTimestamp(),
+        isCustom: true,
+      };
+      // Save to user's favorites subcollection
+      await setDoc(
+        doc(db, "users", currentUser.id, "favorites", campgroundId),
+        campgroundData
+      );
+      // Optionally: Save to a global custom_campgrounds collection for admin review
+      // await setDoc(doc(db, "custom_campgrounds", campgroundId), campgroundData);
+      setAddModalVisible(false);
+      setShowAddToTrip(true);
+      setNewCampgroundName("");
+      setNewCampgroundAddress("");
+      setNewCampgroundNotes("");
+      alert("Campground saved to your favorites! Now add to a trip.");
+      const handleConfirmAddToTrip = async () => {
+        if (!selectedTripId) return;
+        try {
+          // Add the campground ID to the selected trip's customCampgrounds array
+          // (Assume customCampgrounds is an array of campground IDs or objects)
+          const trip = trips.find((t) => t.id === selectedTripId);
+          if (!trip) return;
+          const updatedCampgrounds = Array.isArray(trip.customCampgrounds)
+            ? [...trip.customCampgrounds, { id: `${currentUser.id}_${Date.now()}`, name: newCampgroundName.trim() }]
+            : [{ id: `${currentUser.id}_${Date.now()}`, name: newCampgroundName.trim() }];
+          useTripsStore.getState().updateTrip(trip.id, { customCampgrounds: updatedCampgrounds });
+          setShowAddToTrip(false);
+          setSelectedTripId(null);
+          alert("Campground added to your trip!");
+        } catch (err) {
+          alert("Failed to add campground to trip. Please try again.");
+          console.error("Error adding campground to trip:", err);
+        }
+      };
+    } catch (err) {
+      alert("Failed to save campground. Please try again.");
+      console.error("Error saving campground:", err);
+    }
   };
 
   const showEmptyState = !isLoading && parks.length === 0 && hasSearched;
@@ -226,8 +280,102 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
 
   return (
     <View style={styles.root}>
+      {/* Add Campground Modal */}
+            {/* Add to Trip Modal */}
+            <Modal
+              visible={showAddToTrip}
+              animationType="slide"
+              transparent={true}
+              onRequestClose={() => setShowAddToTrip(false)}
+            >
+              <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)" }}>
+                <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 24, width: "90%" }}>
+                  <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 20, marginBottom: 16 }}>Add Campground to a Trip</Text>
+                  {trips.length === 0 ? (
+                    <Text style={{ marginBottom: 20 }}>You have no trips. Create a trip first!</Text>
+                  ) : (
+                    <>
+                      <Text style={{ marginBottom: 8 }}>Select a trip:</Text>
+                      {trips.map((trip) => (
+                        <TouchableOpacity
+                          key={trip.id}
+                          onPress={() => setSelectedTripId(trip.id)}
+                          style={{
+                            padding: 12,
+                            borderRadius: 8,
+                            backgroundColor: selectedTripId === trip.id ? DEEP_FOREST : CARD_BACKGROUND_LIGHT,
+                            marginBottom: 8,
+                          }}
+                        >
+                          <Text style={{ color: selectedTripId === trip.id ? "#fff" : DEEP_FOREST, fontFamily: fonts.bodySemibold }}>{trip.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      <TouchableOpacity
+                        onPress={handleConfirmAddToTrip}
+                        style={{ backgroundColor: DEEP_FOREST, borderRadius: 8, padding: 12, marginTop: 12, alignItems: "center" }}
+                        disabled={!selectedTripId}
+                      >
+                        <Text style={{ color: "#fff", fontFamily: fonts.bodySemibold }}>Add to Trip</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => setShowAddToTrip(false)} style={{ padding: 10, marginTop: 8 }}>
+                        <Text style={{ color: DEEP_FOREST, fontFamily: fonts.bodySemibold }}>Cancel</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </View>
+            </Modal>
+      <Modal
+        visible={addModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setAddModalVisible(false)}
+      >
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)" }}>
+          <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 24, width: "90%" }}>
+            <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 20, marginBottom: 16 }}>Add Your Own Campground</Text>
+            <TextInput
+              placeholder="Campground Name"
+              value={newCampgroundName}
+              onChangeText={setNewCampgroundName}
+              style={{ borderWidth: 1, borderColor: BORDER_SOFT, borderRadius: 8, padding: 10, marginBottom: 12 }}
+            />
+            <TextInput
+              placeholder="Address (optional)"
+              value={newCampgroundAddress}
+              onChangeText={setNewCampgroundAddress}
+              style={{ borderWidth: 1, borderColor: BORDER_SOFT, borderRadius: 8, padding: 10, marginBottom: 12 }}
+            />
+            <TextInput
+              placeholder="Notes (optional)"
+              value={newCampgroundNotes}
+              onChangeText={setNewCampgroundNotes}
+              style={{ borderWidth: 1, borderColor: BORDER_SOFT, borderRadius: 8, padding: 10, marginBottom: 20, minHeight: 60 }}
+              multiline
+            />
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 12 }}>
+              <TouchableOpacity onPress={() => setAddModalVisible(false)} style={{ padding: 10 }}>
+                <Text style={{ color: DEEP_FOREST, fontFamily: fonts.bodySemibold }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleSaveCampground} style={{ backgroundColor: DEEP_FOREST, borderRadius: 8, padding: 10, paddingHorizontal: 18 }}>
+                <Text style={{ color: "#fff", fontFamily: fonts.bodySemibold }}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       {/* Main Content */}
       <View style={{ flex: 1, backgroundColor: colors.parchment }}>
+
+      {/* Add Campground Button */}
+      <View style={{ alignItems: "center", marginTop: spacing.md, marginBottom: spacing.sm }}>
+        <TouchableOpacity
+          onPress={handleAddCampground}
+          style={{ backgroundColor: DEEP_FOREST, borderRadius: 24, paddingVertical: 12, paddingHorizontal: 28 }}
+        >
+          <Text style={{ color: "#fff", fontFamily: fonts.bodySemibold, fontSize: 16 }}>+ Add your own campground</Text>
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
         style={{ flex: 1 }}
