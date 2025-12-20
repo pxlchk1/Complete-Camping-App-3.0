@@ -8,7 +8,16 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "plugins": [
+      [
+        "expo-linking",
+        {
+          "enabled": true
+        }
+      ]
+    ],
     "ios": {
+      "associatedDomains": ["applinks:tentlantern.app", "applinks:www.tentlantern.app"],
       "supportsTablet": true,
       "bundleIdentifier": "com.tentlanternchild.completecampingcompanion",
       "buildNumber": "19",
@@ -37,7 +46,21 @@
       "package": "com.tentlanternchild.completecampingcompanion",
       "runtimeVersion": {
         "policy": "appVersion"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "tentlantern.app",
+              "pathPrefix": "/invite"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "extra": {
       "eas": {

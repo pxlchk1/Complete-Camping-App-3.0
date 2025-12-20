@@ -315,11 +315,15 @@ export default function HomeScreen() {
                 style={{ backgroundColor: RIVER_ROCK, paddingVertical: 14, borderRadius: 10 }}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+<<<<<<< HEAD
                   // @ts-ignore - Navigate to Connect tab in HomeTabs, then to Ask screen
                   navigation.navigate("HomeTabs", { 
                     screen: "Connect",
                     params: { screen: "Ask" }
                   });
+=======
+                  navigation.navigate("QuestionsListScreen");
+>>>>>>> backup-dec-10-2025-gear-fixes
                 }}
                 accessibilityLabel="Ask a Camper"
                 accessibilityRole="button"

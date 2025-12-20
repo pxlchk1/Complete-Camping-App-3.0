@@ -59,6 +59,7 @@ import CreateFeedbackScreen from "../screens/community/CreateFeedbackScreen";
 // Gear Closet screens
 import MyGearClosetScreen from "../screens/MyGearClosetScreen";
 import AddGearScreen from "../screens/AddGearScreen";
+import EditGearScreen from "../screens/EditGearScreen";
 import GearDetailScreen from "../screens/GearDetailScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 
@@ -188,6 +189,7 @@ export default function RootNavigator() {
       {/* Gear Closet */}
       <Stack.Screen name="MyGearCloset" component={MyGearClosetScreen} />
       <Stack.Screen name="AddGear" component={AddGearScreen} />
+      <Stack.Screen name="EditGear" component={EditGearScreen} />
       <Stack.Screen name="GearDetail" component={GearDetailScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
 

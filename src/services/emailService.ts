@@ -1,70 +1,64 @@
 /**
  * Email Service
- * Handles sending emails via Firebase Cloud Functions or external email service
+ * Handles sending emails via Firebase Cloud Functions
  */
 
 import { auth } from "../config/firebase";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 /**
- * Send campground invitation email
- * This would typically call a Cloud Function or external API to send the email
+ * Generate unique invitation token
+ */
+function generateInvitationToken(): string {
+  return `inv_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+}
+
+/**
+ * Send campground invitation email via Cloud Function
  */
 export async function sendCampgroundInvitation(
   recipientEmail: string,
   recipientName: string,
   inviterName: string
-): Promise<void> {
+): Promise<{ success: boolean; invitationToken: string }> {
   try {
     const user = auth.currentUser;
     if (!user) {
       throw new Error("Must be authenticated to send invitation");
     }
 
-    // TODO: In production, this should call a Cloud Function or external email API
-    // For now, we'll just log the email that would be sent
-    console.log("[EmailService] Campground invitation would be sent:");
-    console.log({
-      to: recipientEmail,
-      recipientName,
-      inviterName,
-      subject: `${inviterName} invited you to join their campground on Tent & Lantern`,
-      body: `
-Hi ${recipientName},
+    const invitationToken = generateInvitationToken();
 
-${inviterName} has invited you to join their campground on Tent & Lantern - the complete camping app!
+    // Call Firebase Cloud Function
+    const functions = getFunctions();
+    const sendInvitation = httpsCallable(functions, "sendCampgroundInvitation");
 
-By joining their campground, you'll be included in all their camping trip plans and details. You can coordinate trips, share packing lists, meal plans, and more.
-
-Download the Tent & Lantern app to get started:
-• iOS: [App Store Link]
-• Android: [Play Store Link]
-
-Once you've installed the app, sign up with this email address (${recipientEmail}) to automatically join ${inviterName}'s campground.
-
-Happy camping!
-The Tent & Lantern Team
-      `,
+    const result = await sendInvitation({
+      recipientEmail: recipientEmail.toLowerCase().trim(),
+      recipientName: recipientName.trim(),
+      inviterName: inviterName.trim(),
+      inviterId: user.uid,
+      invitationToken,
     });
 
-    // In production, you would make an API call here:
-    // const response = await fetch('YOUR_CLOUD_FUNCTION_URL', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     to: recipientEmail,
-    //     recipientName,
-    //     inviterName,
-    //     templateType: 'campground-invitation',
-    //   }),
-    // });
-    //
-    // if (!response.ok) {
-    //   throw new Error('Failed to send invitation email');
-    // }
+    console.log("[EmailService] Invitation sent successfully", result.data);
 
-    console.log("[EmailService] Invitation email logged successfully");
-  } catch (error) {
+    return {
+      success: true,
+      invitationToken,
+    };
+  } catch (error: any) {
     console.error("[EmailService] Error sending invitation:", error);
-    throw error;
+    
+    // Provide user-friendly error message
+    if (error.code === "functions/unauthenticated") {
+      throw new Error("You must be signed in to send invitations");
+    } else if (error.code === "functions/invalid-argument") {
+      throw new Error("Please check that all information is correct");
+    } else if (error.code === "functions/unavailable") {
+      throw new Error("Unable to send invitation. Please check your internet connection");
+    } else {
+      throw new Error(error.message || "Failed to send invitation. Please try again");
+    }
   }
 }

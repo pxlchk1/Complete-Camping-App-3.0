@@ -250,6 +250,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
   }
 
   return (
+<<<<<<< HEAD
     <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
         {/* Cover */}
@@ -258,30 +259,225 @@ export default function MyCampsiteScreen({ navigation }: any) {
           style={{ width: SCREEN_WIDTH, height: COVER_HEIGHT }}
         >
           {/* Top Bar */}
-          <View
-            style={{
-              paddingTop: insets.top + 8,
-              paddingHorizontal: 20,
-              flexDirection: "row",
-              justifyContent: "space-between",
-            }}
+=======
+    <View className="flex-1" style={{ backgroundColor: DEEP_FOREST }}>
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        {/* Hero Header with Background Image */}
+        <View style={{ height: COVER_HEIGHT + insets.top }}>
+          <ImageBackground
+            source={profile.backgroundUrl ? { uri: profile.backgroundUrl } : HERO_IMAGES.WELCOME}
+            style={{ width: "100%", height: "100%" }}
+            resizeMode="cover"
           >
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                navigation.goBack();
-              }}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: "rgba(0,0,0,0.5)",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="arrow-back" size={22} color={PARCHMENT} />
-            </Pressable>
+            {/* Gradient Overlay */}
+            <View
+              // Defensive fallback
+              return null;
+            }
+
+            return (
+              <View className="flex-1" style={{ backgroundColor: DEEP_FOREST }}>
+                <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+                  {/* Hero Header with Background Image */}
+                  <View style={{ height: COVER_HEIGHT + insets.top }}>
+                    <ImageBackground
+                      source={profile.backgroundUrl ? { uri: profile.backgroundUrl } : HERO_IMAGES.WELCOME}
+                      style={{ width: "100%", height: "100%" }}
+                      resizeMode="cover"
+                    >
+                      {/* Gradient Overlay */}
+                      <View
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundColor: "rgba(0, 0, 0, 0.3)",
+                        }}
+                      />
+
+                      {/* Back & Settings Buttons */}
+                      <View
+                        style={{
+                          paddingTop: insets.top + 8,
+                          paddingHorizontal: 20,
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Pressable
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            navigation.goBack();
+                          }}
+                          className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
+                          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+                        >
+                          <Ionicons name="arrow-back" size={24} color={PARCHMENT} />
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            // Gate: Login required to edit profile
+                            if (isGuest || !auth.currentUser) {
+                              navigation.navigate("Auth");
+                              return;
+                            }
+                            navigation.navigate("EditProfile");
+                          }}
+                          className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
+                          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+                        >
+                          <Ionicons name="create-outline" size={24} color={PARCHMENT} />
+                        </Pressable>
+                      </View>
+                    </ImageBackground>
+                  </View>
+
+                  {/* Profile Section with Avatar Overlap */}
+                  <View className="px-5" style={{ marginTop: -PROFILE_OVERLAP }}>
+                    {/* Avatar */}
+                    {profile.avatarUrl ? (
+                      <Image
+                        source={{ uri: profile.avatarUrl }}
+                        style={{
+                          width: PROFILE_SIZE - 8,
+                          height: PROFILE_SIZE - 8,
+                          borderRadius: (PROFILE_SIZE - 8) / 2,
+                        }}
+                      />
+                    ) : (
+                      <View
+                        style={{
+                          width: PROFILE_SIZE - 8,
+                          height: PROFILE_SIZE - 8,
+                          borderRadius: (PROFILE_SIZE - 8) / 2,
+                          backgroundColor: DEEP_FOREST,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontFamily: "SourceSans3_700Bold",
+                            fontSize: 40,
+                            color: PARCHMENT,
+                          }}
+                        >
+                          {initials}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Badge Row */}
+                  <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 24 }}>
+                    {[
+                      { label: "Weekend\nCamper", icon: "bonfire", color: "#92AFB1" },
+                      { label: "Trail\nLeader", icon: "compass", color: "#AC9A6D" },
+                      { label: "Backcountry\nGuide", icon: "navigate", color: "#485952" },
+                    ].map((b) => (
+                      <View key={b.label} style={{ width: 80, alignItems: "center" }}>
+                        <View
+                          style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 28,
+                            backgroundColor: b.color,
+                            borderWidth: 3,
+                            borderColor: PARCHMENT,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Ionicons name={b.icon as any} size={26} color={PARCHMENT} />
+                        </View>
+                        <Text
+                          style={{
+                            textAlign: "center",
+                            marginTop: 6,
+                            fontSize: 9,
+                            lineHeight: 11,
+                            fontFamily: "SourceSans3_600SemiBold",
+                            color: TEXT_SECONDARY,
+                          }}
+                        >
+                          {b.label}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Restore Purchases */}
+                  <Pressable
+                    onPress={handleRestorePurchases}
+                    disabled={restoring}
+                    style={{
+                      margin: 20,
+                      padding: 16,
+                      borderRadius: 12,
+                      borderWidth: 2,
+                      borderColor: EARTH_GREEN,
+                      backgroundColor: CARD_BACKGROUND_LIGHT,
+                      alignItems: "center",
+                    }}
+                  >
+                    {restoring ? (
+                      <ActivityIndicator color={EARTH_GREEN} />
+                    ) : (
+                      <>
+                        <Ionicons name="reload-circle-outline" size={24} color={EARTH_GREEN} />
+                        <Text style={{ marginTop: 6, fontFamily: "SourceSans3_600SemiBold" }}>
+                          Restore Purchases
+                        </Text>
+                      </>
+                    )}
+                  </Pressable>
+
+                  {/* Sign Out */}
+                  <Pressable
+                    onPress={handleSignOut}
+                    style={{
+                      marginHorizontal: 20,
+                      padding: 14,
+                      borderRadius: 10,
+                      backgroundColor: "#dc2626",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        textAlign: "center",
+                        fontFamily: "SourceSans3_600SemiBold",
+                        color: PARCHMENT,
+                      }}
+                    >
+                      Sign Out
+                    </Text>
+                  </Pressable>
+                </ScrollView>
+
+                <AccountRequiredModal
+                  visible={showAccountModal}
+                  onCreateAccount={() => navigation.navigate("Auth")}
+                  onMaybeLater={() => setShowAccountModal(false)}
+                />
+
+                <PaywallModal
+                  visible={showProModal}
+                  onClose={() => setShowProModal(false)}
+                />
+              </View>
+            );
+                    color: PARCHMENT,
+                  }}
+                >
+                  {initials}
+                </Text>
+              </View>
+            )}
+>>>>>>> backup-dec-10-2025-gear-fixes
           </View>
 
           {/* Badge Row */}
