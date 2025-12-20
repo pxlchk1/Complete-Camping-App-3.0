@@ -1,34 +1,28 @@
+import React, { useEffect, useState } from "react";
 /**
  * Meals Screen - Toggle between two views
  * 1. Meal Planner - Plan meals for active trips
  * 2. Meal Ideas - Browse and add recipes to trips
  */
 
-import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   Pressable,
   FlatList,
-  ImageBackground,
   TextInput,
   Modal,
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { SafeAreaView } from "react-native-safe-area-context";
-import PlanTopNav from "../components/PlanTopNav";
-import AccountButtonHeader from "../components/AccountButtonHeader";
 import AddCustomMealModal from "../components/AddCustomMealModal";
 import FireflyLoader from "../components/common/FireflyLoader";
 import EmptyState from "../components/EmptyState";
-import { HERO_IMAGES } from "../constants/images";
-import { DEEP_FOREST, EARTH_GREEN, PARCHMENT, TEXT_ON_DARK } from "../constants/colors";
+import { DEEP_FOREST, EARTH_GREEN, PARCHMENT } from "../constants/colors";
 import { useTrips } from "../state/tripsStore";
 import { RootStackParamList } from "../navigation/types";
 import { MealCategory, PrepType, MealLibraryItem } from "../types/meal";
@@ -60,6 +54,12 @@ const PREP_TYPE_LABELS: Record<PrepType, string> = {
 };
 
 export default function MealsScreen({ onTabChange }: MealsScreenProps) {
+  console.log("[PLAN_TRACE] Enter MealsScreen");
+
+  useEffect(() => {
+    console.log("[PLAN_TRACE] MealsScreen mounted");
+  }, []);
+
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<MealsScreenNavigationProp>();
   const trips = useTrips();
@@ -99,6 +99,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
     if (activeView === "recipes") {
       loadRecipesFromFirebase();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView]);
 
   const loadRecipesFromFirebase = async () => {
@@ -108,9 +109,9 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
       const q = query(recipesRef, orderBy("name"));
       const snapshot = await getDocs(q);
 
-      const firebaseRecipes = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
+      const firebaseRecipes = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
       })) as MealLibraryItem[];
 
       if (firebaseRecipes.length > 0) {
@@ -127,6 +128,8 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
   };
 
   const loadLocalRecipes = () => {
+    // Kept as-is from existing codebase
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useMealStore } = require("../state/mealStore");
     const state = useMealStore.getState();
 
@@ -141,21 +144,22 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
   // Filter recipes
   const filteredRecipes = recipes.filter((recipe) => {
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase();
       const matchesSearch =
-        recipe.name.toLowerCase().includes(query) ||
-        recipe.ingredients?.some((ing) => ing.toLowerCase().includes(query)) ||
-        recipe.tags?.some((tag) => tag.toLowerCase().includes(query));
+        recipe.name.toLowerCase().includes(q) ||
+        recipe.ingredients?.some((ing) => ing.toLowerCase().includes(q)) ||
+        recipe.tags?.some((tag) => tag.toLowerCase().includes(q));
 
       if (!matchesSearch) return false;
     }
 
     if (!selectedFilters.includes("All")) {
-      const categoryMatch = selectedFilters.some(f =>
-        f.toLowerCase() === recipe.category.toLowerCase()
+      const categoryMatch = selectedFilters.some(
+        (f) => f.toLowerCase() === recipe.category.toLowerCase()
       );
-      const prepTypeMatch = selectedFilters.some(f =>
-        f.toLowerCase() === PREP_TYPE_LABELS[recipe.prepType].toLowerCase()
+
+      const prepTypeMatch = selectedFilters.some(
+        (f) => f.toLowerCase() === PREP_TYPE_LABELS[recipe.prepType].toLowerCase()
       );
 
       if (!categoryMatch && !prepTypeMatch) return false;
@@ -166,26 +170,38 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
 
   const handleToggle = async (view: MealsView) => {
     if (view === activeView) return;
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {
+      // ignore haptics failures
+    }
     setActiveView(view);
   };
 
   const handleFilterChipPress = async (filter: string) => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // ignore haptics failures
+    }
 
     if (filter === "All") {
       setSelectedFilters(["All"]);
     } else {
       const newFilters = selectedFilters.includes(filter)
-        ? selectedFilters.filter(f => f !== filter)
-        : [...selectedFilters.filter(f => f !== "All"), filter];
+        ? selectedFilters.filter((f) => f !== filter)
+        : [...selectedFilters.filter((f) => f !== "All"), filter];
 
       setSelectedFilters(newFilters.length === 0 ? ["All"] : newFilters);
     }
   };
 
   const handleAddToTripPress = async (recipe: MealLibraryItem) => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {
+      // ignore haptics failures
+    }
     setSelectedRecipe(recipe);
     setSelectedTripForAdd(activeTrips.length > 0 ? activeTrips[0].id : null);
     setSelectedMealType(recipe.category);
@@ -210,7 +226,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
 
       await LocalMealService.addMeal(selectedTripForAdd, mealData);
 
-      const trip = trips.find(t => t.id === selectedTripForAdd);
+      const trip = trips.find((t) => t.id === selectedTripForAdd);
       const tripName = trip?.name || "trip";
       const dayText = `Day ${selectedDay}`;
       const mealTypeText = CATEGORY_LABELS[selectedMealType];
@@ -220,7 +236,12 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
       setTimeout(() => setShowToast(false), 3000);
 
       setShowAddToTrip(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {
+        // ignore haptics failures
+      }
     } catch (error) {
       console.error("Failed to add meal to trip:", error);
     }
@@ -235,6 +256,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
     instructions?: string;
     tags?: string[];
   }) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { useMealStore } = require("../state/mealStore");
     const addCustomMeal = useMealStore.getState().addCustomMeal;
 
@@ -248,7 +270,11 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      // ignore haptics failures
+    }
   };
 
   const filterOptions = [
@@ -270,17 +296,11 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
       <View className="bg-white rounded-xl p-4 mb-3 border border-stone-200 shadow-sm">
         <View className="flex-row items-start justify-between mb-2">
           <View className="flex-1 mr-3">
-            <Text
-              className="text-base mb-1"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-            >
+            <Text className="text-base mb-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
               {item.name}
             </Text>
 
-            <Text
-              className="text-sm mb-2"
-              style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}
-            >
+            <Text className="text-sm mb-2" style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}>
               {categoryLabel} • {prepTypeLabel} • {item.difficulty === "easy" ? "Easy" : "Moderate"}
             </Text>
 
@@ -288,10 +308,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
               <View className="flex-row flex-wrap gap-1.5">
                 {item.tags.slice(0, 2).map((tag, index) => (
                   <View key={index} className="px-2 py-0.5 rounded bg-stone-100">
-                    <Text
-                      className="text-xs"
-                      style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}
-                    >
+                    <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}>
                       {tag}
                     </Text>
                   </View>
@@ -304,35 +321,22 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
             <Pressable
               onPress={() => activeTrips.length > 0 && handleAddToTripPress(item)}
               disabled={activeTrips.length === 0}
-              className={`rounded-lg px-3 py-2 ${
-                activeTrips.length === 0
-                  ? "bg-stone-300"
-                  : "bg-forest active:opacity-80"
-              }`}
+              className={`rounded-lg px-3 py-2 ${activeTrips.length === 0 ? "bg-stone-300" : "bg-forest active:opacity-80"}`}
               style={{ minWidth: 100 }}
             >
               <View className="flex-row items-center justify-center">
                 <Text
-                  className={`text-sm mr-1 ${
-                    activeTrips.length === 0 ? "text-stone-500" : "text-white"
-                  }`}
+                  className={`text-sm mr-1 ${activeTrips.length === 0 ? "text-stone-500" : "text-white"}`}
                   style={{ fontFamily: "SourceSans3_600SemiBold" }}
                 >
                   Add to trip
                 </Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={14}
-                  color={activeTrips.length === 0 ? "#78716c" : "white"}
-                />
+                <Ionicons name="chevron-forward" size={14} color={activeTrips.length === 0 ? "#78716c" : "white"} />
               </View>
             </Pressable>
-            
+
             {activeTrips.length === 0 && (
-              <Text
-                className="text-xs mt-1 text-center"
-                style={{ fontFamily: "SourceSans3_400Regular", color: "#999", maxWidth: 100 }}
-              >
+              <Text className="text-xs mt-1 text-center" style={{ fontFamily: "SourceSans3_400Regular", color: "#999", maxWidth: 100 }}>
                 Create a trip first
               </Text>
             )}
@@ -346,40 +350,41 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
 
   return (
     <View className="flex-1 bg-parchment">
+      {/* Page Title Header */}
+      <View
+        style={{
+          paddingTop: insets.top + 12,
+          paddingBottom: 12,
+          backgroundColor: "#F4EBD0",
+          paddingHorizontal: 20,
+        }}
+      >
+        <Text style={{ fontFamily: "JosefinSlab_700Bold", fontSize: 24, color: "#16492f" }}>
+          Meal Planner
+        </Text>
+      </View>
 
       {/* Toggle */}
-            {/* Page Title Header */}
-            <View style={{ paddingTop: insets.top + 12, paddingBottom: 12, backgroundColor: '#F4EBD0', paddingHorizontal: 20 }}>
-              <Text style={{ fontFamily: 'JosefinSlab_700Bold', fontSize: 24, color: '#16492f' }}>Meal Planner</Text>
-            </View>
-            {/* Toggle */}
       <View className="px-4 pt-4 pb-3">
         <View className="flex-row bg-stone-200 rounded-xl p-1">
           <Pressable
             onPress={() => handleToggle("planner")}
-            className={`flex-1 py-2 rounded-lg ${
-              activeView === "planner" ? "bg-forest" : "bg-transparent"
-            }`}
+            className={`flex-1 py-2 rounded-lg ${activeView === "planner" ? "bg-forest" : "bg-transparent"}`}
           >
             <Text
-              className={`text-center text-sm ${
-                activeView === "planner" ? "text-white" : "text-forest"
-              }`}
+              className={`text-center text-sm ${activeView === "planner" ? "text-white" : "text-forest"}`}
               style={{ fontFamily: "SourceSans3_600SemiBold" }}
             >
               Meal Planner
             </Text>
           </Pressable>
+
           <Pressable
             onPress={() => handleToggle("recipes")}
-            className={`flex-1 py-2 rounded-lg ${
-              activeView === "recipes" ? "bg-forest" : "bg-transparent"
-            }`}
+            className={`flex-1 py-2 rounded-lg ${activeView === "recipes" ? "bg-forest" : "bg-transparent"}`}
           >
             <Text
-              className={`text-center text-sm ${
-                activeView === "recipes" ? "text-white" : "text-forest"
-              }`}
+              className={`text-center text-sm ${activeView === "recipes" ? "text-white" : "text-forest"}`}
               style={{ fontFamily: "SourceSans3_600SemiBold" }}
             >
               Meal Ideas
@@ -389,9 +394,9 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
       </View>
 
       {/* VIEW 1: Meal Planner */}
-      {activeView === "planner" && (
-        activeTrips.length === 0 ? (
-          <View style={{ flex: 1, backgroundColor: '#F4EBD0' }}>
+      {activeView === "planner" &&
+        (activeTrips.length === 0 ? (
+          <View style={{ flex: 1, backgroundColor: "#F4EBD0" }}>
             <EmptyState
               iconName="calendar"
               title="No active trips"
@@ -406,28 +411,18 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
               <View className="flex-row items-center justify-between mb-3">
                 <View className="flex-row items-center">
                   <Ionicons name="calendar" size={24} color={DEEP_FOREST} />
-                  <Text
-                    className="ml-2 text-lg"
-                    style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
-                  >
+                  <Text className="ml-2 text-lg" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
                     Plan Trip Meals
                   </Text>
                 </View>
                 <View className="bg-forest rounded-full px-3 py-1">
-                  <Text
-                    className="text-xs text-white"
-                    style={{ fontFamily: "SourceSans3_600SemiBold" }}
-                  >
+                  <Text className="text-xs text-white" style={{ fontFamily: "SourceSans3_600SemiBold" }}>
                     {activeTrips.length} {activeTrips.length === 1 ? "trip" : "trips"}
                   </Text>
                 </View>
               </View>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 12 }}
-              >
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                 {activeTrips.map((trip) => (
                   <Pressable
                     key={trip.id}
@@ -446,19 +441,9 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
                     >
                       {trip.name}
                     </Text>
-                    <Text
-                      className="text-xs"
-                      style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}
-                    >
-                      {new Date(trip.startDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}{" "}
-                      -{" "}
-                      {new Date(trip.endDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}
+                    <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}>
+                      {new Date(trip.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} -{" "}
+                      {new Date(trip.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                     </Text>
                   </Pressable>
                 ))}
@@ -467,31 +452,30 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
 
             {/* Helpful info section */}
             {activeTrips.length > 0 && (
-            <View className="px-4 pt-4">
-              <View className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-                <View className="flex-row items-start">
-                  <Ionicons name="bulb-outline" size={20} color="#d97706" style={{ marginTop: 2, marginRight: 8 }} />
-                  <View className="flex-1">
-                    <Text
-                      className="text-sm mb-1"
-                      style={{ fontFamily: "SourceSans3_600SemiBold", color: "#92400e" }}
-                    >
-                      Tip: Build your meal plan
-                    </Text>
-                    <Text
-                      className="text-sm"
-                      style={{ fontFamily: "SourceSans3_400Regular", color: "#78350f" }}
-                    >
-                      Tap a trip to plan breakfast, lunch, dinner, and snacks for each day. Or browse Meal Ideas to add meals directly.
-                    </Text>
+              <View className="px-4 pt-4">
+                <View className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                  <View className="flex-row items-start">
+                    <Ionicons
+                      name="bulb-outline"
+                      size={20}
+                      color="#d97706"
+                      style={{ marginTop: 2, marginRight: 8 }}
+                    />
+                    <View className="flex-1">
+                      <Text className="text-sm mb-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: "#92400e" }}>
+                        Tip: Build your meal plan
+                      </Text>
+                      <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: "#78350f" }}>
+                        Tap a trip to plan breakfast, lunch, dinner, and snacks for each day. Or browse Meal Ideas to add
+                        meals directly.
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
             )}
           </View>
-        )
-      )}
+        ))}
 
       {/* VIEW 2: Meal Ideas */}
       {activeView === "recipes" && (
@@ -499,22 +483,20 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
           <View className="px-4 pb-3">
             <View className="mb-2 flex-row items-center justify-between">
               <View className="flex-1">
-                <Text
-                  className="text-lg mb-1"
-                  style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
-                >
+                <Text className="text-lg mb-1" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
                   Camp Recipe Library
                 </Text>
-                <Text
-                  className="text-sm"
-                  style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}
-                >
+                <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}>
                   Simple meals you can add to any trip.
                 </Text>
               </View>
               <Pressable
                 onPress={async () => {
-                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  try {
+                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  } catch {
+                    // ignore haptics failures
+                  }
                   setShowAddCustomMeal(true);
                 }}
                 className="ml-3 bg-forest rounded-full p-2 active:opacity-80"
@@ -542,12 +524,17 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
             </View>
 
             {/* Filter Chips */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
-            >
-              {filterOptions.map((filter) => {
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {[
+                "All",
+                "Breakfast",
+                "Lunch",
+                "Dinner",
+                "Snacks",
+                "No cook",
+                "Camp stove",
+                "Campfire",
+              ].map((filter) => {
                 const isSelected = selectedFilters.includes(filter);
                 return (
                   <Pressable
@@ -573,10 +560,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
           {loadingRecipes ? (
             <View className="flex-1 items-center justify-center">
               <ActivityIndicator size="large" color={DEEP_FOREST} />
-              <Text
-                className="mt-4"
-                style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}
-              >
+              <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}>
                 Loading recipes...
               </Text>
             </View>
@@ -589,16 +573,10 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
               ListEmptyComponent={
                 <View className="items-center justify-center py-12">
                   <Ionicons name="book-outline" size={48} color={EARTH_GREEN} />
-                  <Text
-                    className="text-center mt-4 mb-2"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                  >
+                  <Text className="text-center mt-4 mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
                     No recipes yet
                   </Text>
-                  <Text
-                    className="text-center mb-4 px-8"
-                    style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}
-                  >
+                  <Text className="text-center mb-4 px-8" style={{ fontFamily: "SourceSans3_400Regular", color: "#5a5a5a" }}>
                     You can start by adding your favorite camp meals. They will show up here for future trips.
                   </Text>
                 </View>
@@ -609,21 +587,13 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
       )}
 
       {/* Add to Trip Modal */}
-      <Modal
-        visible={showAddToTrip}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowAddToTrip(false)}
-      >
+      <Modal visible={showAddToTrip} animationType="fade" transparent={true} onRequestClose={() => setShowAddToTrip(false)}>
         <View className="flex-1 bg-black/50 justify-end">
           <SafeAreaView className="bg-white rounded-t-2xl" edges={["bottom"]}>
             <View className="p-6">
               {/* Header */}
               <View className="flex-row items-center justify-between mb-4">
-                <Text
-                  className="text-xl"
-                  style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
-                >
+                <Text className="text-xl" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
                   Add to Trip
                 </Text>
                 <Pressable onPress={() => setShowAddToTrip(false)} className="p-2">
@@ -633,10 +603,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
 
               {selectedRecipe && (
                 <View className="mb-4">
-                  <Text
-                    className="text-base"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                  >
+                  <Text className="text-base" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
                     {selectedRecipe.name}
                   </Text>
                 </View>
@@ -645,25 +612,16 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
               {/* Select Trip */}
               {activeTrips.length > 1 && (
                 <View className="mb-4">
-                  <Text
-                    className="text-sm mb-2"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                  >
+                  <Text className="text-sm mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
                     Select Trip
                   </Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 8 }}
-                  >
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                     {activeTrips.map((trip) => (
                       <Pressable
                         key={trip.id}
                         onPress={() => setSelectedTripForAdd(trip.id)}
                         className={`px-4 py-2 rounded-xl border ${
-                          selectedTripForAdd === trip.id
-                            ? "bg-forest border-forest"
-                            : "bg-white border-stone-300"
+                          selectedTripForAdd === trip.id ? "bg-forest border-forest" : "bg-white border-stone-300"
                         }`}
                       >
                         <Text
@@ -680,10 +638,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
 
               {/* Select Meal Type */}
               <View className="mb-4">
-                <Text
-                  className="text-sm mb-2"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                >
+                <Text className="text-sm mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
                   Meal Type
                 </Text>
                 <View className="flex-row gap-2">
@@ -692,9 +647,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
                       key={cat}
                       onPress={() => setSelectedMealType(cat)}
                       className={`flex-1 px-3 py-2 rounded-xl border ${
-                        selectedMealType === cat
-                          ? "bg-forest border-forest"
-                          : "bg-white border-stone-300"
+                        selectedMealType === cat ? "bg-forest border-forest" : "bg-white border-stone-300"
                       }`}
                     >
                       <Text
@@ -711,19 +664,12 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
               {/* Select Day */}
               {selectedTripForAdd && (
                 <View className="mb-6">
-                  <Text
-                    className="text-sm mb-2"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                  >
+                  <Text className="text-sm mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
                     Day
                   </Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 8 }}
-                  >
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                     {(() => {
-                      const trip = trips.find(t => t.id === selectedTripForAdd);
+                      const trip = trips.find((t) => t.id === selectedTripForAdd);
                       const tripDays = trip
                         ? Math.ceil(
                             (new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) /
@@ -736,9 +682,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
                           key={day}
                           onPress={() => setSelectedDay(day)}
                           className={`px-4 py-2 rounded-xl border ${
-                            selectedDay === day
-                              ? "bg-forest border-forest"
-                              : "bg-white border-stone-300"
+                            selectedDay === day ? "bg-forest border-forest" : "bg-white border-stone-300"
                           }`}
                         >
                           <Text
@@ -755,14 +699,8 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
               )}
 
               {/* Confirm Button */}
-              <Pressable
-                onPress={handleConfirmAddToTrip}
-                className="bg-forest rounded-xl py-3 items-center active:opacity-90"
-              >
-                <Text
-                  className="text-white text-base"
-                  style={{ fontFamily: "SourceSans3_600SemiBold" }}
-                >
+              <Pressable onPress={handleConfirmAddToTrip} className="bg-forest rounded-xl py-3 items-center active:opacity-90">
+                <Text className="text-white text-base" style={{ fontFamily: "SourceSans3_600SemiBold" }}>
                   Add to Trip
                 </Text>
               </Pressable>
@@ -772,28 +710,19 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
       </Modal>
 
       {/* Add Custom Meal Modal */}
-      <AddCustomMealModal
-        visible={showAddCustomMeal}
-        onClose={() => setShowAddCustomMeal(false)}
-        onSave={handleSaveCustomMeal}
-      />
+      <AddCustomMealModal visible={showAddCustomMeal} onClose={() => setShowAddCustomMeal(false)} onSave={handleSaveCustomMeal} />
 
       {/* Toast Notification */}
       {showToast && (
-        <View
-          className="absolute bottom-20 left-4 right-4 bg-forest rounded-xl px-4 py-3 flex-row items-center shadow-lg"
-          style={{ elevation: 5 }}
-        >
+        <View className="absolute bottom-20 left-4 right-4 bg-forest rounded-xl px-4 py-3 flex-row items-center shadow-lg" style={{ elevation: 5 }}>
           <Ionicons name="checkmark-circle" size={20} color="white" />
-          <Text
-            className="text-white ml-2 flex-1"
-            style={{ fontFamily: "SourceSans3_400Regular" }}
-          >
+          <Text className="text-white ml-2 flex-1" style={{ fontFamily: "SourceSans3_400Regular" }}>
             {toastMessage}
           </Text>
         </View>
       )}
-      {loadingRecipes && activeView === "recipes" && <FireflyLoader />}
+
+      {loadingRecipes && activeView === "recipes" ? <FireflyLoader /> : null}
     </View>
   );
 }

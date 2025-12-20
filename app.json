@@ -17,6 +17,8 @@
       "entitlements": {
         "com.apple.developer.applesignin": [
           "Default",
+          "Default",
+          "Default",
           "Default"
         ]
       },
@@ -27,16 +29,23 @@
         "NSCalendarsUsageDescription": "This app may access your calendar through third-party libraries to enhance your camping trip planning experience.",
         "NSContactsUsageDescription": "This app may access your contacts through third-party libraries to help you share camping trips with friends and family.",
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "runtimeVersion": "1.0.0"
     },
     "android": {
       "edgeToEdgeEnabled": true,
-      "package": "com.tentlanternchild.completecampingcompanion"
+      "package": "com.tentlanternchild.completecampingcompanion",
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "extra": {
       "eas": {
         "projectId": "587deb41-d7a9-474f-8baf-09024d0a6ef1"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/587deb41-d7a9-474f-8baf-09024d0a6ef1"
     }
   }
 }

@@ -4,7 +4,8 @@
  */
 
 import React, { useState } from "react";
-import { View, Text, Pressable, TextInput, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, Pressable, TextInput, ActivityIndicator, Platform } from "react-native";
+import KeyboardAwareScrollView from "../../components/KeyboardAwareScrollView";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import ModalHeader from "../../components/ModalHeader";
@@ -112,12 +113,14 @@ export default function CreateFeedbackScreen() {
         }}
       />
 
-      <KeyboardAvoidingView
+      <KeyboardAwareScrollView
         className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={90}
+        contentContainerStyle={{ padding: 20 }}
+        enableOnAndroid
+        extraScrollHeight={40}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView className="flex-1" contentContainerStyle={{ padding: 20 }}>
           {error && (
             <View className="rounded-xl p-4 mb-4 flex-row items-center bg-red-100 border border-red-300">
               <Ionicons name="alert-circle" size={20} color="#dc2626" />
@@ -229,6 +232,7 @@ export default function CreateFeedbackScreen() {
                 minHeight: 150,
               }}
               maxLength={1500}
+              returnKeyType="done"
             />
             <Text className="mt-1 text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
               {body.length}/1500 • Minimum 20 characters
@@ -253,8 +257,8 @@ export default function CreateFeedbackScreen() {
               • Check if similar feedback already exists
             </Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {/* ...existing code... */}
+      </KeyboardAwareScrollView>
     </View>
   );
 }

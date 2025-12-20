@@ -11,7 +11,7 @@ import ModalHeader from "../../components/ModalHeader";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { createStory } from "../../services/storiesService";
+import { getFirestore, collection, addDoc, updateDoc, serverTimestamp, doc } from "firebase/firestore";
 import { useCurrentUser } from "../../state/userStore";
 import { RootStackNavigationProp } from "../../navigation/types";
 import {
@@ -81,61 +81,50 @@ export default function UploadPhotoScreen() {
     }
   };
 
-  const uploadImageToStorage = async (uri: string, storyId: string): Promise<string> => {
+  const uploadImageToStorage = async (uri: string, photoId: string): Promise<{ downloadURL: string, storagePath: string }> => {
     const storage = getStorage();
-    // Matches Firebase Storage rules: stories/{userId}/{storyId}/{fileName}
-    const filename = `stories/${currentUser?.id || "anonymous"}/${storyId}/${Date.now()}.jpg`;
-    const storageRef = ref(storage, filename);
-
-    // Fetch the image as a blob
+    const userId = currentUser?.id || "anonymous";
+    const storagePath = `connectPhotos/${userId}/${photoId}.jpg`;
+    const storageRef = ref(storage, storagePath);
     const response = await fetch(uri);
     const blob = await response.blob();
-
-    // Upload to Firebase Storage
     await uploadBytes(storageRef, blob);
-
-    // Get download URL
     const downloadURL = await getDownloadURL(storageRef);
-    return downloadURL;
+    return { downloadURL, storagePath };
   };
 
   const handleSubmit = async () => {
     if (!currentUser || !imageUri || !caption.trim() || uploading) return;
-
     if (caption.length < 10) {
       setError("Caption must be at least 10 characters");
       return;
     }
-
     try {
       setUploading(true);
       setError(null);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-
-      // Create story first to get the storyId
-      const storyId = await createStory({
-        imageUrl: "", // Temporary empty URL
+      const db = getFirestore();
+      // Create Firestore doc first to get the photoId
+      const docRef = await addDoc(collection(db, "connectPhotos"), {
+        imageUrl: "", // Placeholder, will update after upload
+        storagePath: "",
         caption: caption.trim(),
         tags,
-        authorId: currentUser.id,
-        locationLabel: locationLabel.trim() || undefined,
+        userId: currentUser.id,
+        displayName: currentUser.displayName || "Anonymous User",
+        locationName: locationLabel.trim() || null,
+        createdAt: serverTimestamp(),
       });
-
-      // Upload image to Firebase Storage with storyId
-      const imageUrl = await uploadImageToStorage(imageUri, storyId);
-
-      // Update story with actual image URL
-      // Note: storiesService should have an update function
-      await createStory({
-        imageUrl,
-        caption: caption.trim(),
-        tags,
-        authorId: currentUser.id,
-        locationLabel: locationLabel.trim() || undefined,
-      }, storyId);
-
+      const photoId = docRef.id;
+      // Upload image to Firebase Storage
+      const { downloadURL, storagePath } = await uploadImageToStorage(imageUri, photoId);
+      // Update Firestore doc with real imageUrl and storagePath
+      await updateDoc(doc(db, "connectPhotos", photoId), {
+        imageUrl: downloadURL,
+        storagePath,
+      });
       // Navigate to the photo detail
-      navigation.replace("PhotoDetail", { storyId });
+      navigation.replace("PhotoDetail", { photoId });
     } catch (err: any) {
       setError(err.message || "Failed to upload photo");
       setUploading(false);

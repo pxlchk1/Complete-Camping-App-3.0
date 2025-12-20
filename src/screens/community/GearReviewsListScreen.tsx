@@ -18,6 +18,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { DocumentSnapshot } from "firebase/firestore";
 import * as Haptics from "expo-haptics";
 import { getGearReviews } from "../../services/gearReviewsService";
+import { gearReviewVotesService } from "../../services/firestore/gearReviewVotesService";
+import VoteButtons from "../../components/VoteButtons";
 import { GearReview, GearCategory } from "../../types/community";
 import { RootStackNavigationProp } from "../../navigation/types";
 import { useCurrentUser } from "../../state/userStore";
@@ -55,8 +57,8 @@ export default function GearReviewsListScreen() {
   const currentUser = useCurrentUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  const [reviews, setReviews] = useState<GearReview[]>([]);
-  const [filteredReviews, setFilteredReviews] = useState<GearReview[]>([]);
+  const [reviews, setReviews] = useState<(GearReview & { voteScore: number; userVote: "up" | "down" | null })[]>([]);
+  const [filteredReviews, setFilteredReviews] = useState<(GearReview & { voteScore: number; userVote: "up" | "down" | null })[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [loading, setLoading] = useState(true);
@@ -102,10 +104,29 @@ export default function GearReviewsListScreen() {
         refresh ? undefined : lastDoc || undefined
       );
 
+      // Fetch votes for each review
+      const reviewsWithVotes = await Promise.all(
+        result.reviews.map(async (review) => {
+          let voteScore = 0;
+          let userVote: "up" | "down" | null = null;
+          try {
+            const summary = await gearReviewVotesService.getVoteSummary(review.id);
+            voteScore = summary.score;
+            if (currentUser) {
+              const vote = await gearReviewVotesService.getUserVote(review.id);
+              userVote = vote?.voteType || null;
+            }
+          } catch (e) {
+            voteScore = review.upvoteCount || 0;
+          }
+          return { ...review, voteScore, userVote };
+        })
+      );
+
       if (refresh) {
-        setReviews(result.reviews);
+        setReviews(reviewsWithVotes);
       } else {
-        setReviews((prev) => [...prev, ...result.reviews]);
+        setReviews((prev) => [...prev, ...reviewsWithVotes]);
       }
 
       setLastDoc(result.lastDoc);
@@ -160,7 +181,22 @@ export default function GearReviewsListScreen() {
     }
   }, [searchQuery, reviews]);
 
-  const renderReviewItem = ({ item }: { item: GearReview }) => (
+  const handleVote = async (reviewId: string, voteType: "up" | "down") => {
+    try {
+      await gearReviewVotesService.vote(reviewId, voteType);
+      setReviews((prev) =>
+        prev.map((review) =>
+          review.id === reviewId
+            ? { ...review, userVote: voteType, voteScore: review.voteScore + (voteType === "up" ? 1 : -1) }
+            : review
+        )
+      );
+    } catch (e) {
+      // TODO: show error toast
+    }
+  };
+
+  const renderReviewItem = ({ item }: { item: GearReview & { voteScore: number; userVote: "up" | "down" | null } }) => (
     <Pressable
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -245,15 +281,12 @@ export default function GearReviewsListScreen() {
         >
           {formatTimeAgo(toDateString(item.createdAt))}
         </Text>
-        <View className="flex-row items-center">
-          <Ionicons name="arrow-up" size={14} color={TEXT_MUTED} />
-          <Text
-            className="ml-1 text-xs"
-            style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_MUTED }}
-          >
-            {item.upvoteCount || 0}
-          </Text>
-        </View>
+        <VoteButtons
+          score={item.voteScore}
+          userVote={item.userVote}
+          onVote={(voteType) => handleVote(item.id, voteType)}
+          layout="vertical"
+        />
       </View>
     </Pressable>
   );

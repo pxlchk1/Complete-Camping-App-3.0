@@ -9,6 +9,8 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { tipsService, TipPost } from "../../services/firestore/tipsService";
+import { tipVotesService } from "../../services/firestore/tipVotesService";
+import VoteButtons from "../../components/VoteButtons";
 import { auth } from "../../config/firebase";
 import { RootStackNavigationProp } from "../../navigation/types";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
@@ -24,13 +26,19 @@ import {
   TEXT_MUTED,
 } from "../../constants/colors";
 
+
 type SortOption = "newest" | "my";
+
+interface TipWithVotes extends TipPost {
+  voteScore: number;
+  userVote: "up" | "down" | null;
+}
 
 export default function TipsListScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const currentUser = auth.currentUser;
 
-  const [tips, setTips] = useState<TipPost[]>([]);
+  const [tips, setTips] = useState<TipWithVotes[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>("newest");
@@ -51,7 +59,26 @@ export default function TipsListScreen() {
         allTips = await tipsService.getTips();
       }
 
-      setTips(allTips);
+      // Fetch votes for each tip
+      const tipsWithVotes: TipWithVotes[] = await Promise.all(
+        allTips.map(async (tip) => {
+          let voteScore = 0;
+          let userVote: "up" | "down" | null = null;
+          try {
+            const summary = await tipVotesService.getVoteSummary(tip.id);
+            voteScore = summary.score;
+            if (currentUser) {
+              const vote = await tipVotesService.getUserVote(tip.id);
+              userVote = vote?.voteType || null;
+            }
+          } catch (e) {
+            // fallback to upvotes if error
+            voteScore = tip.upvotes || 0;
+          }
+          return { ...tip, voteScore, userVote };
+        })
+      );
+      setTips(tipsWithVotes);
     } catch (err: any) {
       setError(err.message || "Failed to load tips");
     } finally {
@@ -106,7 +133,25 @@ export default function TipsListScreen() {
       )
     : tips;
 
-  const renderTip = ({ item }: { item: TipPost }) => (
+  const handleVote = async (tipId: string, voteType: "up" | "down") => {
+    try {
+      await tipVotesService.vote(tipId, voteType);
+      // Refresh just this tip's votes
+      setTips((prev) =>
+        prev.map((tip) =>
+          tip.id === tipId
+            ? { ...tip, userVote: voteType, voteScore: tip.voteScore + (voteType === "up" ? 1 : -1) }
+            : tip
+        )
+      );
+      // Optionally reload all votes for accuracy
+      // await loadTips();
+    } catch (e) {
+      // TODO: show error toast
+    }
+  };
+
+  const renderTip = ({ item }: { item: TipWithVotes }) => (
     <Pressable
       onPress={() => handleTipPress(item.id)}
       className="rounded-xl p-4 mb-3 border active:opacity-90"
@@ -126,10 +171,16 @@ export default function TipsListScreen() {
         {item.content}
       </Text>
 
-      <View className="flex-row items-center">
+      <View className="flex-row items-center justify-between mt-2">
         <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-          by {item.userName} • {formatTimeAgo(item.createdAt)} • {item.upvotes} upvotes
+          by {item.userName} • {formatTimeAgo(item.createdAt)}
         </Text>
+        <VoteButtons
+          score={item.voteScore}
+          userVote={item.userVote}
+          onVote={(voteType) => handleVote(item.id, voteType)}
+          layout="vertical"
+        />
       </View>
     </Pressable>
   );

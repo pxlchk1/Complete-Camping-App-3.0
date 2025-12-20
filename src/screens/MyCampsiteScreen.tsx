@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { signOut } from "firebase/auth";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 import AccountRequiredModal from "../components/AccountRequiredModal";
 import PaywallModal from "../components/PaywallModal";
@@ -73,6 +73,8 @@ export default function MyCampsiteScreen({ navigation }: any) {
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
   const [activeTab] = useState<CampsiteTab>("trips");
   const [savedCampgrounds, setSavedCampgrounds] = useState<any[]>([]);
   const [loadingCampgrounds, setLoadingCampgrounds] = useState(false);
@@ -80,18 +82,87 @@ export default function MyCampsiteScreen({ navigation }: any) {
   const [showProModal, setShowProModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
+  // Logging helper
+  const log = (...args: any[]) => {
+    if (__DEV__) console.log("[MyCampsiteScreen]", ...args);
+  };
+
+  // Timeout for loading state
   useEffect(() => {
+    if (!loading) return;
+    const timeout = setTimeout(() => {
+      setTimedOut(true);
+      setLoading(false);
+      log("Timeout: loading exceeded 8 seconds");
+    }, 8000);
+    return () => clearTimeout(timeout);
+  }, [loading]);
+
+  // Fetch profile doc and favorites
+  useEffect(() => {
+    const fetchProfile = async () => {
+      log("Screen mount");
+      const user = auth.currentUser;
+      if (!user) {
+        log("No user: showing AccountRequiredModal");
+        setLoading(false);
+        setProfile(null);
+        return;
+      }
+      log("Auth state resolved", user.uid);
+      setLoading(true);
+      setError(null);
+      setTimedOut(false);
+      try {
+        // Fetch profile doc
+        const profileRef = doc(db, "profiles", user.uid);
+        const profileSnap = await getDoc(profileRef);
+        log("Firestore profile doc fetched");
+        if (!profileSnap.exists()) {
+          log("Profile doc does not exist, creating default");
+          await setDoc(profileRef, {
+            displayName: user.displayName || "Camper",
+            handle: user.email ? user.email.split("@")[0] : "camper",
+            avatarUrl: null,
+            backgroundUrl: null,
+            membershipTier: "freeMember",
+            bio: null,
+            location: null,
+            campingStyle: null,
+            createdAt: serverTimestamp(),
+          });
+          setProfile({
+            displayName: user.displayName || "Camper",
+            handle: user.email ? user.email.split("@")[0] : "camper",
+            avatarUrl: null,
+            backgroundUrl: null,
+            membershipTier: "freeMember",
+            bio: null,
+            location: null,
+            campingStyle: null,
+          });
+        } else {
+          setProfile(profileSnap.data() as UserProfile);
+        }
+        log("Profile state set");
+      } catch (err: any) {
+        log("Error fetching profile doc", err);
+        setError("Failed to load profile");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+
+    // Listen to favorites (existing logic)
     const user = auth.currentUser;
     if (!user) return;
-
     const favRef = collection(db, "users", user.uid, "favorites");
     setLoadingCampgrounds(true);
-
     const unsub = onSnapshot(favRef, (snap) => {
       setSavedCampgrounds(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoadingCampgrounds(false);
     });
-
     return () => unsub();
   }, []);
 
@@ -117,12 +188,65 @@ export default function MyCampsiteScreen({ navigation }: any) {
     }
   }
 
-  if (loading || !profile) {
+
+  // Show AccountRequiredModal if not logged in
+  if (!loading && !auth.currentUser) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
+        <AccountRequiredModal
+          visible={true}
+          onCreateAccount={() => navigation.navigate("Auth")}
+          onMaybeLater={() => navigation.goBack()}
+        />
+      </View>
+    );
+  }
+
+  // Timeout or error fallback
+  if (timedOut || error) {
+    return (
+      <View style={{ flex: 1, backgroundColor: PARCHMENT, justifyContent: "center", alignItems: "center" }}>
+        <Ionicons name="alert-circle-outline" size={64} color={DEEP_FOREST} style={{ marginBottom: 24 }} />
+        <Text style={{ fontFamily: "JosefinSlab_700Bold", fontSize: 20, color: DEEP_FOREST, marginBottom: 8 }}>
+          Having trouble loading your account
+        </Text>
+        <Text style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY, marginBottom: 24, textAlign: "center", maxWidth: 320 }}>
+          Check your connection and try again.
+        </Text>
+        <View style={{ flexDirection: "row", gap: 16 }}>
+          <Pressable
+            onPress={() => {
+              setLoading(true);
+              setError(null);
+              setTimedOut(false);
+            }}
+            style={{ backgroundColor: DEEP_FOREST, borderRadius: 8, paddingVertical: 12, paddingHorizontal: 24, marginRight: 8 }}
+          >
+            <Text style={{ color: PARCHMENT, fontFamily: "SourceSans3_600SemiBold" }}>Try again</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={{ backgroundColor: BORDER_SOFT, borderRadius: 8, paddingVertical: 12, paddingHorizontal: 24 }}
+          >
+            <Text style={{ color: DEEP_FOREST, fontFamily: "SourceSans3_600SemiBold" }}>Go back</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  // Show loader with background (no blank screen)
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: PARCHMENT, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color={DEEP_FOREST} />
       </View>
     );
+  }
+
+  if (!profile) {
+    // Defensive fallback
+    return null;
   }
 
   return (

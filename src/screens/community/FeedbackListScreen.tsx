@@ -9,6 +9,8 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { feedbackService, FeedbackPost } from "../../services/firestore/feedbackService";
+import { feedbackVoteService } from "../../services/firestore/feedbackVoteService";
+import VoteButtons from "../../components/VoteButtons";
 import { auth } from "../../config/firebase";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
 import { requireAuth } from "../../utils/gating";
@@ -34,7 +36,7 @@ export default function FeedbackListScreen() {
   const currentUser = auth.currentUser;
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  const [posts, setPosts] = useState<FeedbackPost[]>([]);
+  const [posts, setPosts] = useState<(FeedbackPost & { voteScore: number; userVote: "up" | "down" | null; commentCount?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("all");
@@ -51,24 +53,25 @@ export default function FeedbackListScreen() {
     try {
       setLoading(true);
       setError(null);
-
-      console.log("[FeedbackList] Loading posts from Firestore...");
       const allPosts = await feedbackService.getFeedback();
-      console.log(`[FeedbackList] Loaded ${allPosts.length} posts from Firestore.`);
-
-      if (allPosts.length === 0) {
-        console.log("[FeedbackList] No posts found after seed attempt.");
-      }
-
-      // Filter by category if not "all"
+      // TODO: Replace with actual comment count fetch if available
+      const postsWithVotes = await Promise.all(
+        allPosts.map(async (post) => {
+          let voteScore = post.karmaScore || 0;
+          let userVote: "up" | "down" | null = null;
+          try {
+            const summary = await feedbackVoteService.getUserVote(post.id);
+            if (summary) userVote = summary.value === 1 ? "up" : summary.value === -1 ? "down" : null;
+          } catch {}
+          // Placeholder: commentCount is not implemented, set to 0
+          return { ...post, voteScore, userVote, commentCount: post.commentCount ?? 0 };
+        })
+      );
       const filtered = selectedCategory === "all"
-        ? allPosts
-        : allPosts.filter(post => post.category === selectedCategory);
-      
-      console.log(`[FeedbackList] After filtering by "${selectedCategory}": ${filtered.length} posts`);
+        ? postsWithVotes
+        : postsWithVotes.filter(post => post.category === selectedCategory);
       setPosts(filtered);
     } catch (err: any) {
-      console.error("[FeedbackList] Error loading posts:", err);
       setError(err.message || "Failed to load feedback");
     } finally {
       setLoading(false);
@@ -200,10 +203,9 @@ export default function FeedbackListScreen() {
     return date.toLocaleDateString();
   };
 
-  const renderPost = ({ item }: { item: FeedbackPost }) => {
+  const renderPost = ({ item }: { item: FeedbackPost & { voteScore: number; userVote: "up" | "down" | null; commentCount?: number } }) => {
     const statusColor = getStatusColor(item.status);
     const statusLabel = getStatusLabel(item.status);
-
     return (
       <Pressable
         onPress={() => handlePostPress(item.id)}
@@ -240,39 +242,41 @@ export default function FeedbackListScreen() {
           {item.description}
         </Text>
 
+        {/* Footer: up/down votes and comments count */}
         <View className="flex-row items-center justify-between pt-3 border-t" style={{ borderColor: BORDER_SOFT }}>
           <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
             {formatTimeAgo(item.createdAt)}
           </Text>
-
-          <View className="flex-row items-center gap-2">
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation();
-                handleDownvote(item.id);
+          <View className="flex-row items-center gap-4">
+            <VoteButtons
+              score={item.voteScore}
+              userVote={item.userVote}
+              onVote={async (voteType) => {
+                try {
+                  await feedbackVoteService.vote(item.id, voteType === "up" ? 1 : -1);
+                  setPosts((prev) =>
+                    prev.map((p) =>
+                      p.id === item.id
+                        ? {
+                            ...p,
+                            userVote: p.userVote === voteType ? null : voteType,
+                            voteScore:
+                              p.voteScore + (p.userVote === voteType ? (voteType === "up" ? -1 : 1) : voteType === "up" ? (p.userVote === "down" ? 2 : 1) : (p.userVote === "up" ? -2 : -1)),
+                          }
+                        : p
+                    )
+                  );
+                } catch {}
               }}
-              className="flex-row items-center px-2 py-1 rounded-lg bg-white border active:opacity-70"
-              style={{ borderColor: BORDER_SOFT }}
-            >
-              <Ionicons name="arrow-down-circle-outline" size={18} color="#6b7280" />
-            </Pressable>
-            
-            <View className="px-3 py-1 rounded-lg bg-white border" style={{ borderColor: BORDER_SOFT }}>
-              <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                {item.karmaScore}
+              layout="horizontal"
+              size="medium"
+            />
+            <View className="flex-row items-center ml-2">
+              <Ionicons name="chatbubble-outline" size={18} color={TEXT_MUTED} />
+              <Text className="ml-1 text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_MUTED }}>
+                {item.commentCount ?? 0}
               </Text>
             </View>
-
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation();
-                handleUpvote(item.id);
-              }}
-              className="flex-row items-center px-2 py-1 rounded-lg bg-white border active:opacity-70"
-              style={{ borderColor: BORDER_SOFT }}
-            >
-              <Ionicons name="arrow-up-circle-outline" size={18} color={EARTH_GREEN} />
-            </Pressable>
           </View>
         </View>
       </Pressable>
@@ -334,7 +338,7 @@ export default function FeedbackListScreen() {
     <View className="flex-1 bg-parchment">
       {/* Header */}
       <CommunitySectionHeader
-        title="Feedback"
+        title="App Feedback"
         onAddPress={handleCreatePost}
       />
 

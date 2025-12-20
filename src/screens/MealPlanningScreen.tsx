@@ -30,7 +30,6 @@ import {
   EARTH_GREEN,
   GRANITE_GOLD,
   PARCHMENT,
-  PARCHMENT_BORDER,
 } from "../constants/colors";
 
 type MealPlanningScreenRouteProp = RouteProp<RootStackParamList, "MealPlanning">;
@@ -39,7 +38,11 @@ type MealPlanningScreenNavigationProp = NativeStackNavigationProp<
   "MealPlanning"
 >;
 
-const MEAL_CATEGORIES: { key: MealCategory; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const MEAL_CATEGORIES: {
+  key: MealCategory;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
   { key: "breakfast", label: "Breakfast", icon: "sunny" },
   { key: "lunch", label: "Lunch", icon: "restaurant" },
   { key: "dinner", label: "Dinner", icon: "moon" },
@@ -89,7 +92,10 @@ export default function MealPlanningScreen() {
           setMeals(tripMeals);
           return;
         } catch (fbError: any) {
-          if (fbError?.code === 'permission-denied' || fbError?.message?.includes('permission')) {
+          if (
+            fbError?.code === "permission-denied" ||
+            fbError?.message?.toLowerCase?.().includes("permission")
+          ) {
             console.log("Using local storage for meals");
           }
           setUseLocalStorage(true);
@@ -123,16 +129,18 @@ export default function MealPlanningScreen() {
         notes: libraryMeal.instructions || undefined,
       };
 
-      let mealId: string;
       if (useLocalStorage) {
-        mealId = await LocalMealService.addMeal(tripId, mealData);
+        await LocalMealService.addMeal(tripId, mealData);
       } else {
         try {
-          mealId = await MealService.addMeal(userId, tripId, mealData);
+          await MealService.addMeal(userId, tripId, mealData);
         } catch (fbError: any) {
-          if (fbError?.code === 'permission-denied' || fbError?.message?.includes('permission')) {
+          if (
+            fbError?.code === "permission-denied" ||
+            fbError?.message?.toLowerCase?.().includes("permission")
+          ) {
             setUseLocalStorage(true);
-            mealId = await LocalMealService.addMeal(tripId, mealData);
+            await LocalMealService.addMeal(tripId, mealData);
           } else {
             throw fbError;
           }
@@ -142,7 +150,12 @@ export default function MealPlanningScreen() {
       await loadMeals();
       setShowAddMeal(false);
       setSearchQuery("");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {
+        // ignore haptics failures
+      }
     } catch (error) {
       console.error("Failed to add meal:", error);
     }
@@ -167,16 +180,18 @@ export default function MealPlanningScreen() {
         notes: customMealInstructions.trim() || undefined,
       };
 
-      let mealId: string;
       if (useLocalStorage) {
-        mealId = await LocalMealService.addMeal(tripId, mealData);
+        await LocalMealService.addMeal(tripId, mealData);
       } else {
         try {
-          mealId = await MealService.addMeal(userId, tripId, mealData);
+          await MealService.addMeal(userId, tripId, mealData);
         } catch (fbError: any) {
-          if (fbError?.code === 'permission-denied' || fbError?.message?.includes('permission')) {
+          if (
+            fbError?.code === "permission-denied" ||
+            fbError?.message?.toLowerCase?.().includes("permission")
+          ) {
             setUseLocalStorage(true);
-            mealId = await LocalMealService.addMeal(tripId, mealData);
+            await LocalMealService.addMeal(tripId, mealData);
           } else {
             throw fbError;
           }
@@ -192,7 +207,11 @@ export default function MealPlanningScreen() {
       setShowCustomMealForm(false);
       setShowAddMeal(false);
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {
+        // ignore haptics failures
+      }
     } catch (error) {
       console.error("Failed to add custom meal:", error);
     }
@@ -200,13 +219,22 @@ export default function MealPlanningScreen() {
 
   const handleDeleteMeal = async (meal: Meal) => {
     try {
+      try {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {
+        // ignore haptics failures
+      }
+
       if (useLocalStorage) {
         await LocalMealService.deleteMeal(tripId, meal.id);
       } else {
         try {
           await MealService.deleteMeal(userId, tripId, meal.id);
         } catch (fbError: any) {
-          if (fbError?.code === 'permission-denied' || fbError?.message?.includes('permission')) {
+          if (
+            fbError?.code === "permission-denied" ||
+            fbError?.message?.toLowerCase?.().includes("permission")
+          ) {
             setUseLocalStorage(true);
             await LocalMealService.deleteMeal(tripId, meal.id);
           } else {
@@ -216,7 +244,12 @@ export default function MealPlanningScreen() {
       }
 
       await loadMeals();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {
+        // ignore haptics failures
+      }
     } catch (error) {
       console.error("Failed to delete meal:", error);
     }
@@ -233,11 +266,12 @@ export default function MealPlanningScreen() {
   const filteredLibrary = mealLibrary.filter((meal) => {
     if (meal.category !== selectedCategory) return false;
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase();
+      const ingredients = (meal.ingredients || []) as string[];
       return (
-        meal.name.toLowerCase().includes(query) ||
-        meal.ingredients.some((ing) => ing.toLowerCase().includes(query)) ||
-        meal.tags?.some((tag) => tag.toLowerCase().includes(query))
+        meal.name.toLowerCase().includes(q) ||
+        ingredients.some((ing) => ing.toLowerCase().includes(q)) ||
+        meal.tags?.some((tag) => tag.toLowerCase().includes(q))
       );
     }
     return true;
@@ -246,13 +280,10 @@ export default function MealPlanningScreen() {
   return (
     <SafeAreaView className="flex-1 bg-parchment" edges={["top"]}>
       {/* Header */}
-      <View className="px-5 pt-4 pb-3 border-b border-parchmentDark">
+      <View className="px-5 pt-4 pb-3 border-b border-stone-200">
         <View className="flex-row items-center mb-2 justify-between">
           <View className="flex-row items-center flex-1">
-            <Pressable
-              onPress={() => navigation.goBack()}
-              className="mr-2 active:opacity-70"
-            >
+            <Pressable onPress={() => navigation.goBack()} className="mr-2 active:opacity-70">
               <Ionicons name="arrow-back" size={24} color={DEEP_FOREST} />
             </Pressable>
             <Text
@@ -262,62 +293,44 @@ export default function MealPlanningScreen() {
               Meal Planning
             </Text>
           </View>
-          <View className="flex-row items-center gap-2">
+          <View className="flex-row items-center" style={{ gap: 8 }}>
             <Pressable
               onPress={() => navigation.navigate("ShoppingList", { tripId })}
               className="bg-forest rounded-full px-4 py-2 flex-row items-center active:opacity-90"
             >
               <Ionicons name="cart" size={18} color={PARCHMENT} />
-              <Text
-                className="text-white ml-1.5 text-sm"
-                style={{ fontFamily: "SourceSans3_600SemiBold" }}
-              >
+              <Text className="text-white ml-1.5 text-sm" style={{ fontFamily: "SourceSans3_600SemiBold" }}>
                 Shopping
               </Text>
             </Pressable>
             <AccountButton />
           </View>
         </View>
-        <Text
-          className="text-sm"
-          style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
-        >
+        <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}>
           For: {trip.name}
         </Text>
 
         {/* Trip Duration */}
         <View className="mt-3 flex-row items-center">
           <Ionicons name="calendar-outline" size={16} color={EARTH_GREEN} />
-          <Text
-            className="ml-2 text-sm"
-            style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
-          >
+          <Text className="ml-2 text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}>
             {tripDays} {tripDays === 1 ? "day" : "days"}
           </Text>
         </View>
       </View>
 
       {/* Day Selector */}
-      <View className="px-5 py-3 border-b border-parchmentDark">
-        <Text
-          className="text-xs mb-2"
-          style={{ fontFamily: "SourceSans3_600SemiBold", color: EARTH_GREEN }}
-        >
+      <View className="px-5 py-3 border-b border-stone-200">
+        <Text className="text-xs mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: EARTH_GREEN }}>
           SELECT DAY
         </Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8 }}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
           {Array.from({ length: tripDays }, (_, i) => i + 1).map((day) => (
             <Pressable
               key={day}
               onPress={() => setSelectedDay(day)}
               className={`px-4 py-2 rounded-xl border ${
-                selectedDay === day
-                  ? "bg-forest border-forest"
-                  : "bg-white border-stone-300"
+                selectedDay === day ? "bg-forest border-forest" : "bg-white border-stone-300"
               }`}
             >
               <Text
@@ -355,9 +368,16 @@ export default function MealPlanningScreen() {
                     </Text>
                   </View>
                   <Pressable
-                    onPress={() => {
+                    onPress={async () => {
+                      try {
+                        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      } catch {
+                        // ignore haptics failures
+                      }
                       setSelectedCategory(category.key);
                       setShowAddMeal(true);
+                      setShowCustomMealForm(false);
+                      setSearchQuery("");
                     }}
                     className="bg-forest rounded-full p-2 active:opacity-90"
                   >
@@ -368,10 +388,7 @@ export default function MealPlanningScreen() {
                 {/* Meals */}
                 {categoryMeals.length === 0 ? (
                   <View className="bg-white rounded-xl p-4 mb-3 border border-stone-200">
-                    <Text
-                      className="text-center"
-                      style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
-                    >
+                    <Text className="text-center" style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}>
                       No {category.label.toLowerCase()} planned
                     </Text>
                   </View>
@@ -388,7 +405,7 @@ export default function MealPlanningScreen() {
                         >
                           {meal.name}
                         </Text>
-                        {meal.notes && (
+                        {meal.notes ? (
                           <Text
                             className="text-sm"
                             style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
@@ -396,12 +413,9 @@ export default function MealPlanningScreen() {
                           >
                             {meal.notes}
                           </Text>
-                        )}
+                        ) : null}
                       </View>
-                      <Pressable
-                        onPress={() => handleDeleteMeal(meal)}
-                        className="ml-2 p-2 active:opacity-70"
-                      >
+                      <Pressable onPress={() => handleDeleteMeal(meal)} className="ml-2 p-2 active:opacity-70">
                         <Ionicons name="trash-outline" size={20} color="#dc2626" />
                       </Pressable>
                     </View>
@@ -414,107 +428,103 @@ export default function MealPlanningScreen() {
       )}
 
       {/* Add Meal Modal */}
-      <Modal
-        visible={showAddMeal}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowAddMeal(false)}
-      >
+      <Modal visible={showAddMeal} animationType="fade" transparent={true} onRequestClose={() => setShowAddMeal(false)}>
         <View className="flex-1 bg-black/50">
           <SafeAreaView className="flex-1" edges={["bottom"]}>
             <View className="flex-1 mt-20">
               <View className="flex-1 bg-parchment rounded-t-2xl">
                 {/* Modal Header */}
-                <View className="p-5 pb-3 border-b border-parchmentDark flex-row items-center justify-between">
-                  <Text
-                    className="text-xl font-bold"
-                    style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
-                  >
+                <View className="p-5 pb-3 border-b border-stone-200 flex-row items-center justify-between">
+                  <Text className="text-xl font-bold" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
                     Add {MEAL_CATEGORIES.find((c) => c.key === selectedCategory)?.label}
                   </Text>
-                  <Pressable onPress={() => setShowAddMeal(false)} className="p-2">
+                  <Pressable
+                    onPress={() => {
+                      setShowAddMeal(false);
+                      setShowCustomMealForm(false);
+                      setSearchQuery("");
+                    }}
+                    className="p-2"
+                  >
                     <Ionicons name="close" size={28} color={DEEP_FOREST} />
                   </Pressable>
                 </View>
 
                 {/* Search */}
-                <View className="px-5 pt-3 pb-2">
-                  <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-stone-200">
-                    <Ionicons name="search" size={20} color={EARTH_GREEN} />
-                    <TextInput
-                      className="flex-1 ml-2 text-forest"
-                      style={{ fontFamily: "SourceSans3_400Regular", fontSize: 16 }}
-                      placeholder="Search meals..."
-                      placeholderTextColor="#999"
-                      value={searchQuery}
-                      onChangeText={setSearchQuery}
-                    />
-                    {searchQuery.length > 0 && (
-                      <Pressable onPress={() => setSearchQuery("")}>
-                        <Ionicons name="close-circle" size={20} color={EARTH_GREEN} />
-                      </Pressable>
-                    )}
+                {!showCustomMealForm && (
+                  <View className="px-5 pt-3 pb-2">
+                    <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-stone-200">
+                      <Ionicons name="search" size={20} color={EARTH_GREEN} />
+                      <TextInput
+                        className="flex-1 ml-2 text-forest"
+                        style={{ fontFamily: "SourceSans3_400Regular", fontSize: 16 }}
+                        placeholder="Search meals..."
+                        placeholderTextColor="#999"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                      />
+                      {searchQuery.length > 0 && (
+                        <Pressable onPress={() => setSearchQuery("")}>
+                          <Ionicons name="close-circle" size={20} color={EARTH_GREEN} />
+                        </Pressable>
+                      )}
+                    </View>
                   </View>
-                </View>
+                )}
 
                 {/* Create Custom Meal Button */}
-                <View className="px-5 pb-3">
-                  <Pressable
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setShowCustomMealForm(true);
-                    }}
-                    className="bg-granite rounded-xl py-3 flex-row items-center justify-center active:opacity-90"
-                    style={{ backgroundColor: GRANITE_GOLD }}
-                  >
-                    <Ionicons name="create-outline" size={20} color={PARCHMENT} />
-                    <Text
-                      className="ml-2"
-                      style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                {!showCustomMealForm && (
+                  <View className="px-5 pb-3">
+                    <Pressable
+                      onPress={async () => {
+                        try {
+                          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        } catch {
+                          // ignore haptics failures
+                        }
+                        setShowCustomMealForm(true);
+                      }}
+                      className="rounded-xl py-3 flex-row items-center justify-center active:opacity-90"
+                      style={{ backgroundColor: GRANITE_GOLD }}
                     >
-                      Create Custom Meal
-                    </Text>
-                  </Pressable>
-                </View>
+                      <Ionicons name="create-outline" size={20} color={PARCHMENT} />
+                      <Text className="ml-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
+                        Create Custom Meal
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
 
                 {/* Meal Library List */}
                 <ScrollView className="flex-1 px-5">
-                  {!showCustomMealForm && filteredLibrary.map((meal) => (
-                    <Pressable
-                      key={meal.id}
-                      onPress={() => handleAddMealFromLibrary(meal)}
-                      className="bg-white rounded-xl p-4 mb-3 border border-stone-200 active:bg-stone-50"
-                    >
-                      <Text
-                        className="text-base mb-1"
-                        style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+                  {!showCustomMealForm &&
+                    filteredLibrary.map((meal) => (
+                      <Pressable
+                        key={meal.id}
+                        onPress={() => handleAddMealFromLibrary(meal)}
+                        className="bg-white rounded-xl p-4 mb-3 border border-stone-200 active:bg-stone-50"
                       >
-                        {meal.name}
-                      </Text>
-                      {meal.tags && meal.tags.length > 0 && (
-                        <View className="flex-row flex-wrap gap-1 mt-2">
-                          {meal.tags.slice(0, 3).map((tag, index) => (
-                            <View key={index} className="px-2 py-0.5 rounded bg-stone-100">
-                              <Text
-                                className="text-xs"
-                                style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
-                              >
-                                {tag}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                    </Pressable>
-                  ))}
+                        <Text className="text-base mb-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
+                          {meal.name}
+                        </Text>
+                        {meal.tags && meal.tags.length > 0 && (
+                          <View className="flex-row flex-wrap gap-1 mt-2">
+                            {meal.tags.slice(0, 3).map((tag, index) => (
+                              <View key={index} className="px-2 py-0.5 rounded bg-stone-100">
+                                <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}>
+                                  {tag}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </Pressable>
+                    ))}
 
                   {!showCustomMealForm && filteredLibrary.length === 0 && (
                     <View className="items-center justify-center py-12">
                       <Ionicons name="search-outline" size={48} color={EARTH_GREEN} />
-                      <Text
-                        className="text-center mt-4"
-                        style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                      >
+                      <Text className="text-center mt-4" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
                         No meals found
                       </Text>
                     </View>
@@ -524,10 +534,7 @@ export default function MealPlanningScreen() {
                   {showCustomMealForm && (
                     <View className="pb-6">
                       <View className="mb-4">
-                        <Text
-                          className="text-sm mb-2"
-                          style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                        >
+                        <Text className="text-sm mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
                           Meal Name *
                         </Text>
                         <TextInput
@@ -541,16 +548,10 @@ export default function MealPlanningScreen() {
                       </View>
 
                       <View className="mb-4">
-                        <Text
-                          className="text-sm mb-2"
-                          style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                        >
+                        <Text className="text-sm mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
                           Ingredients (optional)
                         </Text>
-                        <Text
-                          className="text-xs mb-2"
-                          style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
-                        >
+                        <Text className="text-xs mb-2" style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}>
                           One ingredient per line
                         </Text>
                         <TextInput
@@ -563,17 +564,14 @@ export default function MealPlanningScreen() {
                           style={{
                             fontFamily: "SourceSans3_400Regular",
                             color: DEEP_FOREST,
-                            textAlignVertical: "top"
+                            textAlignVertical: "top",
                           }}
                           placeholderTextColor="#999"
                         />
                       </View>
 
                       <View className="mb-6">
-                        <Text
-                          className="text-sm mb-2"
-                          style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                        >
+                        <Text className="text-sm mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
                           Instructions (optional)
                         </Text>
                         <TextInput
@@ -586,13 +584,13 @@ export default function MealPlanningScreen() {
                           style={{
                             fontFamily: "SourceSans3_400Regular",
                             color: DEEP_FOREST,
-                            textAlignVertical: "top"
+                            textAlignVertical: "top",
                           }}
                           placeholderTextColor="#999"
                         />
                       </View>
 
-                      <View className="flex-row gap-3">
+                      <View className="flex-row" style={{ gap: 12 }}>
                         <Pressable
                           onPress={() => {
                             setShowCustomMealForm(false);
@@ -602,25 +600,17 @@ export default function MealPlanningScreen() {
                           }}
                           className="flex-1 border border-stone-300 rounded-xl py-3 active:opacity-70"
                         >
-                          <Text
-                            className="text-center"
-                            style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                          >
+                          <Text className="text-center" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}>
                             Cancel
                           </Text>
                         </Pressable>
                         <Pressable
                           onPress={handleAddCustomMeal}
                           disabled={!customMealName.trim()}
-                          className={`flex-1 rounded-xl py-3 ${
-                            customMealName.trim() ? "active:opacity-90" : "opacity-50"
-                          }`}
+                          className={`flex-1 rounded-xl py-3 ${customMealName.trim() ? "active:opacity-90" : "opacity-50"}`}
                           style={{ backgroundColor: DEEP_FOREST }}
                         >
-                          <Text
-                            className="text-center"
-                            style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
-                          >
+                          <Text className="text-center" style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
                             Add Meal
                           </Text>
                         </Pressable>

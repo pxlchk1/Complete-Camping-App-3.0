@@ -1,23 +1,46 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, ScrollView, ImageBackground, ActivityIndicator, Pressable, StyleSheet, Modal, TextInput, TouchableOpacity } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+/**
+ * Parks Browse Screen
+ * Plan > Campgrounds tab
+ *
+ * Notes:
+ * - This file was broken by logs inserted before imports, duplicate React imports, and a hook call outside the component.
+ * - This version is a full, safe overwrite that restores valid structure and keeps your existing UI intent.
+ */
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  StyleSheet,
+  Modal,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { collection, query, where, getDocs, limit as firestoreLimit, orderBy } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDocs,
+  limit as firestoreLimit,
+  serverTimestamp,
+  setDoc,
+  query,
+} from "firebase/firestore";
+
 import { db } from "../config/firebase";
 import { useTripsStore } from "../state/tripsStore";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useUserStore } from "../state/userStore";
-import { LinearGradient } from "expo-linear-gradient";
 
 // Components
 import ParksMap from "../components/ParksMap";
-import AccountButtonHeader from "../components/AccountButtonHeader";
 import ParkFilterBar, { FilterMode, ParkType, DriveTime } from "../components/ParkFilterBar";
 import ParkListItem from "../components/ParkListItem";
 import ParkDetailModal from "../components/ParkDetailModal";
-import PlanTopNav from "../components/PlanTopNav";
 import FireflyLoader from "../components/common/FireflyLoader";
 
 // Types
@@ -26,8 +49,14 @@ import { RootStackParamList } from "../navigation/types";
 
 // Theme
 import { colors, spacing, radius, fonts, fontSizes } from "../theme/theme";
-import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_SECONDARY } from "../constants/colors";
-import { HERO_IMAGES } from "../constants/images";
+import {
+  DEEP_FOREST,
+  EARTH_GREEN,
+  GRANITE_GOLD,
+  CARD_BACKGROUND_LIGHT,
+  BORDER_SOFT,
+  TEXT_SECONDARY,
+} from "../constants/colors";
 
 type ParksBrowseScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -35,22 +64,48 @@ interface ParksBrowseScreenProps {
   onTabChange?: (tab: "trips" | "parks" | "weather" | "packing" | "meals") => void;
 }
 
-function ParksBrowseScreen(props: ParksBrowseScreenProps) {
-  // Add Campground Modal state
+type LatLng = { latitude: number; longitude: number };
+
+export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProps) {
+  console.log("[PLAN_TRACE] Enter ParksBrowseScreen");
+
+  useEffect(() => {
+    console.log("[PLAN_TRACE] ParksBrowseScreen mounted");
+  }, []);
+
+  const navigation = useNavigation<ParksBrowseScreenNavigationProp>();
+
+  // Filters and view mode
+  const [mode, setMode] = useState<FilterMode>("near");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [driveTime, setDriveTime] = useState<DriveTime>(2 as DriveTime);
+  const [parkType, setParkType] = useState<ParkType>("all" as ParkType);
+  const [userLocation, setUserLocation] = useState<LatLng | null>(null);
+  const [viewMode, setViewMode] = useState<"map" | "list">("map");
+
+  // Data and UI state
+  const [parks, setParks] = useState<Park[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedPark, setSelectedPark] = useState<Park | null>(null);
+
+  // Add campground + add to trip flow
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [showAddToTrip, setShowAddToTrip] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
-  const trips = useTripsStore((s) => s.trips);
-  const currentUser = useUserStore((s) => s.currentUser);
+
   const [newCampgroundName, setNewCampgroundName] = useState("");
   const [newCampgroundAddress, setNewCampgroundAddress] = useState("");
   const [newCampgroundNotes, setNewCampgroundNotes] = useState("");
-  const navigation = useNavigation<ParksBrowseScreenNavigationProp>();
-  // ...existing code continues here...
 
-  // Calculate distance between two coordinates (Haversine formula) - returns distance in miles
-  const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 3959; // Radius of the Earth in miles
+  const trips = useTripsStore((s) => s.trips);
+  const updateTrip = useTripsStore((s) => s.updateTrip);
+  const currentUser = useUserStore((s) => s.currentUser);
+
+  // Haversine distance in miles
+  const getDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 3959;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
@@ -61,23 +116,25 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
-  };
+  }, []);
 
-  // Fetch parks based on current filters
+  const maxDistanceMiles = useMemo(() => {
+    // mph approximation
+    return Number(driveTime) * 55;
+  }, [driveTime]);
+
   const fetchParks = useCallback(async () => {
-    // Only fetch if user has actively searched
+    // Only fetch after user has initiated search or location flow
     if (!hasSearched) {
       console.log("[ParksBrowse] Waiting for user to initiate search");
       return;
     }
 
-    // If in "near" mode but no location, don't fetch yet
     if (mode === "near" && !userLocation) {
       console.log("[ParksBrowse] Near mode requires location");
       return;
     }
 
-    // If in search mode but query is too short, don't fetch
     if (mode === "search" && searchQuery.trim().length < 2) {
       console.log("[ParksBrowse] Search query too short");
       setParks([]);
@@ -85,24 +142,21 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
     }
 
     setIsLoading(true);
-  const insets = useSafeAreaInsets();
     setError(null);
 
     try {
       const parksCollection = collection(db, "parks");
-      // Load all parks - we'll filter client-side for now
-      // Future optimization: add server-side filtering with indexes
       const q = query(parksCollection, firestoreLimit(3000));
       const querySnapshot = await getDocs(q);
 
-      let fetchedParks: Park[] = [];
-
       console.log("[ParksBrowse] Firebase returned", querySnapshot.size, "documents");
 
-      querySnapshot.forEach((doc) => {
-        const data: any = doc.data();
-        fetchedParks.push({
-          id: doc.id,
+      let fetched: (Park & { distance?: number })[] = [];
+
+      querySnapshot.forEach((d) => {
+        const data: any = d.data();
+        fetched.push({
+          id: d.id,
           name: data.name || "",
           filter: data.filter || "national_forest",
           address: data.address || "",
@@ -113,51 +167,32 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
         });
       });
 
-      // Search by name
+      // Search by name or state
       if (mode === "search" && searchQuery.trim().length >= 2) {
         const lower = searchQuery.toLowerCase();
-        fetchedParks = fetchedParks.filter((park) =>
-          park.name.toLowerCase().includes(lower) ||
-          park.state.toLowerCase().includes(lower)
-        );
+        fetched = fetched.filter((p) => p.name.toLowerCase().includes(lower) || p.state.toLowerCase().includes(lower));
       }
 
       // Filter by park type
-      if (parkType !== "all") {
-        fetchedParks = fetchedParks.filter((park) => park.filter === parkType);
+      if (parkType !== ("all" as any)) {
+        fetched = fetched.filter((p) => p.filter === parkType);
       }
 
-      // "Near me" filtering and sorting by distance
+      // Near me filter and sort by distance
       if (mode === "near" && userLocation) {
-        const parksWithDistance = fetchedParks.map((park) => ({
-          ...park,
-          distance: getDistance(
-            userLocation.latitude,
-            userLocation.longitude,
-            park.latitude,
-            park.longitude
-          ),
-        }));
+        fetched = fetched
+          .map((p) => ({
+            ...p,
+            distance: getDistance(userLocation.latitude, userLocation.longitude, p.latitude, p.longitude),
+          }))
+          .filter((p) => (p.distance ?? 999999) <= maxDistanceMiles)
+          .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
 
-        const maxDistanceMiles = driveTime * 55; // mph approximation
-
-        fetchedParks = parksWithDistance
-          .filter((p) => p.distance <= maxDistanceMiles)
-          .sort((a, b) => a.distance - b.distance);
-
-        console.log(
-          "[ParksBrowse] Found",
-          fetchedParks.length,
-          "parks within",
-          driveTime,
-          "hours (",
-          maxDistanceMiles,
-          "mi)"
-        );
+        console.log("[ParksBrowse] Found", fetched.length, "parks within", driveTime, "hours (", maxDistanceMiles, "mi )");
       }
 
-      console.log("[ParksBrowse] Final parks count:", fetchedParks.length);
-      setParks(fetchedParks);
+      console.log("[ParksBrowse] Final parks count:", fetched.length);
+      setParks(fetched);
     } catch (err: any) {
       console.error("Error fetching parks:", err?.code, err?.message, err);
       setError("Failed to load parks. Please check your connection and try again.");
@@ -165,22 +200,19 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [hasSearched, mode, searchQuery, userLocation, driveTime, parkType]);
+  }, [hasSearched, mode, searchQuery, userLocation, driveTime, parkType, maxDistanceMiles, getDistance]);
 
-  // Fetch parks when filters change
   useEffect(() => {
     fetchParks();
   }, [fetchParks]);
 
-  // Log loading state changes
   useEffect(() => {
-    console.log("[ParksBrowseScreen] Loading state changed - isLoading:", isLoading);
+    console.log("[ParksBrowseScreen] Loading state changed, isLoading:", isLoading);
   }, [isLoading]);
 
   const handleModeChange = (newMode: FilterMode) => {
     console.log("[ParksBrowseScreen] Mode changed to:", newMode);
-    
-    // Only reset if actually changing modes
+
     if (newMode !== mode) {
       setMode(newMode);
       setSearchQuery("");
@@ -190,16 +222,14 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
     }
   };
 
-  const handleLocationRequest = (location: { latitude: number; longitude: number }) => {
+  const handleLocationRequest = (location: LatLng) => {
     console.log("[ParksBrowseScreen] Location received:", location);
     setUserLocation(location);
     setHasSearched(true);
   };
 
   const handleSearchSubmit = () => {
-    if (searchQuery.trim().length >= 2) {
-      setHasSearched(true);
-    }
+    if (searchQuery.trim().length >= 2) setHasSearched(true);
   };
 
   const handleLocationError = (errorMsg: string) => {
@@ -207,25 +237,21 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
     setError(errorMsg);
   };
 
-  const handleParkPress = (park: Park) => {
-    setSelectedPark(park);
-  };
+  const handleParkPress = (park: Park) => setSelectedPark(park);
 
-  const handleAddCampground = () => {
-    setAddModalVisible(true);
-  };
+  const handleAddCampground = () => setAddModalVisible(true);
 
   const handleSaveCampground = async () => {
     if (!currentUser) {
-      alert("You must be logged in to save a campground.");
+      Alert.alert("Sign in required", "You must be logged in to save a campground.");
       return;
     }
     if (!newCampgroundName.trim()) {
-      alert("Campground name is required.");
+      Alert.alert("Missing name", "Campground name is required.");
       return;
     }
+
     try {
-      // Generate a new ID for the custom campground
       const campgroundId = `${currentUser.id}_${Date.now()}`;
       const campgroundData = {
         id: campgroundId,
@@ -236,41 +262,48 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
         createdAt: serverTimestamp(),
         isCustom: true,
       };
-      // Save to user's favorites subcollection
-      await setDoc(
-        doc(db, "users", currentUser.id, "favorites", campgroundId),
-        campgroundData
-      );
-      // Optionally: Save to a global custom_campgrounds collection for admin review
-      // await setDoc(doc(db, "custom_campgrounds", campgroundId), campgroundData);
+
+      await setDoc(doc(db, "users", currentUser.id, "favorites", campgroundId), campgroundData);
+
       setAddModalVisible(false);
       setShowAddToTrip(true);
+
+      // Clear inputs after saving
       setNewCampgroundName("");
       setNewCampgroundAddress("");
       setNewCampgroundNotes("");
-      alert("Campground saved to your favorites! Now add to a trip.");
-      const handleConfirmAddToTrip = async () => {
-        if (!selectedTripId) return;
-        try {
-          // Add the campground ID to the selected trip's customCampgrounds array
-          // (Assume customCampgrounds is an array of campground IDs or objects)
-          const trip = trips.find((t) => t.id === selectedTripId);
-          if (!trip) return;
-          const updatedCampgrounds = Array.isArray(trip.customCampgrounds)
-            ? [...trip.customCampgrounds, { id: `${currentUser.id}_${Date.now()}`, name: newCampgroundName.trim() }]
-            : [{ id: `${currentUser.id}_${Date.now()}`, name: newCampgroundName.trim() }];
-          useTripsStore.getState().updateTrip(trip.id, { customCampgrounds: updatedCampgrounds });
-          setShowAddToTrip(false);
-          setSelectedTripId(null);
-          alert("Campground added to your trip!");
-        } catch (err) {
-          alert("Failed to add campground to trip. Please try again.");
-          console.error("Error adding campground to trip:", err);
-        }
-      };
+
+      Alert.alert("Saved", "Campground saved to your favorites! Now add it to a trip.");
     } catch (err) {
-      alert("Failed to save campground. Please try again.");
       console.error("Error saving campground:", err);
+      Alert.alert("Save failed", "Failed to save campground. Please try again.");
+    }
+  };
+
+  const handleConfirmAddToTrip = async () => {
+    if (!currentUser) return;
+    if (!selectedTripId) return;
+
+    try {
+      const trip = trips.find((t: any) => t.id === selectedTripId);
+      if (!trip) return;
+
+      const nowId = `${currentUser.id}_${Date.now()}`;
+      const newItem = { id: nowId, name: newCampgroundName.trim() || "Custom campground" };
+
+      const updatedCampgrounds = Array.isArray((trip as any).customCampgrounds)
+        ? [...(trip as any).customCampgrounds, newItem]
+        : [newItem];
+
+      updateTrip((trip as any).id, { customCampgrounds: updatedCampgrounds } as any);
+
+      setShowAddToTrip(false);
+      setSelectedTripId(null);
+
+      Alert.alert("Added", "Campground added to your trip!");
+    } catch (err) {
+      console.error("Error adding campground to trip:", err);
+      Alert.alert("Add failed", "Failed to add campground to trip. Please try again.");
     }
   };
 
@@ -280,106 +313,137 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
 
   return (
     <View style={styles.root}>
+      {/* Add to Trip Modal */}
+      <Modal
+        visible={showAddToTrip}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowAddToTrip(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Add Campground to a Trip</Text>
+
+            {trips.length === 0 ? (
+              <Text style={{ marginBottom: 20, color: "#111" }}>You have no trips. Create a trip first.</Text>
+            ) : (
+              <>
+                <Text style={{ marginBottom: 8, color: "#111" }}>Select a trip:</Text>
+
+                {trips.map((trip: any) => (
+                  <TouchableOpacity
+                    key={trip.id}
+                    onPress={() => setSelectedTripId(trip.id)}
+                    style={{
+                      padding: 12,
+                      borderRadius: 8,
+                      backgroundColor: selectedTripId === trip.id ? DEEP_FOREST : CARD_BACKGROUND_LIGHT,
+                      marginBottom: 8,
+                      borderWidth: 1,
+                      borderColor: BORDER_SOFT,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: selectedTripId === trip.id ? "#fff" : DEEP_FOREST,
+                        fontFamily: fonts.bodySemibold,
+                      }}
+                    >
+                      {trip.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+
+                <TouchableOpacity
+                  onPress={handleConfirmAddToTrip}
+                  style={{
+                    backgroundColor: DEEP_FOREST,
+                    borderRadius: 8,
+                    padding: 12,
+                    marginTop: 12,
+                    alignItems: "center",
+                    opacity: selectedTripId ? 1 : 0.5,
+                  }}
+                  disabled={!selectedTripId}
+                >
+                  <Text style={{ color: "#fff", fontFamily: fonts.bodySemibold }}>Add to Trip</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setShowAddToTrip(false)} style={{ padding: 10, marginTop: 8 }}>
+                  <Text style={{ color: DEEP_FOREST, fontFamily: fonts.bodySemibold }}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* Add Campground Modal */}
-            {/* Add to Trip Modal */}
-            <Modal
-              visible={showAddToTrip}
-              animationType="slide"
-              transparent={true}
-              onRequestClose={() => setShowAddToTrip(false)}
-            >
-              <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)" }}>
-                <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 24, width: "90%" }}>
-                  <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 20, marginBottom: 16 }}>Add Campground to a Trip</Text>
-                  {trips.length === 0 ? (
-                    <Text style={{ marginBottom: 20 }}>You have no trips. Create a trip first!</Text>
-                  ) : (
-                    <>
-                      <Text style={{ marginBottom: 8 }}>Select a trip:</Text>
-                      {trips.map((trip) => (
-                        <TouchableOpacity
-                          key={trip.id}
-                          onPress={() => setSelectedTripId(trip.id)}
-                          style={{
-                            padding: 12,
-                            borderRadius: 8,
-                            backgroundColor: selectedTripId === trip.id ? DEEP_FOREST : CARD_BACKGROUND_LIGHT,
-                            marginBottom: 8,
-                          }}
-                        >
-                          <Text style={{ color: selectedTripId === trip.id ? "#fff" : DEEP_FOREST, fontFamily: fonts.bodySemibold }}>{trip.name}</Text>
-                        </TouchableOpacity>
-                      ))}
-                      <TouchableOpacity
-                        onPress={handleConfirmAddToTrip}
-                        style={{ backgroundColor: DEEP_FOREST, borderRadius: 8, padding: 12, marginTop: 12, alignItems: "center" }}
-                        disabled={!selectedTripId}
-                      >
-                        <Text style={{ color: "#fff", fontFamily: fonts.bodySemibold }}>Add to Trip</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setShowAddToTrip(false)} style={{ padding: 10, marginTop: 8 }}>
-                        <Text style={{ color: DEEP_FOREST, fontFamily: fonts.bodySemibold }}>Cancel</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </View>
-              </View>
-            </Modal>
       <Modal
         visible={addModalVisible}
         animationType="slide"
-        transparent={true}
+        transparent
         onRequestClose={() => setAddModalVisible(false)}
       >
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)" }}>
-          <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 24, width: "90%" }}>
-            <Text style={{ fontFamily: fonts.bodySemibold, fontSize: 20, marginBottom: 16 }}>Add Your Own Campground</Text>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Add Your Own Campground</Text>
+
             <TextInput
               placeholder="Campground Name"
               value={newCampgroundName}
               onChangeText={setNewCampgroundName}
-              style={{ borderWidth: 1, borderColor: BORDER_SOFT, borderRadius: 8, padding: 10, marginBottom: 12 }}
+              style={styles.input}
+              placeholderTextColor="#777"
             />
             <TextInput
               placeholder="Address (optional)"
               value={newCampgroundAddress}
               onChangeText={setNewCampgroundAddress}
-              style={{ borderWidth: 1, borderColor: BORDER_SOFT, borderRadius: 8, padding: 10, marginBottom: 12 }}
+              style={styles.input}
+              placeholderTextColor="#777"
             />
             <TextInput
               placeholder="Notes (optional)"
               value={newCampgroundNotes}
               onChangeText={setNewCampgroundNotes}
-              style={{ borderWidth: 1, borderColor: BORDER_SOFT, borderRadius: 8, padding: 10, marginBottom: 20, minHeight: 60 }}
+              style={[styles.input, { minHeight: 70 }]}
+              placeholderTextColor="#777"
               multiline
             />
+
             <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 12 }}>
               <TouchableOpacity onPress={() => setAddModalVisible(false)} style={{ padding: 10 }}>
                 <Text style={{ color: DEEP_FOREST, fontFamily: fonts.bodySemibold }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleSaveCampground} style={{ backgroundColor: DEEP_FOREST, borderRadius: 8, padding: 10, paddingHorizontal: 18 }}>
+              <TouchableOpacity
+                onPress={handleSaveCampground}
+                style={{ backgroundColor: DEEP_FOREST, borderRadius: 8, padding: 10, paddingHorizontal: 18 }}
+              >
                 <Text style={{ color: "#fff", fontFamily: fonts.bodySemibold }}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
       {/* Main Content */}
       <View style={{ flex: 1, backgroundColor: colors.parchment }}>
+        {/* Add Campground Button */}
+        <View style={{ alignItems: "center", marginTop: spacing.md, marginBottom: spacing.sm }}>
+          <TouchableOpacity
+            onPress={handleAddCampground}
+            style={{ backgroundColor: DEEP_FOREST, borderRadius: 24, paddingVertical: 12, paddingHorizontal: 28 }}
+          >
+            <Text style={{ color: "#fff", fontFamily: fonts.bodySemibold, fontSize: 16 }}>
+              + Add your own campground
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Add Campground Button */}
-      <View style={{ alignItems: "center", marginTop: spacing.md, marginBottom: spacing.sm }}>
-        <TouchableOpacity
-          onPress={handleAddCampground}
-          style={{ backgroundColor: DEEP_FOREST, borderRadius: 24, paddingVertical: 12, paddingHorizontal: 28 }}
-        >
-          <Text style={{ color: "#fff", fontFamily: fonts.bodySemibold, fontSize: 16 }}>+ Add your own campground</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
             paddingHorizontal: spacing.lg,
             paddingTop: spacing.md,
             paddingBottom: spacing.xl,
@@ -402,14 +466,8 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
             onLocationError={handleLocationError}
           />
 
-          {/* View Mode Toggle - Map/List */}
-          <View
-            style={{
-              flexDirection: "row",
-              gap: spacing.xs,
-              marginBottom: spacing.md,
-            }}
-          >
+          {/* View Mode Toggle */}
+          <View style={{ flexDirection: "row", gap: spacing.xs, marginBottom: spacing.md }}>
             <Pressable
               onPress={() => setViewMode("map")}
               style={{
@@ -424,11 +482,7 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
                 borderColor: viewMode === "map" ? DEEP_FOREST : BORDER_SOFT,
               }}
             >
-              <Ionicons
-                name="map"
-                size={18}
-                color={viewMode === "map" ? colors.parchment : EARTH_GREEN}
-              />
+              <Ionicons name="map" size={18} color={viewMode === "map" ? colors.parchment : EARTH_GREEN} />
               <Text
                 style={{
                   fontFamily: fonts.bodySemibold,
@@ -455,11 +509,7 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
                 borderColor: viewMode === "list" ? DEEP_FOREST : BORDER_SOFT,
               }}
             >
-              <Ionicons
-                name="list"
-                size={18}
-                color={viewMode === "list" ? colors.parchment : EARTH_GREEN}
-              />
+              <Ionicons name="list" size={18} color={viewMode === "list" ? colors.parchment : EARTH_GREEN} />
               <Text
                 style={{
                   fontFamily: fonts.bodySemibold,
@@ -473,7 +523,7 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
             </Pressable>
           </View>
 
-          {/* Error Message */}
+          {/* Error */}
           {error && (
             <View
               style={{
@@ -485,19 +535,13 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
                 borderColor: "#FCA5A5",
               }}
             >
-              <Text
-                style={{
-                  fontFamily: fonts.bodyRegular,
-                  fontSize: fontSizes.sm,
-                  color: "#991B1B",
-                }}
-              >
+              <Text style={{ fontFamily: fonts.bodyRegular, fontSize: fontSizes.sm, color: "#991B1B" }}>
                 {error}
               </Text>
             </View>
           )}
 
-          {/* Location Prompt for Near Me Mode */}
+          {/* Location prompt */}
           {showLocationPrompt && (
             <View
               style={{
@@ -515,7 +559,7 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
                   width: 60,
                   height: 60,
                   borderRadius: 30,
-                  backgroundColor: DEEP_FOREST + "15",
+                  backgroundColor: `${DEEP_FOREST}15`,
                   alignItems: "center",
                   justifyContent: "center",
                   marginBottom: spacing.sm,
@@ -546,7 +590,7 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
             </View>
           )}
 
-          {/* Initial Welcome State */}
+          {/* Initial state */}
           {showInitialState && (
             <View
               style={{
@@ -564,7 +608,7 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
                   width: 80,
                   height: 80,
                   borderRadius: 40,
-                  backgroundColor: DEEP_FOREST + "15",
+                  backgroundColor: `${DEEP_FOREST}15`,
                   alignItems: "center",
                   justifyContent: "center",
                   marginBottom: spacing.md,
@@ -596,31 +640,38 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
                   ? "Tap 'Near me' above to find parks and campgrounds nearby"
                   : "Enter a park name or location to start searching"}
               </Text>
+
               <View style={{ flexDirection: "row", gap: spacing.xs, flexWrap: "wrap", justifyContent: "center" }}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Ionicons name="location" size={16} color={GRANITE_GOLD} />
-                  <Text style={{ fontFamily: fonts.bodyRegular, fontSize: fontSizes.sm, color: TEXT_SECONDARY, marginLeft: 4 }}>Find nearby</Text>
+                  <Text style={{ fontFamily: fonts.bodyRegular, fontSize: fontSizes.sm, color: TEXT_SECONDARY, marginLeft: 4 }}>
+                    Find nearby
+                  </Text>
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Ionicons name="search" size={16} color={GRANITE_GOLD} />
-                  <Text style={{ fontFamily: fonts.bodyRegular, fontSize: fontSizes.sm, color: TEXT_SECONDARY, marginLeft: 4 }}>Search by name</Text>
+                  <Text style={{ fontFamily: fonts.bodyRegular, fontSize: fontSizes.sm, color: TEXT_SECONDARY, marginLeft: 4 }}>
+                    Search by name
+                  </Text>
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Ionicons name="filter" size={16} color={GRANITE_GOLD} />
-                  <Text style={{ fontFamily: fonts.bodyRegular, fontSize: fontSizes.sm, color: TEXT_SECONDARY, marginLeft: 4 }}>Filter by type</Text>
+                  <Text style={{ fontFamily: fonts.bodyRegular, fontSize: fontSizes.sm, color: TEXT_SECONDARY, marginLeft: 4 }}>
+                    Filter by type
+                  </Text>
                 </View>
               </View>
             </View>
           )}
 
-          {/* Map - only show in map view mode */}
+          {/* Map */}
           {viewMode === "map" && !showLocationPrompt && !showInitialState && (mode !== "near" || userLocation) && (
             <View style={{ marginBottom: spacing.md }}>
               <ParksMap parks={parks} userLocation={userLocation} mode={mode} onParkPress={handleParkPress} />
             </View>
           )}
 
-          {/* Park List - show in list view mode or below map in map view mode */}
+          {/* List */}
           {!isLoading && parks.length > 0 && (
             <View>
               <Text
@@ -639,7 +690,7 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
             </View>
           )}
 
-          {/* Empty State - No Results */}
+          {/* Empty */}
           {showEmptyState && !showLocationPrompt && !showInitialState && (
             <View
               style={{
@@ -656,7 +707,7 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
                   width: 60,
                   height: 60,
                   borderRadius: 30,
-                  backgroundColor: DEEP_FOREST + "15",
+                  backgroundColor: `${DEEP_FOREST}15`,
                   alignItems: "center",
                   justifyContent: "center",
                   marginBottom: spacing.sm,
@@ -698,30 +749,23 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
           onClose={() => setSelectedPark(null)}
           onAddToTrip={(park, tripId) => {
             if (tripId) {
-              // Add to existing trip
               console.log("Add park to existing trip:", park.name, "Trip ID:", tripId);
-              // TODO: Implement adding park to existing trip
               setSelectedPark(null);
             } else {
-              // Create new trip with this park
               console.log("Create new trip with park:", park.name);
               setSelectedPark(null);
-              // Navigate to CreateTrip with park data
-              navigation.navigate("CreateTrip");
+              navigation.navigate("CreateTrip" as never);
             }
           }}
           onCheckWeather={(park) => {
             console.log("Check weather for park:", park.name);
             setSelectedPark(null);
-            // Switch to weather tab
-            if (onTabChange) {
-              onTabChange("weather");
-            }
+            if (onTabChange) onTabChange("weather");
           }}
         />
       </View>
 
-      {/* Show loader when parks are loading */}
+      {/* Loader overlay */}
       {isLoading && (
         <View style={styles.loaderOverlay}>
           <FireflyLoader />
@@ -734,19 +778,47 @@ function ParksBrowseScreen(props: ParksBrowseScreenProps) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    position: 'relative',
+    position: "relative",
     backgroundColor: colors.parchment,
   },
   loaderOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 1000,
     elevation: 1000,
-    pointerEvents: 'none',
+    pointerEvents: "none",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    width: "90%",
+    borderWidth: 1,
+    borderColor: BORDER_SOFT,
+  },
+  modalTitle: {
+    fontFamily: fonts.bodySemibold,
+    fontSize: 20,
+    marginBottom: 16,
+    color: "#111",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: BORDER_SOFT,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+    color: "#111",
   },
 });

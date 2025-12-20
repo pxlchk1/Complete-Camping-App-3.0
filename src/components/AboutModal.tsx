@@ -55,12 +55,20 @@ export default function AboutModal({ visible, onClose }: AboutModalProps) {
 
           {/* Body Text */}
           <Text
-            className="text-base mb-8 leading-6"
+            className="text-base mb-2 leading-6"
             style={{ fontFamily: "SourceSans3_400Regular", color: "#3d3d3d", lineHeight: 24 }}
           >
             The Complete Camping App is one of the ways I try to make camping feel easier,
             friendlier, and a little more fun. It brings together planning tools, gear ideas,
             community advice, and simple checklists so anyone can head outside with confidence.
+          </Text>
+          <Text
+            className="text-base mb-8"
+            style={{ fontFamily: "SourceSans3_400Regular", color: "#3d3d3d", lineHeight: 24 }}
+          >
+            {"\n"}
+            Stay wild & wander often,{"\n"}
+            Alana
           </Text>
 
           {/* Divider */}
@@ -178,11 +186,19 @@ export default function AboutModal({ visible, onClose }: AboutModalProps) {
           <View className="h-px bg-stone-300 mb-6" />
 
           {/* Footer */}
+
           <Text
             className="text-base mb-4"
             style={{ fontFamily: "SourceSans3_400Regular", color: "#3d3d3d" }}
           >
-            Tent and Lantern is Alana Waters Piper.
+            Design and Development by{' '}
+            <Text
+              className="underline"
+              style={{ color: '#2563eb' }}
+              onPress={() => handleLinkPress('https://guyline.studio')}
+            >
+              Guyline.Studio
+            </Text>
           </Text>
 
           <Text

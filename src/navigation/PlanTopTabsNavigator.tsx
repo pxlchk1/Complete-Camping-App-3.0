@@ -1,22 +1,25 @@
 /**
  * Plan Top Tabs Navigator
- * Material top tabs for Trips, Parks, Weather, Packing, Meals
+ * Material top tabs for Trips, Campgrounds, Meals, Pack, Weather
  */
 
-import React, { useEffect, useRef } from "react";
-// ...existing imports...
-import { usePlanTabStore } from "../state/planTabStore";
-import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
+import React, { useEffect, useRef, useState } from "react";
 import { View, ImageBackground, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigationState } from "@react-navigation/native";
+import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
+
+import { usePlanTabStore } from "../state/planTabStore";
+
+import AccountButtonHeader from "../components/AccountButtonHeader";
+
 import MyTripsScreen from "../screens/MyTripsScreen";
 import ParksBrowseScreen from "../screens/ParksBrowseScreen";
-import WeatherScreen from "../screens/WeatherScreen";
-import PackingTabScreen from "../screens/PackingTabScreen";
 import MealsScreen from "../screens/MealsScreen";
-import AccountButtonHeader from "../components/AccountButtonHeader";
+import PackingTabScreen from "../screens/PackingTabScreen";
+import WeatherScreen from "../screens/WeatherScreen";
+import PlanSafeScreen from "../screens/PlanSafeScreen";
+
 import { DEEP_FOREST, PARCHMENT, BORDER_SOFT, TEXT_ON_DARK } from "../constants/colors";
 import { HERO_IMAGES } from "../constants/images";
 
@@ -60,7 +63,7 @@ const getHeroContent = (routeName: string) => {
 
 function HeroHeader({ activeTab }: { activeTab: string }) {
   const insets = useSafeAreaInsets();
-  
+
   const heroImage = getHeroImage(activeTab);
   const { title, description } = getHeroContent(activeTab);
 
@@ -72,11 +75,11 @@ function HeroHeader({ activeTab }: { activeTab: string }) {
         resizeMode="cover"
         accessibilityLabel="Planning camping scene"
       >
-        <View className="flex-1" style={{ paddingTop: insets.top }}>
+        <View style={{ flex: 1, paddingTop: insets.top }}>
           {/* Account Button - Top Right */}
           <AccountButtonHeader color={TEXT_ON_DARK} />
 
-          <View className="flex-1 justify-end px-6 pb-4">
+          <View style={{ flex: 1, justifyContent: "flex-end", paddingHorizontal: 24, paddingBottom: 16 }}>
             <LinearGradient
               colors={["transparent", "rgba(0,0,0,0.6)"]}
               style={{
@@ -88,9 +91,10 @@ function HeroHeader({ activeTab }: { activeTab: string }) {
               }}
             />
             <Text
-              className="text-parchment text-3xl"
               style={{
                 fontFamily: "JosefinSlab_700Bold",
+                fontSize: 30,
+                color: PARCHMENT,
                 textShadowColor: "rgba(0, 0, 0, 0.5)",
                 textShadowOffset: { width: 0, height: 1 },
                 textShadowRadius: 4,
@@ -100,9 +104,10 @@ function HeroHeader({ activeTab }: { activeTab: string }) {
               {title}
             </Text>
             <Text
-              className="text-parchment mt-2"
               style={{
                 fontFamily: "SourceSans3_400Regular",
+                marginTop: 8,
+                color: PARCHMENT,
                 textShadowColor: "rgba(0, 0, 0, 0.5)",
                 textShadowOffset: { width: 0, height: 1 },
                 textShadowRadius: 3,
@@ -119,10 +124,12 @@ function HeroHeader({ activeTab }: { activeTab: string }) {
 }
 
 export default function PlanTopTabsNavigator() {
+  console.log("[PLAN_TRACE] Enter PlanTopTabsNavigator");
+
   // Zustand store for tab state
   const activeTab = usePlanTabStore((s) => s.activeTab);
   const setActiveTab = usePlanTabStore((s) => s.setActiveTab);
-  const tabNames = ["Plan", "Campgrounds", "Meals", "Pack", "Weather"];
+
   const tabKeyToRoute: Record<string, string> = {
     plan: "Plan",
     campgrounds: "Campgrounds",
@@ -130,6 +137,7 @@ export default function PlanTopTabsNavigator() {
     pack: "Pack",
     weather: "Weather",
   };
+
   const routeToTabKey: Record<string, string> = {
     Plan: "plan",
     Campgrounds: "campgrounds",
@@ -140,7 +148,7 @@ export default function PlanTopTabsNavigator() {
 
   // Ref to prevent initial tab reset on every render
   const isFirstRender = useRef(true);
-  const [initialTab, setInitialTab] = React.useState(tabKeyToRoute[activeTab] || "Plan");
+  const [initialTab, setInitialTab] = useState(tabKeyToRoute[activeTab] || "Plan");
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -149,10 +157,12 @@ export default function PlanTopTabsNavigator() {
     }
   }, [activeTab]);
 
+  const activeRouteName = tabKeyToRoute[activeTab] || "Plan";
+
   return (
-    <View className="flex-1 bg-parchment">
+    <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
       {/* Hero Header */}
-      <HeroHeader activeTab={tabKeyToRoute[activeTab] || "Plan"} />
+      <HeroHeader activeTab={activeRouteName} />
 
       {/* Material Top Tabs */}
       <Tab.Navigator
@@ -184,15 +194,15 @@ export default function PlanTopTabsNavigator() {
         }}
         screenListeners={{
           state: (e) => {
-            const routeName = e.data.state.routes[e.data.state.index].name;
+            const state = e.data.state;
+            const routeName = state.routes[state.index]?.name;
             const tabKey = routeToTabKey[routeName];
-            if (tabKey && tabKey !== activeTab) {
-              setActiveTab(tabKey);
-            }
+            if (tabKey && tabKey !== activeTab) setActiveTab(tabKey);
           },
         }}
       >
-        <Tab.Screen name="Plan" component={MyTripsScreen} />
+        {/* Isolation mode: keep PlanSafeScreen as the first tab until crash is identified */}
+        <Tab.Screen name="Plan" component={PlanSafeScreen} />
         <Tab.Screen name="Campgrounds" component={ParksBrowseScreen} />
         <Tab.Screen name="Meals" component={MealsScreen} />
         <Tab.Screen name="Pack" component={PackingTabScreen} />

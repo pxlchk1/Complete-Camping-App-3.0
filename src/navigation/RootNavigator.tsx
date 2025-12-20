@@ -12,6 +12,7 @@ import LearnScreen from "../screens/LearnScreen";
 import MyTripsScreen from "../screens/MyTripsScreen";
 import CommunityTopTabsNavigator from "./CommunityTopTabsNavigator";
 import PlanTopTabsNavigator from "./PlanTopTabsNavigator";
+import { PlanErrorBoundary } from "../components/PlanErrorBoundary";
 import FirstAidScreen from "../screens/FirstAidScreen";
 import CreateTripScreen from "../screens/CreateTripScreen";
 import TripDetailScreen from "../screens/TripDetailScreen";
@@ -72,16 +73,19 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 const PlanStack = createNativeStackNavigator();
 
-function PlanStackNavigator() {
+function PlanStackNavigator(props: any) {
+  console.log("[PlanStackNavigator] mount");
   return (
-    <PlanStack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <PlanStack.Screen name="MyTrips" component={PlanTopTabsNavigator} />
-      <PlanStack.Screen name="ParksBrowse" component={ParksBrowseScreen} />
-    </PlanStack.Navigator>
+    <PlanErrorBoundary navigation={props.navigation}>
+      <PlanStack.Navigator
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <PlanStack.Screen name="MyTrips" component={PlanTopTabsNavigator} />
+        <PlanStack.Screen name="ParksBrowse" component={ParksBrowseScreen} />
+      </PlanStack.Navigator>
+    </PlanErrorBoundary>
   );
 }
 

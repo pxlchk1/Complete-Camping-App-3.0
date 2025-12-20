@@ -1,100 +1,166 @@
 /**
  * Gear Review Detail Screen
  * Shows full gear review with rating, pros, cons, and upvote
+ *
+ * Fixes:
+ * - Wraps all hooks and returns inside a real component function
+ * - Removes corrupted JSX that was pasted into a style object
+ * - Implements basic Firestore fetch, upvote, and reporting so the screen can ship
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
   ScrollView,
-  Pressable,
+  // Pressable,
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import ModalHeader from "../../components/ModalHeader";
 import * as Haptics from "expo-haptics";
-import { getGearReviewById, upvoteGearReview } from "../../services/gearReviewsService";
-import { reportContent } from "../../services/contentReportsService";
-import { GearReview } from "../../types/community";
-import { RootStackParamList, RootStackNavigationProp } from "../../navigation/types";
-import { useCurrentUser } from "../../state/userStore";
-import AccountRequiredModal from "../../components/AccountRequiredModal";
-import { requireAuth } from "../../utils/gating";
-import {
-  DEEP_FOREST,
-  PARCHMENT,
-  CARD_BACKGROUND_LIGHT,
-  BORDER_SOFT,
-  TEXT_PRIMARY_STRONG,
-  TEXT_SECONDARY,
-  TEXT_MUTED,
-} from "../../constants/colors";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { gearReviewVotesService } from "../../services/firestore/gearReviewVotesService";
+import VoteButtons from "../../components/VoteButtons";
 
-type GearReviewDetailRouteProp = RouteProp<RootStackParamList, "GearReviewDetail">;
+import ModalHeader from "../../components/ModalHeader";
+import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { auth, db } from "../../config/firebase";
+
+/** Fallback theme values (safe if your constants are not available here). */
+const DEEP_FOREST = "#1F3B2C";
+// const PARCHMENT = "#F7F1E4";
+const TEXT_PRIMARY_STRONG = "#3D2817";
+const TEXT_SECONDARY = "#6B5A4A";
+
+type GearReview = {
+  id: string;
+  gearName: string;
+  brand?: string;
+  category?: string;
+  summary?: string;
+  reviewText?: string;
+  rating: number;
+  pros?: string[];
+  cons?: string[];
+  upvoteCount: number;
+  createdAt?: any;
+  authorId?: string;
+};
+
+type RouteParams = {
+  reviewId?: string;
+};
 
 export default function GearReviewDetailScreen() {
-  const navigation = useNavigation<RootStackNavigationProp>();
-  const route = useRoute<GearReviewDetailRouteProp>();
-  const { reviewId } = route.params;
-  const currentUser = useCurrentUser();
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+
+  const reviewId = (route?.params as RouteParams | undefined)?.reviewId;
+
+  const [loading, setLoading] = useState(true);
+  const [review, setReview] = useState<GearReview | null>(null);
+  const [voteScore, setVoteScore] = useState(0);
+  const [userVote, setUserVote] = useState<"up" | "down" | null>(null);
+  const [voteLoading, setVoteLoading] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  const [review, setReview] = useState<GearReview | null>(null);
-  const [loading, setLoading] = useState(true);
+  // const isSignedIn = useMemo(() => !!auth?.currentUser?.uid, []);
 
-  const formatTimeAgo = (dateString: string | any) => {
-    const now = new Date();
-    const date = typeof dateString === "string" ? new Date(dateString) : dateString.toDate?.() || new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-
-    if (diffInHours < 1) return "Just now";
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-    const diffInWeeks = Math.floor(diffInDays / 7);
-    if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
-    return date.toLocaleDateString();
-  };
-
-  useEffect(() => {
-    loadReview();
-  }, [reviewId]);
-
-  const loadReview = async () => {
+  const loadReview = useCallback(async () => {
+    if (!reviewId) {
+      setLoading(false);
+      setReview(null);
+      return;
+    }
     try {
       setLoading(true);
-      const data = await getGearReviewById(reviewId);
-      setReview(data);
-    } catch (error) {
+      const ref = doc(db, "gearReviews", String(reviewId));
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        setReview(null);
+        return;
+      }
+      const data = snap.data() as any;
+      const normalized: GearReview = {
+        id: snap.id,
+        gearName: data.gearName ?? "",
+        brand: data.brand ?? "",
+        category: data.category ?? "",
+        summary: data.summary ?? "",
+        reviewText: data.reviewText ?? data.fullReview ?? "",
+        rating: typeof data.rating === "number" ? data.rating : 0,
+        pros: Array.isArray(data.pros) ? data.pros : [],
+        cons: Array.isArray(data.cons) ? data.cons : [],
+        upvoteCount: typeof data.upvoteCount === "number" ? data.upvoteCount : 0,
+        createdAt: data.createdAt,
+        authorId: data.authorId,
+      };
+      setReview(normalized);
+      // Voting state
+      try {
+        const summary = await gearReviewVotesService.getVoteSummary(snap.id);
+        setVoteScore(summary.score);
+        const userVoteObj = await gearReviewVotesService.getUserVote(snap.id);
+        setUserVote(userVoteObj?.voteType || null);
+      } catch {}
+    } catch {
       Alert.alert("Error", "Failed to load review");
       navigation.goBack();
     } finally {
       setLoading(false);
     }
+  }, [navigation, reviewId]);
+
+  useEffect(() => {
+    loadReview();
+  }, [loadReview]);
+
+  const requireAuthOrShowModal = () => {
+    const uid = auth?.currentUser?.uid;
+    if (!uid) {
+      setShowLoginModal(true);
+      return false;
+    }
+    return true;
   };
 
-  const handleUpvote = async () => {
-    if (!requireAuth(() => setShowLoginModal(true))) {
-      return;
+  const handleVote = async (voteType: "up" | "down") => {
+    if (!requireAuthOrShowModal()) return;
+    if (!reviewId) return;
+    setVoteLoading(true);
+    const prevVote = userVote;
+    const prevScore = voteScore;
+    // Optimistic UI
+    let newVote: "up" | "down" | null = voteType;
+    let newScore = voteScore;
+    if (userVote === voteType) {
+      newVote = null;
+      newScore += voteType === "up" ? -1 : 1;
+    } else if (userVote === "up" && voteType === "down") {
+      newScore -= 2;
+    } else if (userVote === "down" && voteType === "up") {
+      newScore += 2;
+    } else {
+      newScore += voteType === "up" ? 1 : -1;
     }
+    setUserVote(newVote);
+    setVoteScore(newScore);
     try {
-      await upvoteGearReview(reviewId);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      if (review) {
-        setReview({ ...review, upvoteCount: review.upvoteCount + 1 });
-      }
-    } catch (error) {
-      Alert.alert("Error", "Failed to upvote review");
+      await gearReviewVotesService.vote(reviewId, newVote ?? voteType);
+    } catch {
+      setUserVote(prevVote);
+      setVoteScore(prevScore);
+    } finally {
+      setVoteLoading(false);
     }
   };
 
   const handleReport = () => {
-    if (!requireAuth(() => setShowLoginModal(true))) {
-      return;
-    }
+    if (!requireAuthOrShowModal()) return;
+    if (!reviewId) return;
+
     Alert.alert("Report Review", "Why are you reporting this review?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -102,15 +168,21 @@ export default function GearReviewDetailScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            await reportContent({
+            const uid = auth?.currentUser?.uid;
+            if (!uid) return;
+
+            const reportRef = doc(db, "reports", `${String(reviewId)}_${Date.now()}`);
+            await setDoc(reportRef, {
               targetType: "gearReview",
-              targetId: reviewId,
+              targetId: String(reviewId),
               reason: "User reported inappropriate content",
-              reporterId: currentUser.id,
+              reporterId: uid,
+              createdAt: serverTimestamp(),
             });
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
             Alert.alert("Success", "Thank you for your report");
-          } catch (error) {
+          } catch {
             Alert.alert("Error", "Failed to submit report");
           }
         },
@@ -118,7 +190,23 @@ export default function GearReviewDetailScreen() {
     ]);
   };
 
-  if (loading || !review) {
+  const renderStars = (rating: number) => {
+    const stars: React.ReactElement[] = [];
+    const safeRating = Math.max(0, Math.min(5, Math.round(rating)));
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <Ionicons
+          key={i}
+          name={i <= safeRating ? "star" : "star-outline"}
+          size={20}
+          color="#F59E0B"
+        />
+      );
+    }
+    return <View className="flex-row">{stars}</View>;
+  };
+
+  if (loading) {
     return (
       <View className="flex-1 bg-parchment">
         <ModalHeader title="Review" showTitle />
@@ -129,24 +217,41 @@ export default function GearReviewDetailScreen() {
     );
   }
 
-  const renderStars = (rating: number) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      stars.push(
-        <Ionicons
-          key={i}
-          name={i <= rating ? "star" : "star-outline"}
-          size={20}
-          color="#F59E0B"
+  if (!review) {
+    return (
+      <View className="flex-1 bg-parchment">
+        <ModalHeader title="Review" showTitle />
+        <View className="flex-1 items-center justify-center px-6">
+          <Text
+            style={{
+              fontFamily: "SourceSans3_600SemiBold",
+              color: TEXT_PRIMARY_STRONG,
+              textAlign: "center",
+            }}
+          >
+            Review not found.
+          </Text>
+        </View>
+
+        <AccountRequiredModal
+          visible={showLoginModal}
+          onCreateAccount={() => {
+            setShowLoginModal(false);
+            navigation.navigate("Auth");
+          }}
+          onMaybeLater={() => setShowLoginModal(false)}
         />
-      );
-    }
-    return <View className="flex-row">{stars}</View>;
-  };
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-parchment">
-      <ModalHeader title="Review" showTitle rightAction={{ icon: "flag-outline", onPress: handleReport }} />
+      <ModalHeader
+        title="Review"
+        showTitle
+        rightAction={{ icon: "flag-outline", onPress: handleReport }}
+      />
 
       <ScrollView className="flex-1 p-5">
         {/* Gear Name and Brand */}
@@ -160,7 +265,7 @@ export default function GearReviewDetailScreen() {
           {review.gearName}
         </Text>
 
-        {review.brand && (
+        {!!review.brand && (
           <Text
             className="text-lg mb-3"
             style={{
@@ -182,83 +287,148 @@ export default function GearReviewDetailScreen() {
               color: TEXT_PRIMARY_STRONG,
             }}
           >
-            {review.rating.toFixed(1)} / 5.0
+            {(review.rating ?? 0).toFixed(1)} / 5.0
           </Text>
         </View>
 
         {/* Category Badge */}
-        <View className="mb-4">
-          <View
-            className="px-3 py-1 rounded-full self-start"
-            style={{ backgroundColor: "#E0F2F1" }}
-          >
-            <Text
-              style={{
-                fontFamily: "SourceSans3_600SemiBold",
-                color: "#00695C",
-                textTransform: "capitalize",
-              }}
+        {!!review.category && (
+          <View className="mb-4">
+            <View
+              className="px-3 py-1 rounded-full self-start"
+              style={{ backgroundColor: "#E0F2F1" }}
             >
-              {review.category}
-            </Text>
+              <Text
+                style={{
+                  fontFamily: "SourceSans3_600SemiBold",
+                  color: "#00695C",
+                  textTransform: "capitalize",
+                }}
+              >
+                {review.category}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Summary */}
-        <View className="mb-4 p-4 rounded-xl" style={{ backgroundColor: "#FEF3C7" }}>
-          <Text
-            className="text-base"
-            style={{
-              fontFamily: "SourceSans3_600SemiBold",
-              color: "#92400E",
-              lineHeight: 22,
-            }}
+        {!!review.summary && (
+          <View
+            className="mb-4 p-4 rounded-xl"
+            style={{ backgroundColor: "#FEF3C7" }}
           >
-            {review.summary}
-          </Text>
-        </View>
+            <Text
+              className="text-base"
+              style={{
+                fontFamily: "SourceSans3_600SemiBold",
+                color: "#92400E",
+                lineHeight: 22,
+              }}
+            >
+              {review.summary}
+            </Text>
+          </View>
+        )}
 
-        {/* Full Review */}
-        <View className="mb-4">
-          <Text
-            className="text-lg mb-2"
-            style={{
-              fontFamily: "JosefinSlab_700Bold",
-              color: TEXT_PRIMARY_STRONG,
-            }}
-          >
-            Full Review
-          </Text>
-          <Text
-            style={{
-              fontFamily: "SourceSans3_400Regular",
-              return (
-                <View className="flex-1 bg-parchment">
-                  <ModalHeader title="Review" showTitle rightAction={{ icon: "flag-outline", onPress: handleReport }} />
-                  <ScrollView className="flex-1 p-5">
-                    {/* ...existing code... */}
-                    <Pressable
-                      onPress={handleUpvote}
-                      className="py-3 px-6 rounded-xl items-center mt-2 active:opacity-90"
-                      style={{ backgroundColor: DEEP_FOREST }}
+        {/* Pros / Cons */}
+        {(review.pros?.length || review.cons?.length) ? (
+          <View className="mb-4">
+            {!!review.pros?.length && (
+              <View className="mb-3">
+                <Text
+                  className="text-lg mb-2"
+                  style={{
+                    fontFamily: "JosefinSlab_700Bold",
+                    color: TEXT_PRIMARY_STRONG,
+                  }}
+                >
+                  Pros
+                </Text>
+                {review.pros!.map((p, idx) => (
+                  <View key={`pro_${idx}`} className="flex-row mb-1">
+                    <Text style={{ color: TEXT_PRIMARY_STRONG }}>• </Text>
+                    <Text
+                      style={{
+                        fontFamily: "SourceSans3_400Regular",
+                        color: TEXT_PRIMARY_STRONG,
+                        lineHeight: 22,
+                        flex: 1,
+                      }}
                     >
-                      <Ionicons name="thumbs-up-outline" size={20} color={PARCHMENT} />
-                      <Text
-                        className="ml-2 text-base"
-                        style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
-                      >
-                        Upvote ({review.upvoteCount})
-                      </Text>
-                    </Pressable>
-                  </ScrollView>
-                  <AccountRequiredModal
-                    visible={showLoginModal}
-                    onCreateAccount={() => {
-                      setShowLoginModal(false);
-                      navigation.navigate("Auth");
-                    }}
-                    onMaybeLater={() => setShowLoginModal(false)}
-                  />
-                </View>
-              );
-                  lineHeight: 22,
+                      {String(p)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {!!review.cons?.length && (
+              <View>
+                <Text
+                  className="text-lg mb-2"
+                  style={{
+                    fontFamily: "JosefinSlab_700Bold",
+                    color: TEXT_PRIMARY_STRONG,
+                  }}
+                >
+                  Cons
+                </Text>
+                {review.cons!.map((c, idx) => (
+                  <View key={`con_${idx}`} className="flex-row mb-1">
+                    <Text style={{ color: TEXT_PRIMARY_STRONG }}>• </Text>
+                    <Text
+                      style={{
+                        fontFamily: "SourceSans3_400Regular",
+                        color: TEXT_PRIMARY_STRONG,
+                        lineHeight: 22,
+                        flex: 1,
+                      }}
+                    >
+                      {String(c)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        ) : null}
+
+        {/* Full Review Body (only if present) */}
+        {!!review.reviewText?.trim() && (
+          <View className="mb-4">
+            <Text
+              style={{
+                fontFamily: "SourceSans3_400Regular",
+                color: TEXT_PRIMARY_STRONG,
+                lineHeight: 22,
+              }}
+            >
+              {review.reviewText}
+            </Text>
+          </View>
+        )}
+
+        {/* Reddit-style Voting Control */}
+        <View className="items-center mb-6">
+          <VoteButtons
+            score={voteScore}
+            userVote={userVote}
+            onVote={handleVote}
+            layout="vertical"
+            size="large"
+            disabled={voteLoading}
+          />
+        </View>
+      </ScrollView>
+
+      <AccountRequiredModal
+        visible={showLoginModal}
+        onCreateAccount={() => {
+          setShowLoginModal(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowLoginModal(false)}
+      />
+    </View>
+  );
+}

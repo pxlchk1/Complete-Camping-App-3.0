@@ -4,7 +4,7 @@
  * Structure: /users/{userId}/trips/{tripId}/packingList/{itemId}
  */
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -29,7 +29,6 @@ import { PackingItem } from "../types/camping";
 import {
   getPackingList,
   addPackingItem,
-  updatePackingItem,
   togglePackingItem,
   deletePackingItem,
   generatePackingListFromTemplate,
@@ -39,10 +38,7 @@ import {
   DEEP_FOREST,
   EARTH_GREEN,
   GRANITE_GOLD,
-  RIVER_ROCK,
-  SIERRA_SKY,
   PARCHMENT,
-  PARCHMENT_BORDER,
 } from "../constants/colors";
 
 type PackingListScreenRouteProp = RouteProp<RootStackParamList, "PackingList">;
@@ -76,12 +72,13 @@ export default function PackingListScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [useLocalStorage, setUseLocalStorage] = useState(false);
+
   const [showAddItem, setShowAddItem] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(DEFAULT_CATEGORIES)
   );
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
-  const [filterPacked, setFilterPacked] = useState(false);
+  const [filterUnpackedOnly, setFilterUnpackedOnly] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
   // Add item form state
@@ -93,46 +90,96 @@ export default function PackingListScreen() {
   // Add category form state
   const [newCategoryName, setNewCategoryName] = useState("");
 
+  const allCategories = useMemo(() => {
+    const fromItems = packingItems.map((i) => i.category).filter(Boolean);
+    const merged = Array.from(new Set([...DEFAULT_CATEGORIES, ...fromItems]));
+    return merged;
+  }, [packingItems]);
+
+  const categories = useMemo(() => {
+    // Show categories even if empty, so defaults are visible
+    return allCategories;
+  }, [allCategories]);
+
+  const itemsByCategory = useMemo(() => {
+    return categories.reduce((acc, cat) => {
+      acc[cat] = packingItems.filter((i) => i.category === cat);
+      return acc;
+    }, {} as Record<string, PackingItem[]>);
+  }, [categories, packingItems]);
+
+  // Calculate stats
+  const totalItems = packingItems.length;
+  const packedItems = packingItems.filter((i) => i.isPacked).length;
+  const progress = totalItems > 0 ? (packedItems / totalItems) * 100 : 0;
+
+  const closeAddModalAndReset = useCallback(() => {
+    setShowAddItem(false);
+    setShowNewCategoryInput(false);
+    setNewCategoryName("");
+    setNewItemLabel("");
+    setNewItemQuantity("1");
+    setNewItemNotes("");
+  }, []);
+
   // Load packing list
   const loadPackingList = useCallback(async () => {
     if (!trip) return;
 
     setLoading(true);
     setError(null);
+
     try {
-      // Try Firebase first if not already using local storage
       if (!useLocalStorage) {
         try {
           const items = await getPackingList(userId, tripId);
 
-          // If no items and trip has camping style, auto-generate
           if (items.length === 0 && trip.campingStyle) {
-            await generatePackingListFromTemplate(userId, tripId, trip.campingStyle);
+            await generatePackingListFromTemplate(
+              userId,
+              tripId,
+              trip.campingStyle
+            );
             const newItems = await getPackingList(userId, tripId);
             setPackingItems(newItems);
           } else {
             setPackingItems(items);
           }
-          return; // Success with Firebase
+
+          // Expand any categories we just learned about
+          setExpandedCategories((prev) => {
+            const next = new Set(prev);
+            items.forEach((i) => next.add(i.category));
+            return next;
+          });
+
+          return;
         } catch (fbError: any) {
           console.log("Firebase error, falling back to local storage:", fbError);
           setUseLocalStorage(true);
         }
       }
 
-      // Use local storage (fallback or already in local mode)
       const items = await LocalPackingService.getPackingList(tripId);
 
-      // If no items and trip has camping style, auto-generate
       if (items.length === 0 && trip.campingStyle) {
-        await LocalPackingService.generatePackingListFromTemplate(tripId, trip.campingStyle);
+        await LocalPackingService.generatePackingListFromTemplate(
+          tripId,
+          trip.campingStyle
+        );
         const newItems = await LocalPackingService.getPackingList(tripId);
         setPackingItems(newItems);
       } else {
         setPackingItems(items);
       }
-    } catch (error: any) {
-      console.error("Failed to load packing list:", error);
+
+      setExpandedCategories((prev) => {
+        const next = new Set(prev);
+        items.forEach((i) => next.add(i.category));
+        return next;
+      });
+    } catch (err: any) {
+      console.error("Failed to load packing list:", err);
       setError("Unable to load packing list. Please try again.");
     } finally {
       setLoading(false);
@@ -144,7 +191,11 @@ export default function PackingListScreen() {
   }, [loadPackingList]);
 
   const handleTogglePacked = async (item: PackingItem) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // ignore haptics failures
+    }
 
     // Optimistic update
     setPackingItems((prev) =>
@@ -153,15 +204,31 @@ export default function PackingListScreen() {
 
     try {
       if (useLocalStorage) {
-        await LocalPackingService.togglePackingItem(tripId, item.id, !item.isPacked);
+        await LocalPackingService.togglePackingItem(
+          tripId,
+          item.id,
+          !item.isPacked
+        );
       } else {
-        await togglePackingItem(userId, tripId, item.id, !item.isPacked);
+        try {
+          await togglePackingItem(userId, tripId, item.id, !item.isPacked);
+        } catch (fbError: any) {
+          // If Firebase fails, switch and retry locally
+          setUseLocalStorage(true);
+          await LocalPackingService.togglePackingItem(
+            tripId,
+            item.id,
+            !item.isPacked
+          );
+        }
       }
-    } catch (error) {
-      console.error("Failed to toggle item:", error);
+    } catch (err) {
+      console.error("Failed to toggle item:", err);
       // Revert on error
       setPackingItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, isPacked: item.isPacked } : i))
+        prev.map((i) =>
+          i.id === item.id ? { ...i, isPacked: item.isPacked } : i
+        )
       );
     }
   };
@@ -175,7 +242,7 @@ export default function PackingListScreen() {
       return;
     }
 
-    const quantity = parseInt(newItemQuantity) || 1;
+    const quantity = Math.max(1, parseInt(newItemQuantity, 10) || 1);
 
     try {
       const newItem: Omit<PackingItem, "id"> = {
@@ -191,73 +258,90 @@ export default function PackingListScreen() {
       if (useLocalStorage) {
         itemId = await LocalPackingService.addPackingItem(tripId, newItem);
       } else {
-        itemId = await addPackingItem(userId, tripId, newItem);
+        try {
+          itemId = await addPackingItem(userId, tripId, newItem);
+        } catch (fbError: any) {
+          setUseLocalStorage(true);
+          itemId = await LocalPackingService.addPackingItem(tripId, newItem);
+        }
       }
 
       setPackingItems((prev) => [...prev, { ...newItem, id: itemId }]);
 
-      // Reset form
-      setNewItemLabel("");
-      setNewItemQuantity("1");
-      setNewItemNotes("");
-      setShowNewCategoryInput(false);
-      setNewCategoryName("");
-      setShowAddItem(false);
+      // Ensure category is visible and expanded
+      setExpandedCategories((prev) => {
+        const next = new Set(prev);
+        next.add(newItem.category);
+        return next;
+      });
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) {
-      console.error("Failed to add item:", error);
+      try {
+        await Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success
+        );
+      } catch {
+        // ignore
+      }
+
+      closeAddModalAndReset();
+    } catch (err) {
+      console.error("Failed to add item:", err);
     }
   };
 
   const handleDeleteItem = async (item: PackingItem) => {
+    // Gate: Login required to delete items
+    if (isGuest) {
+      navigation.navigate("Auth" as any);
+      return;
+    }
+
     try {
       if (useLocalStorage) {
         await LocalPackingService.deletePackingItem(tripId, item.id);
       } else {
-        await deletePackingItem(userId, tripId, item.id);
+        try {
+          await deletePackingItem(userId, tripId, item.id);
+        } catch (fbError: any) {
+          setUseLocalStorage(true);
+          await LocalPackingService.deletePackingItem(tripId, item.id);
+        }
       }
+
       setPackingItems((prev) => prev.filter((i) => i.id !== item.id));
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) {
-      console.error("Failed to delete item:", error);
+
+      try {
+        await Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success
+        );
+      } catch {
+        // ignore
+      }
+    } catch (err) {
+      console.error("Failed to delete item:", err);
     }
   };
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
-      if (next.has(category)) {
-        next.delete(category);
-      } else {
-        next.add(category);
-      }
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
       return next;
     });
   };
 
-  if (!trip) {
-    return null;
-  }
-
-  // Group items by category
-  const categories = Array.from(new Set(packingItems.map((i) => i.category)));
-  const itemsByCategory = categories.reduce((acc, cat) => {
-    acc[cat] = packingItems.filter((i) => i.category === cat);
-    return acc;
-  }, {} as Record<string, PackingItem[]>);
-
-  // Calculate stats
-  const totalItems = packingItems.length;
-  const packedItems = packingItems.filter((i) => i.isPacked).length;
-  const progress = totalItems > 0 ? (packedItems / totalItems) * 100 : 0;
+  if (!trip) return null;
 
   return (
     <>
-      {/* Header with Deep Forest Background - extends to top */}
+      {/* Header with Deep Forest Background */}
       <View style={{ backgroundColor: DEEP_FOREST }}>
         <SafeAreaView edges={["top"]} style={{ backgroundColor: DEEP_FOREST }}>
-          <View className="px-5 pt-4 pb-3 border-b" style={{ borderColor: PARCHMENT }}>
+          <View
+            className="px-5 pt-4 pb-3 border-b"
+            style={{ borderColor: PARCHMENT }}
+          >
             <View className="flex-row items-center mb-2 justify-between">
               <View className="flex-row items-center flex-1">
                 <Pressable
@@ -268,16 +352,26 @@ export default function PackingListScreen() {
                 </Pressable>
                 <Text
                   className="text-xl font-bold flex-1"
-                  style={{ fontFamily: "JosefinSlab_700Bold", color: PARCHMENT }}
+                  style={{
+                    fontFamily: "JosefinSlab_700Bold",
+                    color: PARCHMENT,
+                  }}
                 >
                   Packing List
                 </Text>
               </View>
-              <View className="flex-row items-center gap-3">
+
+              <View className="flex-row items-center" style={{ gap: 12 }}>
                 <Pressable
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setEditMode(!editMode);
+                  onPress={async () => {
+                    try {
+                      await Haptics.impactAsync(
+                        Haptics.ImpactFeedbackStyle.Light
+                      );
+                    } catch {
+                      // ignore
+                    }
+                    setEditMode((v) => !v);
                   }}
                   className="active:opacity-70"
                 >
@@ -285,7 +379,7 @@ export default function PackingListScreen() {
                     className="text-base"
                     style={{
                       fontFamily: "SourceSans3_600SemiBold",
-                      color: editMode ? GRANITE_GOLD : PARCHMENT
+                      color: editMode ? GRANITE_GOLD : PARCHMENT,
                     }}
                   >
                     {editMode ? "Done" : "Edit"}
@@ -294,6 +388,7 @@ export default function PackingListScreen() {
                 <AccountButton color={PARCHMENT} />
               </View>
             </View>
+
             <Text
               className="text-sm"
               style={{ fontFamily: "SourceSans3_400Regular", color: PARCHMENT }}
@@ -306,21 +401,33 @@ export default function PackingListScreen() {
               <View className="flex-row justify-between mb-1">
                 <Text
                   className="text-xs"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    color: PARCHMENT,
+                  }}
                 >
                   {packedItems} of {totalItems} packed
                 </Text>
                 <Text
                   className="text-xs"
-                  style={{ fontFamily: "SourceSans3_400Regular", color: PARCHMENT }}
+                  style={{
+                    fontFamily: "SourceSans3_400Regular",
+                    color: PARCHMENT,
+                  }}
                 >
                   {Math.round(progress)}%
                 </Text>
               </View>
-              <View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(229, 220, 192, 0.3)" }}>
+              <View
+                className="h-2 rounded-full overflow-hidden"
+                style={{ backgroundColor: "rgba(229, 220, 192, 0.3)" }}
+              >
                 <View
                   className="h-full rounded-full"
-                  style={{ width: `${progress}%`, backgroundColor: GRANITE_GOLD }}
+                  style={{
+                    width: `${progress}%`,
+                    backgroundColor: GRANITE_GOLD,
+                  }}
                 />
               </View>
             </View>
@@ -329,10 +436,8 @@ export default function PackingListScreen() {
       </View>
 
       <SafeAreaView className="flex-1 bg-parchment" edges={["bottom"]}>
-
-      {/* Controls */}
-      <View className="px-5 py-3 flex-row items-center justify-between border-b border-parchmentDark">
-        <View className="flex-row gap-2">
+        {/* Controls */}
+        <View className="px-5 py-3 flex-row items-center justify-between border-b border-stone-200">
           <Pressable
             onPress={() => setShowAddItem(true)}
             className="bg-forest rounded-xl px-4 py-2 flex-row items-center active:opacity-90"
@@ -345,438 +450,530 @@ export default function PackingListScreen() {
               Add Item
             </Text>
           </Pressable>
-        </View>
 
-        <Pressable
-          onPress={() => setFilterPacked(!filterPacked)}
-          className="border border-parchmentDark rounded-xl px-3 py-2 active:opacity-70"
-        >
-          <Text
-            className="text-xs"
-            style={{
-              fontFamily: "SourceSans3_600SemiBold",
-              color: filterPacked ? GRANITE_GOLD : DEEP_FOREST,
-            }}
-          >
-            {filterPacked ? "All" : "Unpacked"}
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Packing List */}
-      {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={DEEP_FOREST} />
-        </View>
-      ) : error ? (
-        <View className="flex-1 items-center justify-center px-5">
-          <Ionicons name="alert-circle-outline" size={64} color="#dc2626" />
-          <Text
-            className="mt-4 mb-2 text-center text-lg"
-            style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-          >
-            Connection Error
-          </Text>
-          <Text
-            className="text-center mb-6"
-            style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
-          >
-            {error}
-          </Text>
           <Pressable
-            onPress={loadPackingList}
-            className="bg-forest rounded-xl px-6 py-3 active:opacity-90"
+            onPress={() => setFilterUnpackedOnly((v) => !v)}
+            className="border border-stone-300 rounded-xl px-3 py-2 active:opacity-70"
           >
             <Text
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+              className="text-xs"
+              style={{
+                fontFamily: "SourceSans3_600SemiBold",
+                color: filterUnpackedOnly ? GRANITE_GOLD : DEEP_FOREST,
+              }}
             >
-              Retry
+              {filterUnpackedOnly ? "All" : "Unpacked"}
             </Text>
           </Pressable>
         </View>
-      ) : (
-        <ScrollView className="flex-1 px-5">
-          {categories.length === 0 ? (
-            <View className="flex-1 items-center justify-center py-12">
-              <Ionicons name="bag-outline" size={48} color={EARTH_GREEN} />
+
+        {/* Packing List */}
+        {loading ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator size="large" color={DEEP_FOREST} />
+          </View>
+        ) : error ? (
+          <View className="flex-1 items-center justify-center px-5">
+            <Ionicons name="alert-circle-outline" size={64} color="#dc2626" />
+            <Text
+              className="mt-4 mb-2 text-center text-lg"
+              style={{
+                fontFamily: "SourceSans3_600SemiBold",
+                color: DEEP_FOREST,
+              }}
+            >
+              Connection Error
+            </Text>
+            <Text
+              className="text-center mb-6"
+              style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
+            >
+              {error}
+            </Text>
+            <Pressable
+              onPress={loadPackingList}
+              className="bg-forest rounded-xl px-6 py-3 active:opacity-90"
+            >
               <Text
-                className="mt-3 mb-1 text-center"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+                style={{
+                  fontFamily: "SourceSans3_600SemiBold",
+                  color: PARCHMENT,
+                }}
               >
-                No items yet
+                Retry
               </Text>
-              <Text
-                className="text-center"
-                style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
-              >
-                Add items to start packing
-              </Text>
-            </View>
-          ) : (
-            categories.map((category) => {
-              const items = itemsByCategory[category] || [];
-              const visibleItems = filterPacked
-                ? items.filter((i) => !i.isPacked)
-                : items;
+            </Pressable>
+          </View>
+        ) : (
+          <ScrollView
+            className="flex-1 px-5"
+            contentContainerStyle={{ paddingBottom: 28 }}
+          >
+            {categories.length === 0 ? (
+              <View className="flex-1 items-center justify-center py-12">
+                <Ionicons name="bag-outline" size={48} color={EARTH_GREEN} />
+                <Text
+                  className="mt-3 mb-1 text-center"
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    color: DEEP_FOREST,
+                  }}
+                >
+                  No items yet
+                </Text>
+                <Text
+                  className="text-center"
+                  style={{
+                    fontFamily: "SourceSans3_400Regular",
+                    color: EARTH_GREEN,
+                  }}
+                >
+                  Add items to start packing
+                </Text>
+              </View>
+            ) : (
+              categories.map((category) => {
+                const items = itemsByCategory[category] || [];
+                const visibleItems = filterUnpackedOnly
+                  ? items.filter((i) => !i.isPacked)
+                  : items;
 
-              if (visibleItems.length === 0 && filterPacked) return null;
+                if (visibleItems.length === 0 && filterUnpackedOnly) return null;
 
-              const isExpanded = expandedCategories.has(category);
-              const categoryPacked = items.filter((i) => i.isPacked).length;
+                const isExpanded = expandedCategories.has(category);
+                const categoryPacked = items.filter((i) => i.isPacked).length;
 
-              return (
-                <View key={category} className="mt-4">
-                  {/* Category Header */}
-                  <Pressable
-                    onPress={() => toggleCategory(category)}
-                    className="flex-row items-center justify-between py-2 active:opacity-70"
-                  >
-                    <View className="flex-row items-center flex-1">
-                      <Ionicons
-                        name={isExpanded ? "chevron-down" : "chevron-forward"}
-                        size={20}
-                        color={DEEP_FOREST}
-                      />
-                      <Text
-                        className="ml-2 text-base font-bold"
-                        style={{
-                          fontFamily: "JosefinSlab_700Bold",
-                          color: DEEP_FOREST,
-                        }}
-                      >
-                        {category}
-                      </Text>
-                      <Text
-                        className="ml-2 text-sm"
-                        style={{
-                          fontFamily: "SourceSans3_400Regular",
-                          color: EARTH_GREEN,
-                        }}
-                      >
-                        ({categoryPacked}/{items.length})
-                      </Text>
-                    </View>
-                    {editMode && (
-                      <Pressable
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          setNewItemCategory(category);
-                          setShowAddItem(true);
-                        }}
-                        className="ml-2 bg-forest rounded-full p-1 active:opacity-90"
-                      >
-                        <Ionicons name="add" size={16} color={PARCHMENT} />
-                      </Pressable>
-                    )}
-                  </Pressable>
+                return (
+                  <View key={category} className="mt-4">
+                    {/* Category Header */}
+                    <Pressable
+                      onPress={() => toggleCategory(category)}
+                      className="flex-row items-center justify-between py-2 active:opacity-70"
+                    >
+                      <View className="flex-row items-center flex-1">
+                        <Ionicons
+                          name={isExpanded ? "chevron-down" : "chevron-forward"}
+                          size={20}
+                          color={DEEP_FOREST}
+                        />
+                        <Text
+                          className="ml-2 text-base font-bold"
+                          style={{
+                            fontFamily: "JosefinSlab_700Bold",
+                            color: DEEP_FOREST,
+                          }}
+                        >
+                          {category}
+                        </Text>
+                        <Text
+                          className="ml-2 text-sm"
+                          style={{
+                            fontFamily: "SourceSans3_400Regular",
+                            color: EARTH_GREEN,
+                          }}
+                        >
+                          ({categoryPacked}/{items.length})
+                        </Text>
+                      </View>
 
-                  {/* Items */}
-                  {isExpanded &&
-                    visibleItems.map((item) => (
-                      <Pressable
-                        key={item.id}
-                        onPress={() => handleTogglePacked(item)}
-                        className="flex-row items-center py-3 border-b border-parchmentDark active:opacity-70"
-                      >
-                        {/* Checkbox */}
-                        <View className="mr-3">
-                          <View
-                            className={`w-6 h-6 rounded border-2 ${
-                              item.isPacked
-                                ? "bg-forest border-forest"
-                                : "bg-transparent border-parchmentDark"
-                            } items-center justify-center`}
-                          >
-                            {item.isPacked && (
-                              <Ionicons name="checkmark" size={16} color={PARCHMENT} />
-                            )}
+                      {editMode && (
+                        <Pressable
+                          onPress={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await Haptics.impactAsync(
+                                Haptics.ImpactFeedbackStyle.Light
+                              );
+                            } catch {
+                              // ignore
+                            }
+                            setNewItemCategory(category);
+                            setShowAddItem(true);
+                          }}
+                          className="ml-2 bg-forest rounded-full p-1 active:opacity-90"
+                        >
+                          <Ionicons name="add" size={16} color={PARCHMENT} />
+                        </Pressable>
+                      )}
+                    </Pressable>
+
+                    {/* Items */}
+                    {isExpanded &&
+                      visibleItems.map((item) => (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => handleTogglePacked(item)}
+                          className="flex-row items-center py-3 border-b border-stone-200 active:opacity-70"
+                        >
+                          {/* Checkbox */}
+                          <View className="mr-3">
+                            <View
+                              className={`w-6 h-6 rounded border-2 ${
+                                item.isPacked
+                                  ? "bg-forest border-forest"
+                                  : "bg-transparent border-stone-300"
+                              } items-center justify-center`}
+                            >
+                              {item.isPacked && (
+                                <Ionicons
+                                  name="checkmark"
+                                  size={16}
+                                  color={PARCHMENT}
+                                />
+                              )}
+                            </View>
                           </View>
-                        </View>
 
-                        {/* Item Info */}
-                        <View className="flex-1">
-                          <Text
-                            className={item.isPacked ? "line-through" : ""}
-                            style={{
-                              fontFamily: "SourceSans3_400Regular",
-                              color: item.isPacked ? EARTH_GREEN : DEEP_FOREST,
-                            }}
-                          >
-                            {item.label}
-                            {item.quantity > 1 && ` (${item.quantity})`}
-                          </Text>
-                          {item.notes && (
+                          {/* Item Info */}
+                          <View className="flex-1">
                             <Text
-                              className="text-xs mt-1"
+                              className={item.isPacked ? "line-through" : ""}
                               style={{
                                 fontFamily: "SourceSans3_400Regular",
-                                color: EARTH_GREEN,
+                                color: item.isPacked
+                                  ? EARTH_GREEN
+                                  : DEEP_FOREST,
                               }}
                             >
-                              {item.notes}
+                              {item.label}
+                              {item.quantity > 1 ? ` (${item.quantity})` : ""}
                             </Text>
-                          )}
-                        </View>
+                            {item.notes ? (
+                              <Text
+                                className="text-xs mt-1"
+                                style={{
+                                  fontFamily: "SourceSans3_400Regular",
+                                  color: EARTH_GREEN,
+                                }}
+                              >
+                                {item.notes}
+                              </Text>
+                            ) : null}
+                          </View>
 
-                        {/* Delete/Remove */}
-                        {editMode ? (
-                          <Pressable
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              handleDeleteItem(item);
-                            }}
-                            className="ml-2 px-3 py-1 rounded-lg active:opacity-70"
-                            style={{ backgroundColor: "#fee2e2" }}
-                          >
-                            <Text
-                              className="text-sm"
-                              style={{
-                                fontFamily: "SourceSans3_600SemiBold",
-                                color: "#dc2626"
-                              }}
-                            >
-                              Remove
-                            </Text>
-                          </Pressable>
-                        ) : (
-                          !item.isAutoGenerated && (
+                          {/* Remove */}
+                          {editMode ? (
                             <Pressable
                               onPress={(e) => {
                                 e.stopPropagation();
                                 handleDeleteItem(item);
                               }}
-                              className="ml-2 p-2 active:opacity-70"
+                              className="ml-2 px-3 py-1 rounded-lg active:opacity-70"
+                              style={{ backgroundColor: "#fee2e2" }}
                             >
-                              <Ionicons name="trash-outline" size={18} color="#dc2626" />
+                              <Text
+                                className="text-sm"
+                                style={{
+                                  fontFamily: "SourceSans3_600SemiBold",
+                                  color: "#dc2626",
+                                }}
+                              >
+                                Remove
+                              </Text>
                             </Pressable>
-                          )
-                        )}
-                      </Pressable>
-                    ))}
-                </View>
-              );
-            })
-          )}
-        </ScrollView>
-      )}
+                          ) : (
+                            !item.isAutoGenerated && (
+                              <Pressable
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteItem(item);
+                                }}
+                                className="ml-2 p-2 active:opacity-70"
+                              >
+                                <Ionicons
+                                  name="trash-outline"
+                                  size={18}
+                                  color="#dc2626"
+                                />
+                              </Pressable>
+                            )
+                          )}
+                        </Pressable>
+                      ))}
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+        )}
 
-      {/* Add Item Modal */}
-      <Modal
-        visible={showAddItem}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setShowAddItem(false);
-          setShowNewCategoryInput(false);
-          setNewCategoryName("");
-        }}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1"
+        {/* Add Item Modal */}
+        <Modal
+          visible={showAddItem}
+          transparent
+          animationType="fade"
+          onRequestClose={closeAddModalAndReset}
         >
-          <Pressable
-            className="flex-1 bg-black/50 justify-end"
-            onPress={() => {
-              setShowAddItem(false);
-              setShowNewCategoryInput(false);
-              setNewCategoryName("");
-            }}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            className="flex-1"
           >
             <Pressable
-              className="bg-parchment rounded-t-2xl p-6"
-              onPress={(e) => e.stopPropagation()}
+              className="flex-1 bg-black/50 justify-end"
+              onPress={closeAddModalAndReset}
             >
-              <Text
-                className="text-xl font-bold mb-4"
-                style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+              <Pressable
+                className="bg-parchment rounded-t-2xl p-6"
+                onPress={(e) => e.stopPropagation()}
               >
-                Add Item
-              </Text>
-
-              <View className="flex-row items-center justify-between mb-2">
                 <Text
-                  className="text-sm"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+                  className="text-xl font-bold mb-4"
+                  style={{
+                    fontFamily: "JosefinSlab_700Bold",
+                    color: DEEP_FOREST,
+                  }}
                 >
-                  Category
+                  Add Item
                 </Text>
-                <Pressable
-                  onPress={() => setShowNewCategoryInput(!showNewCategoryInput)}
-                  className="flex-row items-center gap-1 px-2 py-1 rounded-lg active:opacity-70"
-                  style={{ backgroundColor: showNewCategoryInput ? "#f0f9f4" : "transparent" }}
-                >
-                  <Ionicons name="add-circle-outline" size={16} color={EARTH_GREEN} />
-                  <Text
-                    className="text-xs"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", color: EARTH_GREEN }}
-                  >
-                    New Category
-                  </Text>
-                </Pressable>
-              </View>
 
-              {showNewCategoryInput ? (
-                <View className="mb-4">
-                  <TextInput
-                    value={newCategoryName}
-                    onChangeText={setNewCategoryName}
-                    placeholder="Enter new category name"
-                    className="bg-white border border-parchmentDark rounded-xl px-4 py-3 mb-2"
-                    style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST }}
-                    placeholderTextColor={EARTH_GREEN}
-                    autoFocus
-                  />
-                  <View className="flex-row gap-2">
-                    <Pressable
-                      onPress={() => {
-                        setShowNewCategoryInput(false);
-                        setNewCategoryName("");
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text
+                    className="text-sm"
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      color: DEEP_FOREST,
+                    }}
+                  >
+                    Category
+                  </Text>
+
+                  <Pressable
+                    onPress={() => setShowNewCategoryInput((v) => !v)}
+                    className="flex-row items-center px-2 py-1 rounded-lg active:opacity-70"
+                    style={{
+                      backgroundColor: showNewCategoryInput
+                        ? "#f0f9f4"
+                        : "transparent",
+                      gap: 6,
+                    }}
+                  >
+                    <Ionicons
+                      name="add-circle-outline"
+                      size={16}
+                      color={EARTH_GREEN}
+                    />
+                    <Text
+                      className="text-xs"
+                      style={{
+                        fontFamily: "SourceSans3_600SemiBold",
+                        color: EARTH_GREEN,
                       }}
-                      className="flex-1 border border-parchmentDark rounded-lg py-2 active:opacity-70"
                     >
-                      <Text
-                        className="text-center text-xs"
-                        style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                      >
-                        Cancel
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => {
-                        if (newCategoryName.trim()) {
-                          setNewItemCategory(newCategoryName.trim());
+                      New Category
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {showNewCategoryInput ? (
+                  <View className="mb-4">
+                    <TextInput
+                      value={newCategoryName}
+                      onChangeText={setNewCategoryName}
+                      placeholder="Enter new category name"
+                      className="bg-white border border-stone-300 rounded-xl px-4 py-3 mb-2"
+                      style={{
+                        fontFamily: "SourceSans3_400Regular",
+                        color: DEEP_FOREST,
+                      }}
+                      placeholderTextColor="#6b7280"
+                      autoFocus
+                    />
+
+                    <View className="flex-row" style={{ gap: 8 }}>
+                      <Pressable
+                        onPress={() => {
                           setShowNewCategoryInput(false);
                           setNewCategoryName("");
-                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        }
-                      }}
-                      className="flex-1 bg-forest rounded-lg py-2 active:opacity-90"
-                    >
-                      <Text
-                        className="text-center text-xs"
-                        style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
-                      >
-                        Create Category
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                <View className="mb-4">
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    className="flex-row gap-2"
-                  >
-                    {DEFAULT_CATEGORIES.map((cat) => (
-                      <Pressable
-                        key={cat}
-                        onPress={() => setNewItemCategory(cat)}
-                        className={`px-3 py-2 rounded-xl border ${
-                          newItemCategory === cat
-                            ? "bg-forest border-forest"
-                            : "bg-white border-parchmentDark"
-                        }`}
+                        }}
+                        className="flex-1 border border-stone-300 rounded-lg py-2 active:opacity-70"
                       >
                         <Text
-                          className="text-xs"
+                          className="text-center text-xs"
                           style={{
                             fontFamily: "SourceSans3_600SemiBold",
-                            color: newItemCategory === cat ? PARCHMENT : DEEP_FOREST,
+                            color: DEEP_FOREST,
                           }}
                         >
-                          {cat}
+                          Cancel
                         </Text>
                       </Pressable>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
 
-              <Text
-                className="text-sm mb-2"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-              >
-                Item Name
-              </Text>
-              <TextInput
-                value={newItemLabel}
-                onChangeText={setNewItemLabel}
-                placeholder="Enter item name"
-                className="bg-white border border-parchmentDark rounded-xl px-4 py-3 mb-4"
-                style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST }}
-                placeholderTextColor={EARTH_GREEN}
-              />
+                      <Pressable
+                        onPress={async () => {
+                          const name = newCategoryName.trim();
+                          if (!name) return;
 
-              <Text
-                className="text-sm mb-2"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-              >
-                Quantity
-              </Text>
-              <TextInput
-                value={newItemQuantity}
-                onChangeText={setNewItemQuantity}
-                placeholder="1"
-                keyboardType="number-pad"
-                className="bg-white border border-parchmentDark rounded-xl px-4 py-3 mb-4"
-                style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST }}
-                placeholderTextColor={EARTH_GREEN}
-              />
+                          setNewItemCategory(name);
+                          setShowNewCategoryInput(false);
+                          setNewCategoryName("");
 
-              <Text
-                className="text-sm mb-2"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-              >
-                Notes (optional)
-              </Text>
-              <TextInput
-                value={newItemNotes}
-                onChangeText={setNewItemNotes}
-                placeholder="Add notes"
-                multiline
-                numberOfLines={2}
-                className="bg-white border border-parchmentDark rounded-xl px-4 py-3 mb-6"
-                style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST }}
-                placeholderTextColor={EARTH_GREEN}
-              />
+                          // Make it visible immediately
+                          setExpandedCategories((prev) => {
+                            const next = new Set(prev);
+                            next.add(name);
+                            return next;
+                          });
 
-              <View className="flex-row gap-3">
-                <Pressable
-                  onPress={() => {
-                    setShowAddItem(false);
-                    setShowNewCategoryInput(false);
-                    setNewCategoryName("");
+                          try {
+                            await Haptics.notificationAsync(
+                              Haptics.NotificationFeedbackType.Success
+                            );
+                          } catch {
+                            // ignore
+                          }
+                        }}
+                        className="flex-1 bg-forest rounded-lg py-2 active:opacity-90"
+                      >
+                        <Text
+                          className="text-center text-xs"
+                          style={{
+                            fontFamily: "SourceSans3_600SemiBold",
+                            color: PARCHMENT,
+                          }}
+                        >
+                          Create Category
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <View className="mb-4">
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 8 }}
+                    >
+                      {allCategories.map((cat) => (
+                        <Pressable
+                          key={cat}
+                          onPress={() => setNewItemCategory(cat)}
+                          className={`px-3 py-2 rounded-xl border ${
+                            newItemCategory === cat
+                              ? "bg-forest border-forest"
+                              : "bg-white border-stone-300"
+                          }`}
+                        >
+                          <Text
+                            className="text-xs"
+                            style={{
+                              fontFamily: "SourceSans3_600SemiBold",
+                              color:
+                                newItemCategory === cat
+                                  ? PARCHMENT
+                                  : DEEP_FOREST,
+                            }}
+                          >
+                            {cat}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                <Text
+                  className="text-sm mb-2"
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    color: DEEP_FOREST,
                   }}
-                  className="flex-1 border border-parchmentDark rounded-xl py-3 active:opacity-70"
                 >
-                  <Text
-                    className="text-center"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                  >
-                    Cancel
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleAddItem}
-                  className="flex-1 bg-forest rounded-xl py-3 active:opacity-90"
+                  Item Name
+                </Text>
+                <TextInput
+                  value={newItemLabel}
+                  onChangeText={setNewItemLabel}
+                  placeholder="Enter item name"
+                  className="bg-white border border-stone-300 rounded-xl px-4 py-3 mb-4"
+                  style={{
+                    fontFamily: "SourceSans3_400Regular",
+                    color: DEEP_FOREST,
+                  }}
+                  placeholderTextColor="#6b7280"
+                />
+
+                <Text
+                  className="text-sm mb-2"
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    color: DEEP_FOREST,
+                  }}
                 >
-                  <Text
-                    className="text-center"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                  Quantity
+                </Text>
+                <TextInput
+                  value={newItemQuantity}
+                  onChangeText={setNewItemQuantity}
+                  placeholder="1"
+                  keyboardType="number-pad"
+                  className="bg-white border border-stone-300 rounded-xl px-4 py-3 mb-4"
+                  style={{
+                    fontFamily: "SourceSans3_400Regular",
+                    color: DEEP_FOREST,
+                  }}
+                  placeholderTextColor="#6b7280"
+                />
+
+                <Text
+                  className="text-sm mb-2"
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    color: DEEP_FOREST,
+                  }}
+                >
+                  Notes (optional)
+                </Text>
+                <TextInput
+                  value={newItemNotes}
+                  onChangeText={setNewItemNotes}
+                  placeholder="Add notes"
+                  multiline
+                  numberOfLines={2}
+                  className="bg-white border border-stone-300 rounded-xl px-4 py-3 mb-6"
+                  style={{
+                    fontFamily: "SourceSans3_400Regular",
+                    color: DEEP_FOREST,
+                  }}
+                  placeholderTextColor="#6b7280"
+                />
+
+                <View className="flex-row" style={{ gap: 12 }}>
+                  <Pressable
+                    onPress={closeAddModalAndReset}
+                    className="flex-1 border border-stone-300 rounded-xl py-3 active:opacity-70"
                   >
-                    Add
-                  </Text>
-                </Pressable>
-              </View>
+                    <Text
+                      className="text-center"
+                      style={{
+                        fontFamily: "SourceSans3_600SemiBold",
+                        color: DEEP_FOREST,
+                      }}
+                    >
+                      Cancel
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handleAddItem}
+                    className="flex-1 bg-forest rounded-xl py-3 active:opacity-90"
+                    style={{ opacity: newItemLabel.trim() ? 1 : 0.6 }}
+                    disabled={!newItemLabel.trim()}
+                  >
+                    <Text
+                      className="text-center"
+                      style={{
+                        fontFamily: "SourceSans3_600SemiBold",
+                        color: PARCHMENT,
+                      }}
+                    >
+                      Add
+                    </Text>
+                  </Pressable>
+                </View>
+              </Pressable>
             </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
-
-
+          </KeyboardAvoidingView>
+        </Modal>
       </SafeAreaView>
     </>
   );

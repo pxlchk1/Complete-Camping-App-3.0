@@ -54,7 +54,10 @@ function formatShare(trip: Trip) {
   return `${trip.name}${loc}\n${trip.startDate} → ${trip.endDate}`;
 }
 
-export default function MyTripsScreen() {
+  console.log("[PLAN_TRACE] Enter MyTripsScreen");
+  React.useEffect(() => {
+    console.log("[PLAN_TRACE] MyTripsScreen useEffect");
+  }, []);
   const nav = useNavigation<MyTripsScreenNavigationProp>();
   const allTrips = useTrips();
   const currentUser = useAuthStore((s) => s.user);

@@ -109,22 +109,25 @@ export default function PhotosListScreen() {
     navigation.navigate("UploadPhoto");
   };
 
-  const renderPhoto = ({ item }: { item: Story }) => (
+  const renderPhotoItem = ({ item }: { item: any }) => (
     <Pressable
       onPress={() => handlePhotoPress(item.id)}
-      className="rounded-xl mb-4 overflow-hidden active:opacity-90"
-      style={{
-        width: ITEM_WIDTH,
-        backgroundColor: CARD_BACKGROUND_LIGHT,
-        borderWidth: 1,
-        borderColor: BORDER_SOFT,
-      }}
+      className="mb-4 mx-2 rounded-xl overflow-hidden border"
+      style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT, width: ITEM_WIDTH, aspectRatio: 4 / 3 }}
     >
-      <Image
-        source={{ uri: item.thumbnailUrl || item.imageUrl }}
-        style={{ width: "100%", height: ITEM_WIDTH, backgroundColor: "#e5e7eb" }}
-        resizeMode="cover"
-      />
+      {item.imageUrl ? (
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={{ width: "100%", height: "100%" }}
+          resizeMode="cover"
+          onError={() => console.log("Image unavailable:", item.imageUrl)}
+        />
+      ) : (
+        <View className="flex-1 items-center justify-center bg-gray-100">
+          <Ionicons name="image" size={32} color={TEXT_MUTED} />
+          <Text style={{ color: TEXT_MUTED, fontFamily: "SourceSans3_400Regular" }}>Image unavailable</Text>
+        </View>
+      )}
       <View className="p-3">
         <Text
           numberOfLines={2}
@@ -135,15 +138,15 @@ export default function PhotosListScreen() {
         </Text>
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center">
-            <Ionicons name="heart" size={14} color="#dc2626" />
+            <Ionicons name="person" size={14} color={TEXT_MUTED} />
             <Text className="ml-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED, fontSize: 12 }}>
-              {item.likeCount}
+              {item.displayName || "Anonymous"}
             </Text>
           </View>
           <View className="flex-row items-center">
             <Ionicons name="chatbubble-outline" size={14} color={TEXT_MUTED} />
             <Text className="ml-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED, fontSize: 12 }}>
-              {item.commentCount}
+              {item.commentCount || 0}
             </Text>
           </View>
         </View>
@@ -169,7 +172,7 @@ export default function PhotosListScreen() {
     return (
       <View className="flex-1 bg-parchment">
         <CommunitySectionHeader
-          title="Camp Photos"
+          title="Community Photos"
           onAddPress={handleUploadPhoto}
         />
         <View className="flex-1 items-center justify-center px-5">
@@ -314,22 +317,17 @@ export default function PhotosListScreen() {
         </View>
       </Modal>
 
-      {/* Content removed - coming soon message */}
-      <View className="flex-1 items-center justify-center px-5">
-        <Ionicons name="images-outline" size={64} color={GRANITE_GOLD} />
-        <Text
-          className="mt-4 text-xl text-center"
-          style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
-        >
-          Photo sharing coming soon
-        </Text>
-        <Text
-          className="mt-2 text-center"
-          style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-        >
-          We're building an amazing photo sharing experience for the camping community!
-        </Text>
-      </View>
+      {/* Photos Feed */}
+      <FlatList
+        data={photos}
+        renderItem={renderPhotoItem}
+        keyExtractor={item => item.id}
+        numColumns={2}
+        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loadingMore ? <ActivityIndicator size="small" color={DEEP_FOREST} /> : null}
+      />
     </View>
   );
 }
