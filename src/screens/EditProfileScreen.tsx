@@ -78,7 +78,6 @@ export default function EditProfileScreen() {
   const [uploadingCover, setUploadingCover] = useState(false);
 
   // Form state
-<<<<<<< HEAD
   const [about, setAbout] = useState(currentUser?.about || "");
   const [favoriteCampingStyle, setFavoriteCampingStyle] = useState<CampingStyle | undefined>(
     currentUser?.favoriteCampingStyle as CampingStyle | undefined
@@ -88,13 +87,6 @@ export default function EditProfileScreen() {
   );
   const [photoURL, setPhotoURL] = useState(currentUser?.photoURL);
   const [coverPhotoURL, setCoverPhotoURL] = useState(currentUser?.coverPhotoURL);
-=======
-  const [about, setAbout] = useState("");
-  const [favoriteCampingStyle, setFavoriteCampingStyle] = useState<CampingStyle | undefined>();
-  const [favoriteGear, setFavoriteGear] = useState<GearCategory[]>([]);
-  const [photoURL, setPhotoURL] = useState<string | null>(null);
-  const [coverPhotoURL, setCoverPhotoURL] = useState<string | null>(null);
->>>>>>> backup-dec-10-2025-gear-fixes
 
   // Modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -136,10 +128,8 @@ export default function EditProfileScreen() {
     try {
       setSaving(true);
 
-<<<<<<< HEAD
       // Update profiles collection with correct field names
       const profileRef = doc(db, "profiles", user.uid);
-      
       // Filter out empty gear entries
       const gearToSave = Object.entries(favoriteGear).reduce((acc, [key, value]) => {
         if (value && value.trim()) {
@@ -147,23 +137,14 @@ export default function EditProfileScreen() {
         }
         return acc;
       }, {} as Record<string, string>);
-      
       await updateDoc(profileRef, {
-=======
-      // Update profiles collection (used by MyCampsiteScreen)
-      const profileRef = doc(db, "profiles", user.uid);
-      await updateDoc(profileRef, {
-        bio: about.trim() || null,
-        campingStyle: favoriteCampingStyle || null,
+        about: about.trim() || null,
+        favoriteCampingStyle: favoriteCampingStyle || null,
+        favoriteGear: Object.keys(gearToSave).length > 0 ? gearToSave : null,
         avatarUrl: photoURL || null,
         backgroundUrl: coverPhotoURL || null,
         updatedAt: serverTimestamp(),
       });
-
-      // Also update users collection for backwards compatibility
-      const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, {
->>>>>>> backup-dec-10-2025-gear-fixes
         about: about.trim() || null,
         favoriteCampingStyle: favoriteCampingStyle || null,
         favoriteGear: Object.keys(gearToSave).length > 0 ? gearToSave : null,
@@ -266,98 +247,9 @@ export default function EditProfileScreen() {
     }
   };
 
-<<<<<<< HEAD
-=======
-  const toggleGear = (gear: GearCategory) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (favoriteGear.includes(gear)) {
-      setFavoriteGear(favoriteGear.filter((g) => g !== gear));
-    } else {
-      setFavoriteGear([...favoriteGear, gear]);
-    }
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView className="flex-1" style={{ backgroundColor: PARCHMENT }} edges={["top"]}>
-        <ModalHeader title="Edit Profile" showTitle />
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={EARTH_GREEN} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
->>>>>>> backup-dec-10-2025-gear-fixes
+  // ...existing code...
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: DEEP_FOREST }} edges={["top"]}>
-      <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader
-          title="Edit Profile"
-          showTitle
-          rightAction={{
-            icon: "checkmark",
-            onPress: handleSave,
-          }}
-        />
-
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1"
-        >
-          <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-          <View className="px-5 pt-5 pb-8">
-            {/* Photos Section */}
-            <Text
-              className="text-lg mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
-            >
-              Photos
-            </Text>
-
-            <View
-              className="mb-6 p-4 rounded-xl border"
-              style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
-            >
-              {/* Profile Photo */}
-              <View className="mb-4">
-                <Text
-                  className="mb-2"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
-                >
-                  Profile Photo
-                </Text>
-                <View className="flex-row items-center">
-                  <View
-                    className="w-20 h-20 rounded-full mr-4"
-                    style={{ backgroundColor: BORDER_SOFT }}
-                  >
-                    {photoURL ? (
-                      <Image
-                        source={{ uri: photoURL }}
-                        className="w-full h-full rounded-full"
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View className="w-full h-full rounded-full items-center justify-center">
-                        <Ionicons name="person" size={32} color={TEXT_MUTED} />
-                      </View>
-                    )}
-                    {uploadingPhoto && (
-                      <View className="absolute inset-0 rounded-full items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-                        <ActivityIndicator color={PARCHMENT} />
-                      </View>
-                    )}
-                  </View>
-                  <Pressable
-                    onPress={handleSelectPhoto}
-                    className="px-4 py-2 rounded-xl active:opacity-70"
-                    style={{ backgroundColor: DEEP_FOREST }}
-                    disabled={uploadingPhoto}
-                  >
-                    <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
-                      {photoURL ? "Change" : "Upload"}
-                    </Text>
+    // ...existing code...
                   </Pressable>
                 </View>
               </View>

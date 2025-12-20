@@ -246,56 +246,28 @@ export default function MyCampsiteScreen({ navigation }: any) {
 
   if (!profile) {
     // Defensive fallback
-    return null;
-  }
-
-  return (
-<<<<<<< HEAD
-    <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-        {/* Cover */}
-        <ImageBackground
-          source={profile.backgroundUrl ? { uri: profile.backgroundUrl } : HERO_IMAGES[0]}
-          style={{ width: SCREEN_WIDTH, height: COVER_HEIGHT }}
-        >
-          {/* Top Bar */}
-=======
-    <View className="flex-1" style={{ backgroundColor: DEEP_FOREST }}>
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Hero Header with Background Image */}
-        <View style={{ height: COVER_HEIGHT + insets.top }}>
-          <ImageBackground
-            source={profile.backgroundUrl ? { uri: profile.backgroundUrl } : HERO_IMAGES.WELCOME}
-            style={{ width: "100%", height: "100%" }}
-            resizeMode="cover"
-          >
-            {/* Gradient Overlay */}
-            <View
-              // Defensive fallback
-              return null;
-            }
-
-            return (
-              <View className="flex-1" style={{ backgroundColor: DEEP_FOREST }}>
-                <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-                  {/* Hero Header with Background Image */}
-                  <View style={{ height: COVER_HEIGHT + insets.top }}>
-                    <ImageBackground
-                      source={profile.backgroundUrl ? { uri: profile.backgroundUrl } : HERO_IMAGES.WELCOME}
-                      style={{ width: "100%", height: "100%" }}
-                      resizeMode="cover"
-                    >
-                      {/* Gradient Overlay */}
-                      <View
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          backgroundColor: "rgba(0, 0, 0, 0.3)",
-                        }}
-                      />
+    return (
+      <View className="flex-1" style={{ backgroundColor: DEEP_FOREST }}>
+        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+          {/* Hero Header with Background Image */}
+          <View style={{ height: COVER_HEIGHT + insets.top }}>
+            <ImageBackground
+              source={profile.backgroundUrl ? { uri: profile.backgroundUrl } : HERO_IMAGES.WELCOME}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="cover"
+            >
+              {/* Gradient Overlay */}
+              <View
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(0, 0, 0, 0.3)",
+                }}
+              />
+              {/* Back & Settings Buttons */}
 
                       {/* Back & Settings Buttons */}
                       <View
@@ -477,7 +449,6 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 </Text>
               </View>
             )}
->>>>>>> backup-dec-10-2025-gear-fixes
           </View>
 
           {/* Badge Row */}

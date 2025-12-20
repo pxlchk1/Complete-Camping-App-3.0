@@ -31,6 +31,23 @@ interface WeatherScreenProps {
   onTabChange?: (tab: "trips" | "parks" | "weather" | "packing" | "meals") => void;
 }
 
+type LocationLike = {
+  name: string;
+  latitude: number;
+  longitude: number;
+  state?: string;
+};
+
+type TripLike = {
+  id: string;
+  name: string;
+  startDate: string | number | Date;
+  endDate: string | number | Date;
+};
+
+const hasState = (loc: LocationLike): loc is LocationLike & { state: string } =>
+  typeof loc.state === "string" && loc.state.trim().length > 0;
+
 const getWeatherIcon = (condition: string): keyof typeof Ionicons.glyphMap => {
   const lower = (condition || "").toLowerCase();
   if (lower.includes("rain")) return "rainy";
@@ -53,7 +70,7 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
   const insets = useSafeAreaInsets();
 
   const { selectedLocation, userLocation, setUserLocation, setSelectedLocation } = useLocationStore();
-  const trips = useTrips();
+  const trips = useTrips() as unknown as TripLike[];
 
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,17 +83,24 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
   // Prevent out-of-order weather responses from overwriting newer results.
   const requestIdRef = useRef(0);
 
+  // On unmount, bump the request id so any in-flight work becomes stale immediately.
+  useEffect(() => {
+    return () => {
+      requestIdRef.current += 1;
+    };
+  }, []);
+
   useEffect(() => {
     if (__DEV__) {
-      // Keep debug logs inside the component and behind __DEV__ so they never break bundling.
-      // (Also avoids illegal hook usage outside components.)
       // eslint-disable-next-line no-console
       console.log("[PLAN_TRACE] WeatherScreen mounted");
     }
   }, []);
 
-  const location = useMemo(() => {
-    if (selectedLocation) return selectedLocation;
+  const location: LocationLike | null = useMemo(() => {
+    // If your store already types selectedLocation as LocationLike, this cast is unnecessary.
+    if (selectedLocation) return selectedLocation as unknown as LocationLike;
+
     if (userLocation) {
       return {
         name: "Your Location",
@@ -84,6 +108,7 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
         longitude: userLocation.longitude,
       };
     }
+
     return null;
   }, [selectedLocation, userLocation]);
 
@@ -178,7 +203,7 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
         name: query,
         latitude: result.latitude,
         longitude: result.longitude,
-      });
+      } as unknown as any);
 
       setSearchQuery("");
 
@@ -244,7 +269,7 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
               >
                 {location.name}
               </Text>
-              {"state" in location && (location as any).state ? (
+              {hasState(location) ? (
                 <Text
                   style={{
                     fontFamily: fonts.bodyRegular,
@@ -252,7 +277,7 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
                     color: TEXT_SECONDARY,
                   }}
                 >
-                  {(location as any).state}
+                  {location.state}
                 </Text>
               ) : null}
             </View>
@@ -339,7 +364,11 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
                   onSubmitEditing={handleSearchLocation}
                 />
                 {searchQuery.length > 0 && (
-                  <Pressable onPress={() => setSearchQuery("")} accessibilityRole="button" accessibilityLabel="Clear search">
+                  <Pressable
+                    onPress={() => setSearchQuery("")}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear search"
+                  >
                     <Ionicons name="close-circle" size={18} color={EARTH_GREEN} />
                   </Pressable>
                 )}
@@ -822,11 +851,10 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
                   </Text>
                 </View>
               ) : (
-                trips.map((trip: any) => (
+                trips.map((trip) => (
                   <Pressable
                     key={trip.id}
                     onPress={() => {
-                      // Hook up your "add location to trip" action here.
                       if (__DEV__) {
                         // eslint-disable-next-line no-console
                         console.log("Add location to trip:", trip.name);
