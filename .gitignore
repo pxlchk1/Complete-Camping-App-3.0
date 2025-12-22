@@ -3,3 +3,6 @@ node_modules
 # Ignore Bun lockfiles
 bun.lock
 bun.lockb
+
+# Expo local state
+.expo/
