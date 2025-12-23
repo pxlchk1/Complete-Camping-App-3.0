@@ -2,6 +2,7 @@
   "name": "template-app-53",
   "version": "1.0.0",
   "main": "index.ts",
+  "private": true,
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -9,7 +10,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "postinstall": "patch-package && node scripts/patch-ios-podspecs.js"
+    "postinstall": "node scripts/patch-ios-podspecs.js"
   },
   "dependencies": {
     "@expo-google-fonts/josefin-slab": "^0.4.1",
@@ -95,7 +96,6 @@
     "lottie-react-native": "~7.3.1",
     "nativewind": "^4.1.23",
     "openai": "^4.89.0",
-    "patch-package": "^8.0.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "^0.81.5",
@@ -144,11 +144,6 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "typescript": "~5.9.2"
-  },
-  "private": true,
-  "patchedDependencies": {
-    "react-native@0.81.0": "patches/react-native@0.81.0.patch",
-    "expo-asset@11.1.5": "patches/expo-asset@11.1.5.patch"
   },
   "packageManager": "npm@10.9.2"
 }
