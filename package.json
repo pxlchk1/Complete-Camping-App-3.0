@@ -9,7 +9,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "postinstall": "node scripts/patch-ios-podspecs.js"
+    "postinstall": "node scripts/ensure-lightningcss-binary.js && patch-package && node scripts/patch-ios-podspecs.js"
   },
   "dependencies": {
     "@expo-google-fonts/josefin-slab": "^0.4.1",
