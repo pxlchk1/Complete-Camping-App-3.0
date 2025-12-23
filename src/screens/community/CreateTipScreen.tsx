@@ -16,22 +16,18 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Ionicons } from "@expo/vector-icons";
 import ModalHeader from "../../components/ModalHeader";
 import * as Haptics from "expo-haptics";
 import { tipsService } from "../../services/firestore/tipsService";
-import { auth } from "../../config/firebase";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
 import { requireAuth } from "../../utils/gating";
 import { RootStackNavigationProp } from "../../navigation/types";
 import {
   DEEP_FOREST,
-  EARTH_GREEN,
   PARCHMENT,
   CARD_BACKGROUND_LIGHT,
   BORDER_SOFT,
   TEXT_PRIMARY_STRONG,
-  TEXT_SECONDARY,
   TEXT_MUTED,
 } from "../../constants/colors";
 
@@ -48,7 +44,6 @@ const CATEGORIES = [
 
 export default function CreateTipScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
-  const currentUser = auth.currentUser;
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [title, setTitle] = useState("");
@@ -70,7 +65,7 @@ export default function CreateTipScreen() {
     }
     try {
       setSubmitting(true);
-      const tipId = await tipsService.createTip({
+      await tipsService.createTip({
         title: title.trim(),
         content: content.trim(),
         category,

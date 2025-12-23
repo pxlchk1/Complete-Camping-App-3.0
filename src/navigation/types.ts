@@ -89,6 +89,9 @@ export type RootStackParamList = {
   AdminContent: undefined;
   AdminBanned: undefined;
 
+  // Invitation
+  AcceptInvitation: { invitationToken: string };
+
   // Main tabs
   MainTabs: { screen: string; params?: any };
 };

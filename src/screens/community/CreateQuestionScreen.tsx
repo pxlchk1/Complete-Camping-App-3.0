@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import { View, Text, Pressable, TextInput, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import ModalHeader from "../../components/ModalHeader";
@@ -15,7 +15,6 @@ import { RootStackNavigationProp } from "../../navigation/types";
 import {
   DEEP_FOREST,
   PARCHMENT,
-  CARD_BACKGROUND_LIGHT,
   BORDER_SOFT,
   TEXT_PRIMARY_STRONG,
   TEXT_SECONDARY,
@@ -90,8 +89,6 @@ export default function CreateQuestionScreen() {
       setSubmitting(false);
     }
   };
-
-  const isValid = title.trim().length >= 10 && body.trim().length >= 20;
 
   return (
     <View className="flex-1 bg-parchment">

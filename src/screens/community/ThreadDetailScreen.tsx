@@ -16,14 +16,7 @@ import type { RootStackParamList, RootStackNavigationProp } from "../../navigati
 import { getQuestionById, getAnswers, addAnswer, type Question, type Answer } from "../../api/qa-service";
 import { useAuthStore } from "../../state/authStore";
 import { useToast } from "../../components/ToastManager";
-import { Timestamp } from "firebase/firestore";
-import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER } from "../../constants/colors";
-
-// Helper to convert Timestamp to string
-const toDateString = (date: Timestamp | string): string => {
-  if (typeof date === "string") return date;
-  return date.toDate().toISOString();
-};
+import { DEEP_FOREST, PARCHMENT } from "../../constants/colors";
 
 export default function ThreadDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, "ThreadDetail">>();
@@ -77,20 +70,6 @@ export default function ThreadDetailScreen() {
     } finally {
       setPosting(false);
     }
-  };
-
-  const formatTimeAgo = (dateString: string) => {
-    const now = new Date();
-    const date = new Date(dateString);
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-
-    if (diffInHours < 1) return "Just now";
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-    const diffInWeeks = Math.floor(diffInDays / 7);
-    if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
-    return date.toLocaleDateString();
   };
 
   if (loading) {

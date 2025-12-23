@@ -16,7 +16,6 @@ import type { RootStackNavigationProp } from "../../navigation/types";
 import { createQuestion } from "../../api/qa-service";
 import { useAuthStore } from "../../state/authStore";
 import { useToast } from "../../components/ToastManager";
-import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER } from "../../constants/colors";
 
 export default function AskQuestionModal() {
   const navigation = useNavigation<RootStackNavigationProp>();
@@ -41,7 +40,7 @@ export default function AskQuestionModal() {
     try {
       setSubmitting(true);
 
-      const questionId = await createQuestion(
+      await createQuestion(
         question.trim(),
         details.trim(),
         user.id
@@ -51,7 +50,7 @@ export default function AskQuestionModal() {
 
       // Close the modal
       navigation.goBack();
-    } catch (error) {
+    } catch {
       showError("Failed to post question. Please try again.");
     } finally {
       setSubmitting(false);

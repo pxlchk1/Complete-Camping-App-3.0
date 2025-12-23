@@ -1,553 +1,421 @@
-/**
- * Create Gear Review Screen
- * Form for creating a new gear review with star rating
- */
-
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ScrollView,
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
-  Alert,
-  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import ModalHeader from "../../components/ModalHeader";
+import { useNavigation } from "@react-navigation/native";
+import type { RootStackNavigationProp } from "../../navigation/types";
 import * as Haptics from "expo-haptics";
+
+import { auth } from "../../config/firebase";
 import { createGearReview } from "../../services/gearReviewsService";
-import { useCurrentUser } from "../../state/userStore";
-import { RootStackNavigationProp } from "../../navigation/types";
-import { GearCategory } from "../../types/community";
 import {
-  DEEP_FOREST,
-  EARTH_GREEN,
-  PARCHMENT,
-  CARD_BACKGROUND_LIGHT,
   BORDER_SOFT,
+  CARD_BACKGROUND_LIGHT,
+  DEEP_FOREST,
+  PARCHMENT,
+  TEXT_MUTED,
   TEXT_PRIMARY_STRONG,
   TEXT_SECONDARY,
-  TEXT_MUTED,
 } from "../../constants/colors";
+import type { GearCategory } from "../../types/community";
 
-const CATEGORIES: { value: GearCategory; label: string }[] = [
-  { value: "shelter", label: "Shelter" },
-  { value: "sleep", label: "Sleep System" },
-  { value: "kitchen", label: "Kitchen" },
-  { value: "clothing", label: "Clothing" },
-  { value: "lighting", label: "Lighting" },
-  { value: "pack", label: "Backpacks" },
-  { value: "water", label: "Water" },
-  { value: "safety", label: "Safety" },
-  { value: "misc", label: "Other" },
+const CATEGORIES: readonly {
+  key: GearCategory;
+  label: string;
+  description: string;
+}[] = [
+  { key: "tent", label: "Tent", description: "Shelters & accessories" },
+  { key: "sleep", label: "Sleep System", description: "Bags, pads, quilts" },
+  { key: "kitchen", label: "Cooking", description: "Stoves, cookware, food" },
+  { key: "pack", label: "Backpack", description: "Packs & storage" },
+  { key: "lighting", label: "Lighting", description: "Headlamps, lanterns" },
+  { key: "clothing", label: "Clothing", description: "Layers, footwear" },
+  { key: "misc", label: "Other", description: "Anything else" },
 ];
+
+const clampInt = (n: number, min: number, max: number) => Math.max(min, Math.min(max, Math.trunc(n)));
 
 export default function CreateGearReviewScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
-  const currentUser = useCurrentUser();
 
+  const [category, setCategory] = useState<GearCategory>("tent");
   const [gearName, setGearName] = useState("");
   const [brand, setBrand] = useState("");
-  const [category, setCategory] = useState<GearCategory>("misc");
-  const [rating, setRating] = useState(0);
+  const [rating, setRating] = useState<number>(0);
   const [summary, setSummary] = useState("");
   const [body, setBody] = useState("");
-  const [pros, setPros] = useState("");
-  const [cons, setCons] = useState("");
-  const [tagInput, setTagInput] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
-  const handleAddTag = () => {
-    const tag = tagInput.trim().toLowerCase();
-    if (tag && !tags.includes(tag) && tags.length < 5) {
-      setTags([...tags, tag]);
-      setTagInput("");
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  };
+  const isFormValid = useMemo(
+    () => Boolean(gearName.trim() && rating > 0 && summary.trim() && body.trim()),
+    [gearName, rating, summary, body]
+  );
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter((t) => t !== tagToRemove));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
+  const canSubmit = useMemo(() => {
+    return !submitting && isFormValid;
+  }, [submitting, isFormValid]);
 
-  const handleSubmit = async () => {
-    if (!currentUser) {
-      Alert.alert("Error", "Please sign in to create reviews");
+  const handleClose = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    navigation.goBack();
+  }, [navigation]);
+
+  const setStarRating = useCallback((value: number) => {
+    const next = clampInt(value, 0, 5);
+    setRating(next);
+    Haptics.selectionAsync().catch(() => {});
+  }, []);
+
+  const normalizeTag = (raw: string) =>
+    raw
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(/^[#]+/, "")
+      .slice(0, 24);
+
+  const handleAddTag = useCallback(() => {
+    const next = normalizeTag(tagsInput);
+    if (!next) return;
+
+    setTags((prev) => {
+      const exists = prev.some((t) => t.toLowerCase() === next.toLowerCase());
+      if (exists) return prev;
+      if (prev.length >= 8) return prev;
+      return [...prev, next];
+    });
+
+    setTagsInput("");
+    Haptics.selectionAsync().catch(() => {});
+  }, [tagsInput]);
+
+  const handleRemoveTag = useCallback((tag: string) => {
+    setTags((prev) => prev.filter((t) => t !== tag));
+    Haptics.selectionAsync().catch(() => {});
+  }, []);
+
+  const onSubmit = useCallback(async () => {
+    if (!canSubmit) return;
+
+    const user = auth.currentUser;
+    if (!user?.uid) {
+      Alert.alert("Sign in required", "Please sign in to post a gear review.");
       return;
     }
 
-    if (!gearName.trim()) {
-      Alert.alert("Missing Information", "Please enter the gear name");
-      return;
-    }
+    const trimmedGearName = gearName.trim();
+    const trimmedSummary = summary.trim();
+    const trimmedBody = body.trim();
+    const trimmedBrand = brand.trim();
 
-    if (rating === 0) {
-      Alert.alert("Missing Rating", "Please select a star rating");
-      return;
-    }
-
-    if (!summary.trim()) {
-      Alert.alert("Missing Summary", "Please enter a brief summary");
-      return;
-    }
-
-    if (!body.trim()) {
-      Alert.alert("Missing Review", "Please enter your full review");
+    if (!trimmedGearName || !trimmedSummary || !trimmedBody || rating <= 0) {
+      Alert.alert("Missing info", "Please fill out all required fields and select a rating.");
       return;
     }
 
     try {
       setSubmitting(true);
-      const reviewId = await createGearReview({
-        gearName: gearName.trim(),
-        brand: brand.trim() || undefined,
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+
+      await createGearReview({
+        authorId: user.uid,
         category,
-        rating,
-        summary: summary.trim(),
-        body: body.trim(),
-        pros: pros.trim() || undefined,
-        cons: cons.trim() || undefined,
+        gearName: trimmedGearName,
+        brand: trimmedBrand || undefined,
+        rating: clampInt(rating, 1, 5),
+        summary: trimmedSummary,
+        body: trimmedBody,
         tags,
-        authorId: currentUser.id,
       });
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      navigation.replace("GearReviewDetail", { reviewId });
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to create review");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Alert.alert("Posted!", "Your gear review has been posted.");
+      navigation.goBack();
+    } catch (e) {
+      console.error("[CreateGearReview] submit failed:", e);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Alert.alert("Couldn’t post", "Please try again in a moment.");
+    } finally {
       setSubmitting(false);
     }
-  };
-
-  const renderStarSelector = () => {
-    return (
-      <View className="flex-row items-center">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Pressable
-            key={star}
-            onPress={() => {
-              setRating(star);
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }}
-            className="mr-2 active:opacity-70"
-          >
-            <Ionicons
-              name={star <= rating ? "star" : "star-outline"}
-              size={36}
-              color="#F59E0B"
-            />
-          </Pressable>
-        ))}
-      </View>
-    );
-  };
-
-  const isFormValid = gearName.trim() && rating > 0 && summary.trim() && body.trim();
+  }, [
+    canSubmit,
+    gearName,
+    brand,
+    rating,
+    summary,
+    body,
+    tags,
+    category,
+    navigation,
+  ]);
 
   return (
-    <View className="flex-1 bg-parchment">
-      <ModalHeader
-        title="Review Gear"
-        showTitle
-        rightAction={{
-          icon: "checkmark",
-          onPress: handleSubmit
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, backgroundColor: PARCHMENT }}>
+      {/* Header */}
+      <View
+        style={{
+          paddingHorizontal: 18,
+          paddingVertical: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: BORDER_SOFT,
+          backgroundColor: PARCHMENT,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
-      />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1"
       >
-        <ScrollView className="flex-1 p-5">
-          {/* Gear Name */}
-          <View className="mb-4">
-            <Text
-              className="mb-2"
-              style={{
-                fontFamily: "SourceSans3_600SemiBold",
-                color: TEXT_PRIMARY_STRONG,
-              }}
-            >
-              Gear Name *
-            </Text>
-            <TextInput
-              value={gearName}
-              onChangeText={setGearName}
-              placeholder="e.g., MSR Hubba Hubba NX 2"
-              placeholderTextColor={TEXT_MUTED}
-              className="px-4 py-3 rounded-xl border"
-              style={{
-                backgroundColor: CARD_BACKGROUND_LIGHT,
-                borderColor: BORDER_SOFT,
-                fontFamily: "SourceSans3_400Regular",
-                color: TEXT_PRIMARY_STRONG,
-                fontSize: 16,
-              }}
-              maxLength={100}
-            />
-          </View>
+        <Pressable onPress={handleClose} hitSlop={10} style={{ padding: 6 }}>
+          <Ionicons name="close" size={26} color={DEEP_FOREST} />
+        </Pressable>
 
-          {/* Brand */}
-          <View className="mb-4">
-            <Text
-              className="mb-2"
-              style={{
-                fontFamily: "SourceSans3_600SemiBold",
-                color: TEXT_PRIMARY_STRONG,
-              }}
-            >
-              Brand (Optional)
-            </Text>
-            <TextInput
-              value={brand}
-              onChangeText={setBrand}
-              placeholder="e.g., MSR"
-              placeholderTextColor={TEXT_MUTED}
-              className="px-4 py-3 rounded-xl border"
-              style={{
-                backgroundColor: CARD_BACKGROUND_LIGHT,
-                borderColor: BORDER_SOFT,
-                fontFamily: "SourceSans3_400Regular",
-                color: TEXT_PRIMARY_STRONG,
-                fontSize: 16,
-              }}
-              maxLength={50}
-            />
-          </View>
+        <Text style={{ fontFamily: "JosefinSlab_700Bold", fontSize: 18, color: TEXT_PRIMARY_STRONG }}>
+          New Gear Review
+        </Text>
 
-          {/* Category */}
-          <View className="mb-4">
-            <Text
-              className="mb-2"
-              style={{
-                fontFamily: "SourceSans3_600SemiBold",
-                color: TEXT_PRIMARY_STRONG,
-              }}
-            >
-              Category *
-            </Text>
-            <Pressable
-              onPress={() => {
-                setShowCategoryPicker(!showCategoryPicker);
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }}
-              className="px-4 py-3 rounded-xl border flex-row items-center justify-between"
-              style={{
-                backgroundColor: CARD_BACKGROUND_LIGHT,
-                borderColor: BORDER_SOFT,
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: "SourceSans3_400Regular",
-                  color: TEXT_PRIMARY_STRONG,
-                  fontSize: 16,
-                  textTransform: "capitalize",
-                }}
-              >
-                {CATEGORIES.find((c) => c.value === category)?.label || "Select Category"}
-              </Text>
-              <Ionicons
-                name={showCategoryPicker ? "chevron-up" : "chevron-down"}
-                size={20}
-                color={TEXT_MUTED}
-              />
-            </Pressable>
+        <Pressable
+          onPress={onSubmit}
+          disabled={!canSubmit}
+          style={{
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: 999,
+            backgroundColor: canSubmit ? DEEP_FOREST : BORDER_SOFT,
+            opacity: submitting ? 0.85 : 1,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          {submitting ? <ActivityIndicator color={PARCHMENT} /> : null}
+          <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
+            {submitting ? "Posting…" : "Post"}
+          </Text>
+        </Pressable>
+      </View>
 
-            {showCategoryPicker && (
-              <View className="mt-2 rounded-xl border overflow-hidden" style={{ borderColor: BORDER_SOFT }}>
-                {CATEGORIES.map((cat) => (
-                  <Pressable
-                    key={cat.value}
-                    onPress={() => {
-                      setCategory(cat.value);
-                      setShowCategoryPicker(false);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                    className="px-4 py-3 border-b active:opacity-70"
-                    style={{
-                      backgroundColor: category === cat.value ? "#E0F2F1" : CARD_BACKGROUND_LIGHT,
-                      borderColor: BORDER_SOFT,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: "SourceSans3_600SemiBold",
-                        color: category === cat.value ? "#00695C" : TEXT_PRIMARY_STRONG,
-                      }}
-                    >
-                      {cat.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* Rating */}
-          <View className="mb-4">
-            <Text
-              className="mb-2"
-              style={{
-                fontFamily: "SourceSans3_600SemiBold",
-                color: TEXT_PRIMARY_STRONG,
-              }}
-            >
-              Rating *
-            </Text>
-            {renderStarSelector()}
-            {rating > 0 && (
-              <Text
-                className="mt-2 text-sm"
-                style={{
-                  fontFamily: "SourceSans3_400Regular",
-                  color: TEXT_SECONDARY,
-                }}
-              >
-                {rating} out of 5 stars
-              </Text>
-            )}
-          </View>
-
-          {/* Summary */}
-          <View className="mb-4">
-            <Text
-              className="mb-2"
-              style={{
-                fontFamily: "SourceSans3_600SemiBold",
-                color: TEXT_PRIMARY_STRONG,
-              }}
-            >
-              Quick Summary *
-            </Text>
-            <TextInput
-              value={summary}
-              onChangeText={setSummary}
-              placeholder="Brief one-liner about this gear"
-              placeholderTextColor={TEXT_MUTED}
-              className="px-4 py-3 rounded-xl border"
-              style={{
-                backgroundColor: CARD_BACKGROUND_LIGHT,
-                borderColor: BORDER_SOFT,
-                fontFamily: "SourceSans3_400Regular",
-                color: TEXT_PRIMARY_STRONG,
-                fontSize: 16,
-              }}
-              maxLength={150}
-            />
-            <Text
-              className="text-xs mt-1"
-              style={{
-                fontFamily: "SourceSans3_400Regular",
-                color: TEXT_MUTED,
-              }}
-            >
-              {summary.length}/150
-            </Text>
-          </View>
-
-          {/* Full Review */}
-          <View className="mb-4">
-            <Text
-              className="mb-2"
-              style={{
-                fontFamily: "SourceSans3_600SemiBold",
-                color: TEXT_PRIMARY_STRONG,
-              }}
-            >
-              Full Review *
-            </Text>
-            <TextInput
-              value={body}
-              onChangeText={setBody}
-              placeholder="Share your detailed experience with this gear..."
-              placeholderTextColor={TEXT_MUTED}
-              multiline
-              numberOfLines={8}
-              textAlignVertical="top"
-              className="px-4 py-3 rounded-xl border"
-              style={{
-                backgroundColor: CARD_BACKGROUND_LIGHT,
-                borderColor: BORDER_SOFT,
-                fontFamily: "SourceSans3_400Regular",
-                color: TEXT_PRIMARY_STRONG,
-                fontSize: 16,
-                minHeight: 150,
-              }}
-              maxLength={1000}
-            />
-            <Text
-              className="text-xs mt-1"
-              style={{
-                fontFamily: "SourceSans3_400Regular",
-                color: TEXT_MUTED,
-              }}
-            >
-              {body.length}/1000
-            </Text>
-          </View>
-
-          {/* Pros */}
-          <View className="mb-4">
-            <Text
-              className="mb-2"
-              style={{
-                fontFamily: "SourceSans3_600SemiBold",
-                color: TEXT_PRIMARY_STRONG,
-              }}
-            >
-              Pros (Optional)
-            </Text>
-            <TextInput
-              value={pros}
-              onChangeText={setPros}
-              placeholder="What did you like about this gear?"
-              placeholderTextColor={TEXT_MUTED}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-              className="px-4 py-3 rounded-xl border"
-              style={{
-                backgroundColor: CARD_BACKGROUND_LIGHT,
-                borderColor: BORDER_SOFT,
-                fontFamily: "SourceSans3_400Regular",
-                color: TEXT_PRIMARY_STRONG,
-                fontSize: 16,
-                minHeight: 80,
-              }}
-              maxLength={300}
-            />
-          </View>
-
-          {/* Cons */}
-          <View className="mb-4">
-            <Text
-              className="mb-2"
-              style={{
-                fontFamily: "SourceSans3_600SemiBold",
-                color: TEXT_PRIMARY_STRONG,
-              }}
-            >
-              Cons (Optional)
-            </Text>
-            <TextInput
-              value={cons}
-              onChangeText={setCons}
-              placeholder="Any downsides or issues?"
-              placeholderTextColor={TEXT_MUTED}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-              className="px-4 py-3 rounded-xl border"
-              style={{
-                backgroundColor: CARD_BACKGROUND_LIGHT,
-                borderColor: BORDER_SOFT,
-                fontFamily: "SourceSans3_400Regular",
-                color: TEXT_PRIMARY_STRONG,
-                fontSize: 16,
-                minHeight: 80,
-              }}
-              maxLength={300}
-            />
-          </View>
-
-          {/* Tags */}
-          <View className="mb-4">
-            <Text
-              className="mb-2"
-              style={{
-                fontFamily: "SourceSans3_600SemiBold",
-                color: TEXT_PRIMARY_STRONG,
-              }}
-            >
-              Tags (Optional)
-            </Text>
-            <View className="flex-row items-center mb-2">
-              <TextInput
-                value={tagInput}
-                onChangeText={setTagInput}
-                placeholder="Add a tag"
-                placeholderTextColor={TEXT_MUTED}
-                className="flex-1 px-4 py-3 rounded-xl border mr-2"
-                style={{
-                  backgroundColor: CARD_BACKGROUND_LIGHT,
-                  borderColor: BORDER_SOFT,
-                  fontFamily: "SourceSans3_400Regular",
-                  color: TEXT_PRIMARY_STRONG,
-                }}
-                onSubmitEditing={handleAddTag}
-                returnKeyType="done"
-                maxLength={20}
-              />
+      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        {/* Category */}
+        <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG, marginBottom: 10 }}>
+          Category
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 12 }}>
+          {CATEGORIES.map((c) => {
+            const active = c.key === category;
+            return (
               <Pressable
-                onPress={handleAddTag}
-                disabled={!tagInput.trim() || tags.length >= 5}
-                className="px-4 py-3 rounded-xl active:opacity-70"
+                key={c.key}
+                onPress={() => {
+                  setCategory(c.key);
+                  Haptics.selectionAsync().catch(() => {});
+                }}
                 style={{
-                  backgroundColor:
-                    tagInput.trim() && tags.length < 5 ? DEEP_FOREST : BORDER_SOFT,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  borderRadius: 14,
+                  backgroundColor: active ? DEEP_FOREST : CARD_BACKGROUND_LIGHT,
+                  borderWidth: 1,
+                  borderColor: active ? DEEP_FOREST : BORDER_SOFT,
+                  minWidth: 150,
                 }}
               >
-                <Ionicons name="add" size={20} color={PARCHMENT} />
+                <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: active ? PARCHMENT : TEXT_PRIMARY_STRONG }}>
+                  {c.label}
+                </Text>
+                <Text style={{ marginTop: 2, fontFamily: "SourceSans3_400Regular", color: active ? PARCHMENT : TEXT_SECONDARY, fontSize: 12 }}>
+                  {c.description}
+                </Text>
               </Pressable>
-            </View>
+            );
+          })}
+        </ScrollView>
 
-            {tags.length > 0 && (
-              <View className="flex-row flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <View
-                    key={tag}
-                    className="flex-row items-center px-3 py-2 rounded-full bg-amber-100"
-                  >
-                    <Text
-                      className="mr-2"
-                      style={{
-                        fontFamily: "SourceSans3_600SemiBold",
-                        color: "#92400e",
-                      }}
-                    >
-                      {tag}
-                    </Text>
-                    <Pressable onPress={() => handleRemoveTag(tag)}>
-                      <Ionicons name="close-circle" size={18} color="#92400e" />
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
+        {/* Gear name */}
+        <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG, marginTop: 8, marginBottom: 8 }}>
+          Gear name <Text style={{ color: "#dc2626" }}>*</Text>
+        </Text>
+        <TextInput
+          value={gearName}
+          onChangeText={setGearName}
+          placeholder="e.g., Big Agnes Copper Spur HV UL2"
+          placeholderTextColor={TEXT_MUTED}
+          style={{
+            backgroundColor: CARD_BACKGROUND_LIGHT,
+            borderWidth: 1,
+            borderColor: BORDER_SOFT,
+            borderRadius: 14,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            fontFamily: "SourceSans3_400Regular",
+            color: TEXT_PRIMARY_STRONG,
+          }}
+          maxLength={80}
+          returnKeyType="next"
+        />
 
-          {/* Submit Button */}
-          <Pressable
-            onPress={handleSubmit}
-            disabled={submitting || !isFormValid}
-            className="py-4 rounded-xl items-center mt-6 active:opacity-90"
+        {/* Brand */}
+        <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG, marginTop: 14, marginBottom: 8 }}>
+          Brand (optional)
+        </Text>
+        <TextInput
+          value={brand}
+          onChangeText={setBrand}
+          placeholder="e.g., Big Agnes"
+          placeholderTextColor={TEXT_MUTED}
+          style={{
+            backgroundColor: CARD_BACKGROUND_LIGHT,
+            borderWidth: 1,
+            borderColor: BORDER_SOFT,
+            borderRadius: 14,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            fontFamily: "SourceSans3_400Regular",
+            color: TEXT_PRIMARY_STRONG,
+          }}
+          maxLength={40}
+          returnKeyType="next"
+        />
+
+        {/* Rating */}
+        <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG, marginTop: 14, marginBottom: 8 }}>
+          Rating <Text style={{ color: "#dc2626" }}>*</Text>
+        </Text>
+        <View style={{ flexDirection: "row", gap: 10, alignItems: "center", marginBottom: 6 }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Pressable key={i} onPress={() => setStarRating(i)} hitSlop={8}>
+              <Ionicons name={rating >= i ? "star" : "star-outline"} size={30} color={rating >= i ? "#d4a017" : TEXT_MUTED} />
+            </Pressable>
+          ))}
+          <Text style={{ marginLeft: 6, fontFamily: "SourceSans3_600SemiBold", color: TEXT_SECONDARY }}>
+            {rating > 0 ? `${rating}/5` : "Select"}
+          </Text>
+        </View>
+
+        {/* Summary */}
+        <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG, marginTop: 10, marginBottom: 8 }}>
+          Summary <Text style={{ color: "#dc2626" }}>*</Text>
+        </Text>
+        <TextInput
+          value={summary}
+          onChangeText={setSummary}
+          placeholder="One sentence takeaway"
+          placeholderTextColor={TEXT_MUTED}
+          style={{
+            backgroundColor: CARD_BACKGROUND_LIGHT,
+            borderWidth: 1,
+            borderColor: BORDER_SOFT,
+            borderRadius: 14,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            fontFamily: "SourceSans3_400Regular",
+            color: TEXT_PRIMARY_STRONG,
+          }}
+          maxLength={140}
+        />
+
+        {/* Body */}
+        <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG, marginTop: 14, marginBottom: 8 }}>
+          Full review <Text style={{ color: "#dc2626" }}>*</Text>
+        </Text>
+        <TextInput
+          value={body}
+          onChangeText={setBody}
+          placeholder="What did you like/dislike? Conditions used? Who is it for?"
+          placeholderTextColor={TEXT_MUTED}
+          multiline
+          textAlignVertical="top"
+          style={{
+            backgroundColor: CARD_BACKGROUND_LIGHT,
+            borderWidth: 1,
+            borderColor: BORDER_SOFT,
+            borderRadius: 14,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            fontFamily: "SourceSans3_400Regular",
+            color: TEXT_PRIMARY_STRONG,
+            minHeight: 140,
+          }}
+          maxLength={2000}
+        />
+
+        {/* Tags */}
+        <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG, marginTop: 14, marginBottom: 8 }}>
+          Tags (optional)
+        </Text>
+
+        <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+          <TextInput
+            value={tagsInput}
+            onChangeText={setTagsInput}
+            placeholder="Add a tag (e.g., ultralight)"
+            placeholderTextColor={TEXT_MUTED}
             style={{
-              backgroundColor: isFormValid ? DEEP_FOREST : BORDER_SOFT,
+              flex: 1,
+              backgroundColor: CARD_BACKGROUND_LIGHT,
+              borderWidth: 1,
+              borderColor: BORDER_SOFT,
+              borderRadius: 14,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              fontFamily: "SourceSans3_400Regular",
+              color: TEXT_PRIMARY_STRONG,
+            }}
+            maxLength={24}
+            onSubmitEditing={handleAddTag}
+            returnKeyType="done"
+          />
+          <Pressable
+            onPress={handleAddTag}
+            style={{
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              borderRadius: 14,
+              backgroundColor: DEEP_FOREST,
             }}
           >
-            {submitting ? (
-              <ActivityIndicator size="small" color={PARCHMENT} />
-            ) : (
-              <Text
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>Add</Text>
+          </Pressable>
+        </View>
+
+        {tags.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+            {tags.map((t) => (
+              <Pressable
+                key={t}
+                onPress={() => handleRemoveTag(t)}
                 style={{
-                  fontFamily: "SourceSans3_600SemiBold",
-                  color: PARCHMENT,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                  borderRadius: 999,
+                  backgroundColor: CARD_BACKGROUND_LIGHT,
+                  borderWidth: 1,
+                  borderColor: BORDER_SOFT,
                 }}
               >
-                Publish Review
-              </Text>
-            )}
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+                <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>#{t}</Text>
+                <Ionicons name="close-circle" size={18} color={TEXT_MUTED} />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        <Text style={{ marginTop: 10, fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED, fontSize: 12 }}>
+          Tip: tap a tag to remove it.
+        </Text>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

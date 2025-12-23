@@ -28,7 +28,6 @@ import { requireAuth } from "../../utils/gating";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
 import {
   DEEP_FOREST,
-  EARTH_GREEN,
   PARCHMENT,
   CARD_BACKGROUND_LIGHT,
   BORDER_SOFT,

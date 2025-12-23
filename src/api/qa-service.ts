@@ -23,6 +23,9 @@ export interface Question {
   details: string;
   userId: string;
   createdAt: Timestamp | any;
+  score?: number;
+  upvotes?: number;
+  userVote?: "up" | "down" | null;
 }
 
 // Answer interface matching EXACT Firestore structure

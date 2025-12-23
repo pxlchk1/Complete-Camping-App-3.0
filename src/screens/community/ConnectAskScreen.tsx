@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, Pressable, TextInput, FlatList, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -10,14 +10,7 @@ import { requireAuth } from "../../utils/gating";
 import { useToast } from "../../components/ToastManager";
 import VoteButtons from "../../components/VoteButtons";
 import * as Haptics from "expo-haptics";
-import { Timestamp } from "firebase/firestore";
-import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY, TEXT_MUTED } from "../../constants/colors";
-
-// Helper to convert Timestamp to string
-const toDateString = (date: Timestamp | string): string => {
-  if (typeof date === "string") return date;
-  return date.toDate().toISOString();
-};
+import { DEEP_FOREST, PARCHMENT, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY, TEXT_MUTED } from "../../constants/colors";
 
 export default function ConnectAskScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
@@ -29,7 +22,7 @@ export default function ConnectAskScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!user) {
       return;
     }
@@ -43,20 +36,20 @@ export default function ConnectAskScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, showError]);
 
   useEffect(() => {
     if (user) {
       load();
     }
-  }, [user]);
+  }, [user, load]);
 
   useFocusEffect(
     React.useCallback(() => {
       if (user) {
         load();
       }
-    }, [user])
+    }, [user, load])
   );
 
   const filteredQuestions = (searchQuery.trim()
@@ -73,20 +66,6 @@ export default function ConnectAskScreen() {
     }
     // TODO: Implement question voting in Firebase
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
-
-  const formatTimeAgo = (dateString: string) => {
-    const now = new Date();
-    const date = new Date(dateString);
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-
-    if (diffInHours < 1) return "Just now";
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-    const diffInWeeks = Math.floor(diffInDays / 7);
-    if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
-    return date.toLocaleDateString();
   };
 
   return (

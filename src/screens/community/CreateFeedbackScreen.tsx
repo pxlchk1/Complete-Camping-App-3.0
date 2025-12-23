@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import { View, Text, Pressable, TextInput, ActivityIndicator, Platform } from "react-native";
+import { View, Text, Pressable, TextInput } from "react-native";
 import KeyboardAwareScrollView from "../../components/KeyboardAwareScrollView";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,16 +15,13 @@ import { useCurrentUser } from "../../state/userStore";
 import { RootStackNavigationProp } from "../../navigation/types";
 import { FeedbackCategory } from "../../types/community";
 import {
-  DEEP_FOREST,
-  PARCHMENT,
-  CARD_BACKGROUND_LIGHT,
   BORDER_SOFT,
   TEXT_PRIMARY_STRONG,
   TEXT_SECONDARY,
   TEXT_MUTED,
 } from "../../constants/colors";
 
-const CATEGORIES: Array<{ id: FeedbackCategory; label: string; description: string; icon: string }> = [
+const CATEGORIES: { id: FeedbackCategory; label: string; description: string; icon: string }[] = [
   {
     id: "feature",
     label: "Feature Request",
@@ -99,8 +96,6 @@ export default function CreateFeedbackScreen() {
       setSubmitting(false);
     }
   };
-
-  const isValid = title.trim().length >= 10 && body.trim().length >= 20;
 
   return (
     <View className="flex-1 bg-parchment">

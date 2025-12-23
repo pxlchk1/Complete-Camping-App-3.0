@@ -54,10 +54,7 @@ function formatShare(trip: Trip) {
   return `${trip.name}${loc}\n${trip.startDate} → ${trip.endDate}`;
 }
 
-  console.log("[PLAN_TRACE] Enter MyTripsScreen");
-  React.useEffect(() => {
-    console.log("[PLAN_TRACE] MyTripsScreen useEffect");
-  }, []);
+export default function MyTripsScreen() {
   const nav = useNavigation<MyTripsScreenNavigationProp>();
   const allTrips = useTrips();
   const currentUser = useAuthStore((s) => s.user);
@@ -239,7 +236,7 @@ function formatShare(trip: Trip) {
               trip={tripInProgress}
               onResume={() => onResume(tripInProgress)}
               onMenu={() => onMenu(tripInProgress)}
-              onPackingPress={() => setActivePlanTab("pack")}
+              onPackingPress={() => setActivePlanTab("packing")}
               onWeatherPress={() => setActivePlanTab("weather")}
               onMealsPress={() => setActivePlanTab("meals")}
             />
@@ -326,7 +323,7 @@ function formatShare(trip: Trip) {
               trip={item}
               onResume={() => onResume(item)}
               onMenu={() => onMenu(item)}
-              onPackingPress={() => setActivePlanTab("pack")}
+              onPackingPress={() => setActivePlanTab("packing")}
               onWeatherPress={() => setActivePlanTab("weather")}
               onMealsPress={() => setActivePlanTab("meals")}
             />
@@ -365,7 +362,7 @@ function formatShare(trip: Trip) {
           visible={showAccountModal}
           onCreateAccount={() => {
             setShowAccountModal(false);
-            nav.navigate("AuthLanding");
+            nav.navigate("Auth");
           }}
           onMaybeLater={() => setShowAccountModal(false)}
         />

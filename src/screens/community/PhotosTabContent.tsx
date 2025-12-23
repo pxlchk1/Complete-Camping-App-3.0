@@ -7,7 +7,7 @@ import { useAuthStore } from "../../state/authStore";
 import { useToast } from "../../components/ToastManager";
 import * as ImagePicker from "expo-image-picker";
 import type { ImageCategory } from "../../types/community";
-import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY, TEXT_MUTED } from "../../constants/colors";
+import { DEEP_FOREST, PARCHMENT, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY, TEXT_MUTED } from "../../constants/colors";
 
 // Component to handle individual photo rendering with error state
 function PhotoCard({ item, onVote }: { item: any; onVote: (id: string, type: "up" | "down") => void }) {

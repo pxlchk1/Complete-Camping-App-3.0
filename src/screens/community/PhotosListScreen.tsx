@@ -16,7 +16,6 @@ import CommunitySectionHeader from "../../components/CommunitySectionHeader";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
-  GRANITE_GOLD,
   PARCHMENT,
   CARD_BACKGROUND_LIGHT,
   BORDER_SOFT,
