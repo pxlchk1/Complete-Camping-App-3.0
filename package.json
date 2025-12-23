@@ -9,7 +9,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "postinstall": "node scripts/ensure-lightningcss-binary.js && patch-package && node scripts/patch-ios-podspecs.js"
+    "postinstall": "patch-package && node scripts/patch-ios-podspecs.js"
   },
   "dependencies": {
     "@expo-google-fonts/josefin-slab": "^0.4.1",
@@ -126,6 +126,12 @@
     "uuid": "^11.1.0",
     "zeego": "3.0.6",
     "zustand": "^5.0.4"
+  },
+  "optionalDependencies": {
+    "lightningcss-darwin-arm64": "1.27.0",
+    "lightningcss-darwin-x64": "1.27.0",
+    "lightningcss-linux-arm64-gnu": "1.27.0",
+    "lightningcss-linux-x64-gnu": "1.27.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
