@@ -1,6 +1,8 @@
 /**
  * Tip Detail Screen
  * Shows full tip with comments
+ * 
+ * Connect-only actions: Edit/Delete for owners, Remove for admins/mods
  */
 
 import React, { useState, useEffect } from "react";
@@ -12,18 +14,25 @@ import {
   TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Alert,
 } from "react-native";
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { getTipById, upvoteTip, getTipComments, addTipComment } from "../../services/tipsService";
+import { getTipById, getTipComments, addTipComment } from "../../services/tipsService";
 import { reportContent } from "../../services/contentReportsService";
+import { requireEmailVerification } from "../../utils/authHelper";
 import { Tip, TipComment } from "../../types/community";
 import { useCurrentUser } from "../../state/userStore";
 import { RootStackParamList, RootStackNavigationProp } from "../../navigation/types";
 import ModalHeader from "../../components/ModalHeader";
+import VotePill from "../../components/VotePill";
+import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { ContentActionsAffordance } from "../../components/contentActions";
+import { isAdmin, isModerator, canModerateContent } from "../../services/userService";
+import { User } from "../../types/user";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -47,6 +56,26 @@ export default function TipDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showAccountRequired, setShowAccountRequired] = useState(false);
+
+  // Permission checks for content actions
+  const canModerate = currentUser ? canModerateContent(currentUser as User) : false;
+  const roleLabel = currentUser 
+    ? isAdmin(currentUser as User) 
+      ? "ADMIN" as const
+      : isModerator(currentUser as User) 
+        ? "MOD" as const 
+        : null 
+    : null;
+
+  // Content action handlers
+  const handleDeleteTip = async () => {
+    navigation.goBack();
+  };
+
+  const handleRemoveTip = async () => {
+    navigation.goBack();
+  };
 
   const loadTip = async () => {
     try {
@@ -75,34 +104,6 @@ export default function TipDetailScreen() {
     loadTip();
   }, [tipId]);
 
-  const handleUpvote = async () => {
-    if (!currentUser) {
-      Alert.alert(
-        "You need to be logged in to do that",
-        "",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Log In / Sign Up",
-            onPress: () => navigation.navigate("Account"),
-          },
-        ]
-      );
-      return;
-    }
-
-    try {
-      await upvoteTip(tipId);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      // Optimistic update
-      if (tip) {
-        setTip({ ...tip, upvoteCount: tip.upvoteCount + 1 });
-      }
-    } catch (error) {
-      Alert.alert("Error", "Failed to upvote tip");
-    }
-  };
-
   const handleAddComment = async () => {
     if (!currentUser) {
       Alert.alert(
@@ -111,13 +112,17 @@ export default function TipDetailScreen() {
         [
           { text: "Cancel", style: "cancel" },
           {
-            text: "Log In / Sign Up",
+            text: "Log in / Sign up",
             onPress: () => navigation.navigate("Account"),
           },
         ]
       );
       return;
     }
+
+    // Require email verification for posting comments
+    const isVerified = await requireEmailVerification("comment on tips");
+    if (!isVerified) return;
 
     if (!commentText.trim()) return;
 
@@ -147,7 +152,7 @@ export default function TipDetailScreen() {
         [
           { text: "Cancel", style: "cancel" },
           {
-            text: "Log In / Sign Up",
+            text: "Log in / Sign up",
             onPress: () => navigation.navigate("Account"),
           },
         ]
@@ -156,7 +161,7 @@ export default function TipDetailScreen() {
     }
 
     Alert.alert(
-      "Report Tip",
+      "Report tip",
       "Why are you reporting this tip?",
       [
         { text: "Cancel", style: "cancel" },
@@ -251,12 +256,25 @@ export default function TipDetailScreen() {
         <ScrollView className="flex-1">
           {/* Tip Content */}
           <View className="p-5">
-            <Text
-              className="text-2xl mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
-            >
-              {tip.title}
-            </Text>
+            <View className="flex-row items-start justify-between mb-3">
+              <Text
+                className="text-2xl flex-1"
+                style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
+              >
+                {tip.title}
+              </Text>
+              <ContentActionsAffordance
+                itemId={tipId}
+                itemType="tip"
+                createdByUserId={tip.authorId}
+                currentUserId={currentUser?.id}
+                canModerate={canModerate}
+                roleLabel={roleLabel}
+                onRequestDelete={handleDeleteTip}
+                onRequestRemove={handleRemoveTip}
+                layout="cardHeader"
+              />
+            </View>
 
             <Text
               className="text-base mb-4 leading-6"
@@ -284,19 +302,12 @@ export default function TipDetailScreen() {
               <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
                 by @author • {formatTimeAgo(tip.createdAt)}
               </Text>
-              <Pressable
-                onPress={handleUpvote}
-                className="flex-row items-center px-3 py-2 rounded-full bg-white border active:opacity-70"
-                style={{ borderColor: BORDER_SOFT }}
-              >
-                <Ionicons name="arrow-up" size={18} color={DEEP_FOREST} />
-                <Text
-                  className="ml-1"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                >
-                  {tip.upvoteCount}
-                </Text>
-              </Pressable>
+              <VotePill
+                collectionPath="tips"
+                itemId={tipId}
+                initialScore={tip.score || (tip.upvoteCount || 0) - (tip.downvoteCount || 0)}
+                onRequireAccount={() => setShowAccountRequired(true)}
+              />
             </View>
           </View>
 
@@ -304,7 +315,7 @@ export default function TipDetailScreen() {
           <View className="px-5 pb-5">
             <Text
               className="text-lg mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
             >
               Comments ({tip.commentCount})
             </Text>
@@ -322,12 +333,30 @@ export default function TipDetailScreen() {
                   className="p-4 mb-3 rounded-xl border"
                   style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
                 >
-                  <Text
-                    className="mb-2"
-                    style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-                  >
-                    {comment.body}
-                  </Text>
+                  <View className="flex-row items-start justify-between mb-2">
+                    <Text
+                      className="flex-1"
+                      style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                    >
+                      {comment.body}
+                    </Text>
+                    <ContentActionsAffordance
+                      itemId={comment.id}
+                      itemType="comment"
+                      createdByUserId={comment.authorId}
+                      currentUserId={currentUser?.id}
+                      canModerate={canModerate}
+                      roleLabel={roleLabel}
+                      onRequestDelete={async () => {
+                        setComments(prev => prev.filter(c => c.id !== comment.id));
+                      }}
+                      onRequestRemove={async () => {
+                        setComments(prev => prev.filter(c => c.id !== comment.id));
+                      }}
+                      layout="commentRow"
+                      iconSize={16}
+                    />
+                  </View>
                   <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
                     by @author • {formatTimeAgo(comment.createdAt)}
                   </Text>
@@ -347,6 +376,12 @@ export default function TipDetailScreen() {
               placeholderTextColor={TEXT_MUTED}
               multiline
               className="flex-1 px-4 py-3 rounded-xl border mr-2"
+              onFocus={() => {
+                if (!currentUser) {
+                  Keyboard.dismiss();
+                  setShowAccountRequired(true);
+                }
+              }}
               style={{
                 backgroundColor: CARD_BACKGROUND_LIGHT,
                 borderColor: BORDER_SOFT,
@@ -371,6 +406,15 @@ export default function TipDetailScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <AccountRequiredModal
+        visible={showAccountRequired}
+        onCreateAccount={() => {
+          setShowAccountRequired(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowAccountRequired(false)}
+      />
     </View>
   );
 }

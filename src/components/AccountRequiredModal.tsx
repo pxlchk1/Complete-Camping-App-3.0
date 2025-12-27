@@ -36,7 +36,6 @@ export default function AccountRequiredModal({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
       transparent={true}
       onRequestClose={onMaybeLater}
     >
@@ -52,22 +51,21 @@ export default function AccountRequiredModal({
           </View>
 
           {/* Title */}
-          <Text style={styles.title}>Let's get you set up</Text>
+          <Text style={styles.title}>Let's get you set up.</Text>
 
           {/* Message */}
           <Text style={styles.message}>
-            Saving your plans and gear requires a free account. It only takes a
-            moment to set one up.
+            Create a free account so we can save your activity and keep the community running smoothly. It only takes a moment.
           </Text>
 
           {/* Buttons */}
           <View style={styles.buttonContainer}>
             <Pressable style={styles.primaryButton} onPress={onCreateAccount}>
-              <Text style={styles.primaryButtonText}>Create an Account</Text>
+              <Text style={styles.primaryButtonText}>Create an account</Text>
             </Pressable>
 
             <Pressable style={styles.secondaryButton} onPress={onMaybeLater}>
-              <Text style={styles.secondaryButtonText}>Maybe Later</Text>
+              <Text style={styles.secondaryButtonText}>Maybe later</Text>
             </Pressable>
           </View>
         </View>
@@ -125,20 +123,20 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: EARTH_GREEN,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 10,
     marginBottom: 12,
     alignItems: "center",
   },
   primaryButtonText: {
     fontFamily: "SourceSans3_700Bold",
-    fontSize: 18,
+    fontSize: 15,
     color: PARCHMENT,
   },
   secondaryButton: {
     backgroundColor: CARD_BACKGROUND_LIGHT,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 10,
     alignItems: "center",
   },
   secondaryButtonText: {

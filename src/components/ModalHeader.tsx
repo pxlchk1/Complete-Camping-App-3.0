@@ -67,8 +67,8 @@ export default function ModalHeader({
         {showTitle && title && (
           <Text
             style={{
-              fontFamily: "JosefinSlab_700Bold",
-              fontSize: 18,
+              fontFamily: "Raleway_700Bold",
+              fontSize: 16,
               color: PARCHMENT,
               position: "absolute",
               left: 0,

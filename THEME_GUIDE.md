@@ -48,10 +48,10 @@ colors.cardFill      // #F7EFD8 - Card backgrounds (warmer than parchment)
 ### Font Families
 
 ```typescript
-// Display fonts (Josefin Slab) - for headers and titles
-fonts.displayBold         // JosefinSlab_700Bold - Hero titles
-fonts.displaySemibold     // JosefinSlab_600SemiBold - Section headers
-fonts.displayRegular      // JosefinSlab_600SemiBold - Card titles
+// Display fonts (Raleway) - for headers and titles
+fonts.displayBold         // Raleway_700Bold - Hero titles
+fonts.displaySemibold     // Raleway_600SemiBold - Section headers
+fonts.displayRegular      // Raleway_600SemiBold - Card titles
 
 // Body fonts (Source Sans 3) - for body text, labels, buttons
 fonts.bodyBold            // SourceSans3_700Bold
@@ -284,7 +284,7 @@ import { componentStyles, layout, textStyles } from "../theme/theme";
 ```typescript
 // ❌ DON'T DO THIS
 <View style={{ backgroundColor: "#F4EBD0", padding: 24 }}>
-  <Text style={{ fontSize: 20, fontFamily: "JosefinSlab_600SemiBold", color: "#485952" }}>
+  <Text style={{ fontSize: 20, fontFamily: "Raleway_600SemiBold", color: "#485952" }}>
     Title
   </Text>
   <Text style={{ fontSize: 16, color: "#828872" }}>

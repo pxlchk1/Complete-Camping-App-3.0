@@ -1,6 +1,6 @@
 /**
  * My Campground Screen
- * Manages user's camping contacts
+ * Manages user's camping contacts with invite functionality
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -23,6 +23,7 @@ import { getCampgroundContacts, deleteCampgroundContact } from "../services/camp
 import { CampgroundContact } from "../types/campground";
 import { RootStackNavigationProp } from "../navigation/types";
 import ModalHeader from "../components/ModalHeader";
+import InviteOptionsSheet from "../components/InviteOptionsSheet";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -42,6 +43,10 @@ export default function MyCampgroundScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Invite sheet state
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<CampgroundContact | null>(null);
 
   const loadContacts = async () => {
     const user = auth.currentUser;
@@ -115,10 +120,21 @@ export default function MyCampgroundScreen() {
     );
   };
 
+  const handleInviteContact = (contact: CampgroundContact) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedContact(contact);
+    setShowInviteSheet(true);
+  };
+
+  const handleInviteSheetClose = () => {
+    setShowInviteSheet(false);
+    setSelectedContact(null);
+  };
+
   if (loading) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="My Campground" showTitle />
+        <ModalHeader title="My campground" showTitle />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={DEEP_FOREST} />
           <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
@@ -132,7 +148,7 @@ export default function MyCampgroundScreen() {
   if (error && !auth.currentUser) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="My Campground" showTitle />
+        <ModalHeader title="My campground" showTitle />
         <View className="flex-1 items-center justify-center px-5">
           <Ionicons name="people-outline" size={64} color={EARTH_GREEN} />
           <Text
@@ -157,7 +173,7 @@ export default function MyCampgroundScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-      <ModalHeader title="My Campground" showTitle />
+      <ModalHeader title="My campground" showTitle />
 
       <ScrollView
         className="flex-1"
@@ -210,50 +226,78 @@ export default function MyCampgroundScreen() {
         ) : (
           <View className="px-5 pb-5">
             {contacts.map(contact => (
-              <Pressable
+              <View
                 key={contact.id}
-                onPress={() => handleContactPress(contact)}
-                onLongPress={() => handleDeleteContact(contact)}
-                className="mb-3 p-4 rounded-xl border active:opacity-70"
+                className="mb-3 p-4 rounded-xl border"
                 style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
               >
-                <View className="flex-row items-start justify-between">
-                  <View className="flex-1">
-                    <View className="flex-row items-center">
-                      <Text
-                        className="text-lg"
-                        style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
-                      >
-                        {contact.contactName}
-                      </Text>
+                <Pressable
+                  onPress={() => handleContactPress(contact)}
+                  onLongPress={() => handleDeleteContact(contact)}
+                  className="active:opacity-70"
+                >
+                  <View className="flex-row items-start justify-between">
+                    <View className="flex-1">
+                      <View className="flex-row items-center">
+                        <Text
+                          className="text-lg"
+                          style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                        >
+                          {contact.contactName}
+                        </Text>
+                      </View>
+
+                      {contact.contactEmail && (
+                        <Text
+                          className="mt-1"
+                          style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                        >
+                          {contact.contactEmail}
+                        </Text>
+                      )}
+
+                      {contact.contactNote && (
+                        <Text
+                          className="mt-2 text-sm"
+                          style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}
+                        >
+                          {contact.contactNote}
+                        </Text>
+                      )}
                     </View>
 
-                    {contact.contactEmail && (
-                      <Text
-                        className="mt-1"
-                        style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-                      >
-                        {contact.contactEmail}
-                      </Text>
-                    )}
-
-                    {contact.contactNote && (
-                      <Text
-                        className="mt-2 text-sm"
-                        style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}
-                      >
-                        {contact.contactNote}
-                      </Text>
-                    )}
+                    <Ionicons name="chevron-forward" size={20} color={TEXT_MUTED} />
                   </View>
-
-                  <Ionicons name="chevron-forward" size={20} color={TEXT_MUTED} />
-                </View>
-              </Pressable>
+                </Pressable>
+                
+                {/* Invite Button */}
+                <Pressable
+                  onPress={() => handleInviteContact(contact)}
+                  className="flex-row items-center justify-center mt-3 py-2 rounded-lg active:opacity-80"
+                  style={{ backgroundColor: EARTH_GREEN + "20", borderColor: EARTH_GREEN, borderWidth: 1 }}
+                >
+                  <Ionicons name="paper-plane" size={16} color={EARTH_GREEN} />
+                  <Text
+                    className="ml-2"
+                    style={{ fontFamily: "SourceSans3_600SemiBold", color: EARTH_GREEN, fontSize: 14 }}
+                  >
+                    Send Invite
+                  </Text>
+                </Pressable>
+              </View>
             ))}
           </View>
         )}
       </ScrollView>
+
+      {/* Invite Options Sheet */}
+      {selectedContact && (
+        <InviteOptionsSheet
+          visible={showInviteSheet}
+          onClose={handleInviteSheetClose}
+          contact={selectedContact}
+        />
+      )}
     </View>
   );
 }

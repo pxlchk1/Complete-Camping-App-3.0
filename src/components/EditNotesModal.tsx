@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { DEEP_FOREST, PARCHMENT } from "../constants/colors";
 
 interface EditNotesModalProps {
   visible: boolean;
@@ -18,10 +19,19 @@ export default function EditNotesModal({ visible, initialValue, onSave, onClose 
   }, [visible, initialValue]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.modal}>
-          <Text style={styles.header}>Edit Notes</Text>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
+        {/* Header - Deep Forest Green background */}
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            <Text style={styles.headerTitle}>Edit notes</Text>
+            <Pressable onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={20} color={PARCHMENT} />
+            </Pressable>
+          </View>
+        </View>
+        
+        <View style={styles.content}>
           <TextInput
             style={styles.input}
             value={notes}
@@ -56,28 +66,34 @@ export default function EditNotesModal({ visible, initialValue, onSave, onClose 
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modal: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 20,
-    width: "90%",
-    maxWidth: 400,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-  },
   header: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#3D2817",
-    marginBottom: 12,
+    paddingTop: 30,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: DEEP_FOREST,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerTitle: {
+    fontFamily: "Raleway_700Bold",
+    fontSize: 24,
+    color: PARCHMENT,
+    flex: 1,
+    marginRight: 12,
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  content: {
+    padding: 20,
   },
   input: {
     borderWidth: 1,

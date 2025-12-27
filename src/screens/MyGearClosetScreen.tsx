@@ -137,7 +137,7 @@ export default function MyGearClosetScreen() {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
         <ModalHeader
-          title="My Gear Closet"
+          title="My gear closet"
           showTitle
           rightAction={{
             icon: "add",
@@ -157,7 +157,7 @@ export default function MyGearClosetScreen() {
   if (error && !auth.currentUser) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="My Gear Closet" showTitle />
+        <ModalHeader title="My gear closet" showTitle />
         <View className="flex-1 items-center justify-center px-5">
           <Ionicons name="briefcase-outline" size={64} color={EARTH_GREEN} />
           <Text
@@ -178,7 +178,7 @@ export default function MyGearClosetScreen() {
             style={{ backgroundColor: DEEP_FOREST }}
           >
             <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
-              Log In / Create Account
+              Log in / Create account
             </Text>
           </Pressable>
         </View>
@@ -189,7 +189,7 @@ export default function MyGearClosetScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="My Gear Closet"
+        title="My gear closet"
         showTitle
         rightAction={{
           icon: "add",

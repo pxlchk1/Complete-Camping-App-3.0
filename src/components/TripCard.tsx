@@ -3,7 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Trip } from "../types/camping";
 import { format } from "date-fns";
-import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER } from "../constants/colors";
+import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, TEXT_SECONDARY, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER } from "../constants/colors";
 
 function formatDateRange(startISO: string, endISO: string) {
   const start = new Date(startISO);
@@ -74,7 +74,7 @@ export default function TripCard({ trip, onResume, onMenu, onPackingPress, onWea
     >
       <View className="flex-row items-start justify-between mb-2">
         <View className="flex-1 mr-3">
-          <Text className="text-forest text-base font-bold mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }} numberOfLines={1}>
+          <Text className="text-forest text-base font-bold mb-1" style={{ fontFamily: "Raleway_700Bold" }} numberOfLines={1}>
             {trip.name}
           </Text>
           <Text className="text-earthGreen text-sm" style={{ fontFamily: "SourceSans3_400Regular" }} numberOfLines={1}>
@@ -138,8 +138,8 @@ export default function TripCard({ trip, onResume, onMenu, onPackingPress, onWea
             onPress={() => onWeatherPress?.(trip)}
             className="px-2 py-1 rounded-full bg-sierraSky/20 border border-sierraSky flex-row items-center active:opacity-70"
           >
-            <Ionicons name="partly-sunny" size={12} color={RIVER_ROCK} />
-            <Text className="text-xs text-riverRock ml-1" style={{ fontFamily: "SourceSans3_400Regular" }}>
+            <Ionicons name="partly-sunny" size={12} color={TEXT_SECONDARY} />
+            <Text className="text-xs text-secondary ml-1" style={{ fontFamily: "SourceSans3_400Regular" }}>
               {Math.round(weatherInfo.high)}°
             </Text>
           </Pressable>

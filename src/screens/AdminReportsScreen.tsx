@@ -58,9 +58,19 @@ export default function AdminReportsScreen() {
       })) as Report[];
 
       setReports(reportsData);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading reports:", error);
-      Alert.alert("Error", "Failed to load reports");
+      // Don't show error for missing index or empty collection - just show empty state
+      const errorMessage = error?.message || "";
+      const isIndexError = errorMessage.includes("index") || errorMessage.includes("Index");
+      const isPermissionError = errorMessage.includes("permission") || errorMessage.includes("Permission");
+      
+      if (!isIndexError && !isPermissionError) {
+        // Only show alert for unexpected errors, not missing indexes or empty collections
+        Alert.alert("Error", "Failed to load reports");
+      }
+      // Set empty array so UI shows empty state instead of loading forever
+      setReports([]);
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    fontFamily: 'JosefinSlab_700Bold',
+    fontFamily: 'Raleway_700Bold',
     fontSize: 20,
     color: DEEP_FOREST,
     textAlign: 'center',
@@ -64,13 +64,13 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: DEEP_FOREST,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
   },
   buttonText: {
     fontFamily: 'SourceSans3_600SemiBold',
-    fontSize: 16,
+    fontSize: 14,
     color: PARCHMENT,
   },
 });

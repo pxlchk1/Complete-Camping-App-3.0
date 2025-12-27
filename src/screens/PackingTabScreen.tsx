@@ -13,6 +13,8 @@ import { PackingItem } from "../types/camping";
 import { getPackingList, togglePackingItem } from "../api/packing-service";
 import * as LocalPackingService from "../services/localPackingService";
 import * as Haptics from "expo-haptics";
+import { requirePro } from "../utils/gating";
+import AccountRequiredModal from "../components/AccountRequiredModal";
 
 type PlanTab = "trips" | "parks" | "weather" | "packing" | "meals";
 type PackingTabNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -45,6 +47,18 @@ export default function PackingTabScreen({ onTabChange }: PackingTabScreenProps)
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [packingItems, setPackingItems] = useState<PackingItem[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Gating modal state
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  
+  const handleCreateTrip = () => {
+    const canProceed = requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: () => navigation.navigate("Paywall"),
+    });
+    if (!canProceed) return;
+    navigation.navigate("CreateTrip");
+  };
   const [useLocalStorage, setUseLocalStorage] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
@@ -186,10 +200,10 @@ export default function PackingTabScreen({ onTabChange }: PackingTabScreenProps)
         <View style={{ flex: 1, backgroundColor: "#F4EBD0" }}>
           <EmptyState
             iconName="bag"
-            title="No active trips"
-            message="Create a trip to build a packing list."
-            ctaLabel="View Trips"
-            onPress={() => onTabChange("trips")}
+            title="No active trips."
+            message="Your sleeping bag is bored."
+            ctaLabel="Plan a new trip"
+            onPress={handleCreateTrip}
           />
         </View>
       ) : (
@@ -210,7 +224,7 @@ export default function PackingTabScreen({ onTabChange }: PackingTabScreenProps)
                       key={trip.id}
                       onPress={() => setSelectedTripId(trip.id)}
                       className={`px-4 py-2 rounded-xl border ${
-                        isSelected ? "bg-forest border-forest" : "bg-white border-stone-300"
+                        isSelected ? "bg-forest border-forest" : "bg-parchment border-parchmentDark"
                       }`}
                     >
                       <Text
@@ -232,7 +246,7 @@ export default function PackingTabScreen({ onTabChange }: PackingTabScreenProps)
                 <View className="flex-1">
                   <Text
                     className="text-lg mb-1"
-                    style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+                    style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
                   >
                     {selectedTrip.name}
                   </Text>
@@ -262,7 +276,7 @@ export default function PackingTabScreen({ onTabChange }: PackingTabScreenProps)
                       {Math.round(progress)}%
                     </Text>
                   </View>
-                  <View className="h-2 bg-stone-200 rounded-full overflow-hidden">
+                  <View className="h-2 bg-white rounded-full overflow-hidden">
                     <View className="h-full bg-forest rounded-full" style={{ width: `${progress}%` }} />
                   </View>
                 </View>
@@ -276,11 +290,8 @@ export default function PackingTabScreen({ onTabChange }: PackingTabScreenProps)
             </View>
           ) : packingItems.length === 0 ? (
             <View className="flex-1 items-center justify-center px-8">
-              <Ionicons name="add-circle-outline" size={48} color={EARTH_GREEN} />
-              <Text className="text-forest font-semibold mt-3 mb-1 text-center" style={{ fontFamily: "SourceSans3_600SemiBold" }}>
-                No items yet
-              </Text>
-              <Text className="text-earthGreen text-center mb-4" style={{ fontFamily: "SourceSans3_400Regular" }}>
+              <Ionicons name="bag-outline" size={48} color={EARTH_GREEN} style={{ opacity: 0.5 }} />
+              <Text className="text-earthGreen text-center mt-3" style={{ fontFamily: "SourceSans3_400Regular" }}>
                 Tap Manage to add items to your packing list
               </Text>
             </View>
@@ -296,7 +307,7 @@ export default function PackingTabScreen({ onTabChange }: PackingTabScreenProps)
                     <Pressable onPress={() => toggleCategory(category)} className="flex-row items-center justify-between py-2 active:opacity-70">
                       <View className="flex-row items-center flex-1">
                         <Ionicons name={isExpanded ? "chevron-down" : "chevron-forward"} size={20} color={DEEP_FOREST} />
-                        <Text className="ml-2 text-base font-bold" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
+                        <Text className="ml-2 text-base font-bold" style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}>
                           {category}
                         </Text>
                         <Text className="ml-2 text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}>
@@ -347,6 +358,16 @@ export default function PackingTabScreen({ onTabChange }: PackingTabScreenProps)
       )}
 
       {loading ? <FireflyLoader /> : null}
+
+      {/* Gating Modals */}
+      <AccountRequiredModal
+        visible={showAccountModal}
+        onCreateAccount={() => {
+          setShowAccountModal(false);
+          navigation.navigate("Auth" as never);
+        }}
+        onMaybeLater={() => setShowAccountModal(false)}
+      />
     </View>
   );
 }

@@ -10,12 +10,16 @@ import * as Haptics from "expo-haptics";
 // Components
 import AccountButtonHeader from "../components/AccountButtonHeader";
 import { SectionTitle, BodyText, BodyTextMedium } from "../components/Typography";
+import PushPermissionPrompt from "../components/PushPermissionPrompt";
 
 // State
 import { useTripsStore } from "../state/tripsStore";
 import { useGearStore } from "../state/gearStore";
 import { useUserStore, createTestUser } from "../state/userStore";
 import { usePlanTabStore } from "../state/planTabStore";
+
+// Utils
+import { getWelcomeTitle, getWelcomeSubtext } from "../utils/welcomeCopy";
 
 // Constants
 import {
@@ -34,6 +38,7 @@ import {
 } from "../constants/colors";
 import { HERO_IMAGES, LOGOS } from "../constants/images";
 import { RootStackParamList } from "../navigation/types";
+import { auth } from "../config/firebase";
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "Home">;
 
@@ -51,23 +56,7 @@ const CAMPING_TIPS = [
   "Arrive at your campsite with enough daylight to set up comfortably.",
 ];
 
-// Camping style welcome messages
-const CAMPING_STYLE_MESSAGES: { [key: string]: string } = {
-  backpacking: "Ready to hit the trails? Every mile brings new adventures.",
-  "car camping": "Time to load up and chase the sunset. Your perfect campsite awaits!",
-  "rv camping": "The open road is calling. Let's roll into your next adventure!",
-  glamping: "Luxury meets nature. Your comfortable escape is just ahead!",
-  "dispersed camping": "Off the beaten path and into the wild. True freedom awaits!",
-  "winter camping": "Embrace the cold and find beauty in the quiet of winter.",
-  "beach camping": "Sand, surf, and starlight. Paradise is waiting for you!",
-  "mountain camping": "The peaks are calling and you must go. Adventure awaits!",
-  "desert camping": "Under endless skies and stars. The desert has its own magic.",
-  "forest camping": "Into the woods where peace and wonder grow.",
-  overlanding: "Your vehicle is your home, the world is your destination.",
-  "motorcycle camping": "Two wheels, endless roads, infinite possibilities.",
-  "canoe camping": "Paddle your way to serenity. The water is your highway.",
-  "kayak camping": "Glide into adventure. Remote shores are calling your name.",
-};
+
 
 const safeHaptic = () => {
   // Don’t let haptics failures block navigation.
@@ -115,50 +104,26 @@ export default function HomeScreen() {
     return CAMPING_TIPS[dayOfYear % CAMPING_TIPS.length];
   }, []);
 
-  // User display data - show "Camper" if no user, otherwise show first name or display name
-  const userFirstName = currentUser?.displayName?.split(" ")[0] || currentUser?.handle || "Camper";
-  const userAvatarSource = currentUser?.photoURL ? { uri: currentUser.photoURL } : LOGOS.APP_ICON;
+  // User display data - show "Camper" if not logged in, otherwise show first name or display name
+  // Check Firebase auth state - if not logged in, show generic avatar and "Welcome, Camper!"
+  const isLoggedIn = !!auth.currentUser;
+  const userAvatarSource = isLoggedIn && currentUser?.photoURL 
+    ? { uri: currentUser.photoURL } 
+    : LOGOS.APP_ICON;
 
-  // Determine welcome message based on subscription and camping style
-  const getWelcomeMessage = () => {
-    if (!currentUser) return "Your camping adventure starts here";
-
-    const isPaidSubscriber =
-      currentUser.membershipTier === "subscribed" ||
-      currentUser.membershipTier === "isAdmin" ||
-      currentUser.membershipTier === "isModerator";
-
-    if (!isPaidSubscriber) return "Your camping adventure starts here";
-
-    if (currentUser.favoriteCampingStyle) {
-      const styleKey = currentUser.favoriteCampingStyle.toLowerCase();
-      return CAMPING_STYLE_MESSAGES[styleKey] || "Your camping adventure starts here";
-    }
-
-    return "Your camping adventure starts here";
-  };
-
-  const welcomeMessage = getWelcomeMessage();
-
-  const welcomeGreeting =
-    currentUser &&
-    (currentUser.membershipTier === "subscribed" ||
-      currentUser.membershipTier === "isAdmin" ||
-      currentUser.membershipTier === "isModerator")
-      ? `Welcome back, ${userFirstName}!`
-      : currentUser
-      ? `Welcome, ${userFirstName}!`
-      : "Welcome, Camper!";
+  // Welcome greeting and message using centralized utility
+  const welcomeGreeting = getWelcomeTitle(currentUser?.displayName, isLoggedIn);
+  const welcomeMessage = getWelcomeSubtext(currentUser?.favoriteCampingStyle, isLoggedIn);
 
   if (__DEV__) {
     // eslint-disable-next-line no-console
     console.log("🎯 [HomeScreen] Welcome Greeting:", welcomeGreeting);
     // eslint-disable-next-line no-console
-    console.log("🎯 [HomeScreen] User First Name:", userFirstName);
+    console.log("🎯 [HomeScreen] Welcome Message:", welcomeMessage);
     // eslint-disable-next-line no-console
     console.log("🎯 [HomeScreen] Current User Display Name:", currentUser?.displayName);
     // eslint-disable-next-line no-console
-    console.log("🎯 [HomeScreen] Current User Membership:", currentUser?.membershipTier);
+    console.log("🎯 [HomeScreen] Favorite Camping Style:", currentUser?.favoriteCampingStyle);
     // Prevent “unused var” lint confusion if you re-enable sections that rely on these.
     void trips;
     void gearLists;
@@ -193,6 +158,9 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1 bg-forest">
+      {/* Push Permission Soft Prompt - shows after 1+ core action */}
+      <PushPermissionPrompt />
+      
       <View className="flex-1" style={{ backgroundColor: PARCHMENT_BACKGROUND }}>
         {/* Welcome Hero Image - full bleed */}
         <View style={{ height: 200 + insets.top }}>
@@ -202,63 +170,71 @@ export default function HomeScreen() {
             resizeMode="cover"
             accessibilityLabel="Welcome to camping - forest scene"
           >
+            {/* Gradient Overlay - covers full image including safe area */}
+            <LinearGradient
+              colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.6)"]}
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+              }}
+            />
             <View className="flex-1" style={{ paddingTop: insets.top }}>
               {/* Account Button - Top Right */}
               <AccountButtonHeader color={TEXT_ON_DARK} />
 
-              {/* Welcome message with avatar at bottom */}
+              {/* Welcome message with centered avatar above */}
               <View className="flex-1 justify-end">
-                <LinearGradient
-                  colors={["transparent", "rgba(0,0,0,0.4)"]}
-                  style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: 100,
-                  }}
-                />
-                <View className="flex-row items-center px-4 pb-4" style={{ zIndex: 1 }}>
+                <View className="items-center px-4 pb-4" style={{ zIndex: 1 }}>
+                  {/* Centered Avatar */}
                   <View
                     style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 24,
+                      width: 80,
+                      height: 80,
+                      borderRadius: 40,
                       backgroundColor: PARCHMENT,
                       overflow: "hidden",
                       justifyContent: "center",
                       alignItems: "center",
-                      marginRight: 12,
+                      marginBottom: 12,
+                      borderWidth: 3,
+                      borderColor: PARCHMENT,
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 4,
+                      elevation: 4,
                     }}
                   >
-                    <Image source={userAvatarSource} style={{ width: 48, height: 48 }} resizeMode="cover" />
+                    <Image source={userAvatarSource} style={{ width: 80, height: 80 }} resizeMode="cover" />
                   </View>
-                  <View className="flex-1">
-                    <Text
-                      className="text-3xl"
-                      style={{
-                        fontFamily: "JosefinSlab_700Bold",
-                        color: TEXT_ON_DARK,
-                        textShadowColor: "rgba(0, 0, 0, 0.5)",
-                        textShadowOffset: { width: 0, height: 1 },
-                        textShadowRadius: 4,
-                      }}
-                    >
-                      {welcomeGreeting}
-                    </Text>
-                    <Text
-                      className="mt-1"
-                      style={{
-                        fontFamily: "SourceSans3_400Regular",
-                        color: TEXT_ON_DARK,
-                        textShadowColor: "rgba(0, 0, 0, 0.5)",
-                        textShadowOffset: { width: 0, height: 1 },
-                        textShadowRadius: 3,
-                      }}
-                    >
-                      {welcomeMessage}
-                    </Text>
-                  </View>
+                  {/* Welcome Text - Centered */}
+                  <Text
+                    className="text-2xl text-center"
+                    style={{
+                      fontFamily: "Raleway_700Bold",
+                      color: TEXT_ON_DARK,
+                      textShadowColor: "rgba(0, 0, 0, 0.5)",
+                      textShadowOffset: { width: 0, height: 1 },
+                      textShadowRadius: 4,
+                    }}
+                  >
+                    {welcomeGreeting}
+                  </Text>
+                  <Text
+                    className="mt-1 text-center"
+                    style={{
+                      fontFamily: "SourceSans3_400Regular",
+                      color: TEXT_ON_DARK,
+                      textShadowColor: "rgba(0, 0, 0, 0.5)",
+                      textShadowOffset: { width: 0, height: 1 },
+                      textShadowRadius: 3,
+                    }}
+                  >
+                    {welcomeMessage}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -280,8 +256,8 @@ export default function HomeScreen() {
             <View className="space-y-3">
               {/* Plan Trip */}
               <Pressable
-                className="rounded-xl active:scale-95 bg-forest"
-                style={{ backgroundColor: DEEP_FOREST, paddingVertical: 14, borderRadius: 10 }}
+                className="rounded-xl active:scale-95"
+                style={{ backgroundColor: "#59625C", paddingVertical: 14, borderRadius: 10 }}
                 onPress={() => {
                   safeHaptic();
                   setActivePlanTab("trips");
@@ -292,28 +268,29 @@ export default function HomeScreen() {
               >
                 <View className="flex-row items-center justify-between px-4">
                   <View className="flex-row items-center">
-                    <Ionicons name="add-circle-outline" size={24} color={PARCHMENT} />
+                    <Ionicons name="add-circle-outline" size={24} color="#FFFFFF" />
                     <Text
-                      className="text-parchment ml-3"
+                      className="ml-3"
                       style={{
                         fontFamily: "SourceSans3_600SemiBold",
                         fontSize: 15,
                         textTransform: "uppercase",
                         letterSpacing: 0.08,
                         textAlign: "center",
+                        color: "#FFFFFF",
                       }}
                     >
                       Plan Trip
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={PARCHMENT} />
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
                 </View>
               </Pressable>
 
               {/* Packing List */}
               <Pressable
-                className="rounded-xl active:scale-95 bg-granite"
-                style={{ backgroundColor: GRANITE_GOLD, paddingVertical: 14, borderRadius: 10 }}
+                className="rounded-xl active:scale-95"
+                style={{ backgroundColor: "#8A8165", paddingVertical: 14, borderRadius: 10 }}
                 onPress={() => {
                   safeHaptic();
                   setActivePlanTab("packing");
@@ -324,28 +301,29 @@ export default function HomeScreen() {
               >
                 <View className="flex-row items-center justify-between px-4">
                   <View className="flex-row items-center">
-                    <Ionicons name="list" size={24} color={PARCHMENT} />
+                    <Ionicons name="list" size={24} color="#FFFFFF" />
                     <Text
-                      className="text-parchment ml-3"
+                      className="ml-3"
                       style={{
                         fontFamily: "SourceSans3_600SemiBold",
                         fontSize: 15,
                         textTransform: "uppercase",
                         letterSpacing: 0.08,
                         textAlign: "center",
+                        color: "#FFFFFF",
                       }}
                     >
                       Packing List
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={PARCHMENT} />
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
                 </View>
               </Pressable>
 
               {/* Meal Plans */}
               <Pressable
-                className="rounded-xl active:scale-95 bg-riverRock"
-                style={{ backgroundColor: RIVER_ROCK, paddingVertical: 14, borderRadius: 10 }}
+                className="rounded-xl active:scale-95"
+                style={{ backgroundColor: "#8B8577", paddingVertical: 14, borderRadius: 10 }}
                 onPress={() => {
                   safeHaptic();
                   setActivePlanTab("meals");
@@ -356,28 +334,29 @@ export default function HomeScreen() {
               >
                 <View className="flex-row items-center justify-between px-4">
                   <View className="flex-row items-center">
-                    <Ionicons name="restaurant-outline" size={24} color={PARCHMENT} />
+                    <Ionicons name="restaurant-outline" size={24} color="#FFFFFF" />
                     <Text
-                      className="text-parchment ml-3"
+                      className="ml-3"
                       style={{
                         fontFamily: "SourceSans3_600SemiBold",
                         fontSize: 15,
                         textTransform: "uppercase",
                         letterSpacing: 0.08,
                         textAlign: "center",
+                        color: "#FFFFFF",
                       }}
                     >
                       Meal Plans
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={PARCHMENT} />
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
                 </View>
               </Pressable>
 
               {/* Weather Forecast */}
               <Pressable
                 className="rounded-xl active:scale-95"
-                style={{ backgroundColor: SIERRA_SKY, paddingVertical: 14, borderRadius: 10 }}
+                style={{ backgroundColor: "#8A8165", paddingVertical: 14, borderRadius: 10 }}
                 onPress={() => {
                   safeHaptic();
                   setActivePlanTab("weather");
@@ -388,28 +367,29 @@ export default function HomeScreen() {
               >
                 <View className="flex-row items-center justify-between px-4">
                   <View className="flex-row items-center">
-                    <Ionicons name="cloud-outline" size={24} color={PARCHMENT} />
+                    <Ionicons name="cloud-outline" size={24} color="#FFFFFF" />
                     <Text
-                      className="text-parchment ml-3"
+                      className="ml-3"
                       style={{
                         fontFamily: "SourceSans3_600SemiBold",
                         fontSize: 15,
                         textTransform: "uppercase",
                         letterSpacing: 0.08,
                         textAlign: "center",
+                        color: "#FFFFFF",
                       }}
                     >
                       Weather Forecast
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={PARCHMENT} />
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
                 </View>
               </Pressable>
 
               {/* Ask a Camper */}
               <Pressable
-                className="rounded-xl active:scale-95 bg-riverRock"
-                style={{ backgroundColor: RIVER_ROCK, paddingVertical: 14, borderRadius: 10 }}
+                className="rounded-xl active:scale-95"
+                style={{ backgroundColor: "#5A635C", paddingVertical: 14, borderRadius: 10 }}
                 onPress={() => {
                   safeHaptic();
                   navigateToAsk();
@@ -419,28 +399,29 @@ export default function HomeScreen() {
               >
                 <View className="flex-row items-center justify-between px-4">
                   <View className="flex-row items-center">
-                    <Ionicons name="chatbubble-ellipses-outline" size={24} color={PARCHMENT} />
+                    <Ionicons name="chatbubble-ellipses-outline" size={24} color="#FFFFFF" />
                     <Text
-                      className="text-parchment ml-3"
+                      className="ml-3"
                       style={{
                         fontFamily: "SourceSans3_600SemiBold",
                         fontSize: 15,
                         textTransform: "uppercase",
                         letterSpacing: 0.08,
                         textAlign: "center",
+                        color: "#FFFFFF",
                       }}
                     >
                       Ask a Camper
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={PARCHMENT} />
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
                 </View>
               </Pressable>
             </View>
           </View>
 
           {/* Daily Tip Banner */}
-          <View className="rounded-xl p-4 mb-6 border" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}>
+          <View className="rounded-xl p-4 mb-6 border" style={{ backgroundColor: "#C2B9A5", borderColor: BORDER_SOFT }}>
             <View className="flex-row items-center justify-between mb-2">
               <View className="flex-row items-center">
                 <Ionicons name="bulb" size={20} color={GRANITE_GOLD} />

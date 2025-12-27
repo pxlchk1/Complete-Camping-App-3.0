@@ -34,7 +34,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
   const [endDate, setEndDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)); // 7 days from now
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-  const [destination, setDestination] = useState("");
+  // NOTE: Destination removed - users will set destination via Plan > Parks after trip creation
   const [partySize, setPartySize] = useState("4");
   const [description, setDescription] = useState("");
   const [campingStyle, setCampingStyle] = useState<CampingStyle | undefined>(undefined);
@@ -74,6 +74,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+      // NOTE: No destination set here - users set destination via Plan > Parks after trip creation
       const tripId = createTrip({
         name: tripName.trim(),
         startDate: startDate.toISOString().split("T")[0],
@@ -81,10 +82,6 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
         campingStyle,
         partySize: size,
         description: description.trim() || undefined,
-        destination: destination.trim() ? {
-          id: `dest_${Date.now()}`,
-          name: destination.trim(),
-        } : undefined,
         status: "planning",
         season,
       });
@@ -93,7 +90,6 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
       setTripName("");
       setStartDate(new Date());
       setEndDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
-      setDestination("");
       setPartySize("4");
       setDescription("");
       setCampingStyle(undefined);
@@ -131,15 +127,33 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
         className="flex-1 bg-black/40 justify-end"
       >
         <View className="bg-parchment rounded-t-3xl max-h-[90%]">
-          {/* Header */}
-          <View className="flex-row items-center justify-between px-5 pt-5 pb-3 border-b border-parchmentDark">
-            <Text className="text-xl font-bold text-forest" style={{ fontFamily: "JosefinSlab_700Bold" }}>Plan New Trip</Text>
-            <Pressable
-              onPress={onClose}
-              className="w-9 h-9 rounded-full bg-[#f0f9f4] items-center justify-center active:bg-[#dcf3e5]"
-            >
-              <Ionicons name="close" size={20} color={DEEP_FOREST} />
-            </Pressable>
+          {/* Header - Deep Forest Green background */}
+          <View
+            style={{
+              paddingTop: 30,
+              paddingHorizontal: 20,
+              paddingBottom: 20,
+              backgroundColor: DEEP_FOREST,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={{ fontFamily: "Raleway_700Bold", fontSize: 24, color: PARCHMENT, flex: 1, marginRight: 12 }}>Plan new trip</Text>
+              <Pressable
+                onPress={onClose}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: "rgba(255, 255, 255, 0.15)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="close" size={20} color={PARCHMENT} />
+              </Pressable>
+            </View>
           </View>
 
           <ScrollView className="px-5 pt-4" showsVerticalScrollIndicator={false}>
@@ -170,7 +184,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
                           : "bg-parchment border-parchmentDark"
                       }`}
                     >
-                      <Text className="text-2xl mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>{style.emoji}</Text>
+                      <Text className="text-2xl mb-1" style={{ fontFamily: "Raleway_700Bold" }}>{style.emoji}</Text>
                       <Text
                         className={`text-sm font-medium ${
                           campingStyle === style.value ? "text-parchment" : "text-forest"
@@ -218,19 +232,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
               </Text>
             </View>
 
-
-
-            {/* Destination */}
-            <View className="mb-4">
-              <Text className="text-forest text-sm font-semibold mb-2" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Destination</Text>
-              <TextInput
-                value={destination}
-                onChangeText={setDestination}
-                placeholder="e.g., Yosemite Valley, CA"
-                placeholderTextColor="#999"
-                className="bg-parchment border border-parchmentDark rounded-xl px-4 py-3 text-base text-forest"
-              />
-            </View>
+            {/* NOTE: Destination field removed - users set destination via Plan > Parks after trip creation */}
 
             {/* Party Size */}
             <View className="mb-4">
@@ -267,7 +269,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
               onPress={handleCreateTrip}
               className="bg-[#AC9A6D] rounded-2xl px-4 py-4 items-center justify-center active:bg-[#9a8860]"
             >
-              <Text className="text-parchment font-semibold text-base" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Create Trip</Text>
+              <Text className="text-parchment font-semibold text-base" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Create trip</Text>
             </Pressable>
           </View>
         </View>
@@ -284,7 +286,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
                 onPress={(e) => e.stopPropagation()}
               >
                 <View className="flex-row items-center justify-between mb-4">
-                  <Text className="text-xl font-bold text-forest" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+                  <Text className="text-xl font-bold text-forest" style={{ fontFamily: "Raleway_700Bold" }}>
                     Select Start Date
                   </Text>
                   <Pressable
@@ -319,7 +321,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
                 onPress={(e) => e.stopPropagation()}
               >
                 <View className="flex-row items-center justify-between mb-4">
-                  <Text className="text-xl font-bold text-forest" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+                  <Text className="text-xl font-bold text-forest" style={{ fontFamily: "Raleway_700Bold" }}>
                     Select End Date
                   </Text>
                   <Pressable

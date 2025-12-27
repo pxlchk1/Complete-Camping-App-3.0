@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Park } from "../types/camping";
 import { colors, textStyles, spacing, radius, fonts, fontSizes, shadows } from "../theme/theme";
-import { DEEP_FOREST, EARTH_GREEN, CARD_BACKGROUND_LIGHT, CARD_BACKGROUND_ALT, BORDER_SOFT, TEXT_SECONDARY } from "../constants/colors";
+import { DEEP_FOREST, EARTH_GREEN, CARD_BACKGROUND_LIGHT, CARD_BACKGROUND_ALT, BORDER_SOFT, TEXT_SECONDARY, PARCHMENT } from "../constants/colors";
 
 interface ParkListItemProps {
   park: Park;
@@ -24,17 +24,27 @@ const getParkTypeLabel = (filter: string): string => {
   }
 };
 
-export default function ParkListItem({ park, onPress, index }: ParkListItemProps) {
+// Alternating background colors for visual separation
+// PARCHMENT is #F5F1E8, lighter variant is 5% lighter
+const PARCHMENT_BASE = "#F5F1E8";
+const PARCHMENT_LIGHT = "#FAF8F3"; // 5% lighter
+
+export default function ParkListItem({ park, onPress, index = 0 }: ParkListItemProps) {
+  // Alternate background color based on index
+  const isEvenRow = index % 2 === 0;
+  const backgroundColor = isEvenRow ? PARCHMENT_BASE : PARCHMENT_LIGHT;
+
   return (
     <Pressable
       onPress={() => onPress?.(park)}
       style={({ pressed }) => ({
-        backgroundColor: "#F5F1E8",
-        borderRadius: 16,
-        paddingVertical: 12,
+        backgroundColor: backgroundColor,
+        paddingVertical: 18,
         paddingHorizontal: 16,
-        marginBottom: 8,
+        marginHorizontal: -16, // Full width - extend to edges
         opacity: pressed ? 0.7 : 1,
+        borderBottomWidth: 1,
+        borderBottomColor: "#E5E0D5",
       })}
     >
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -46,7 +56,7 @@ export default function ParkListItem({ park, onPress, index }: ParkListItemProps
               fontFamily: fonts.displaySemibold,
               fontSize: fontSizes.md,
               color: DEEP_FOREST,
-              marginBottom: 6,
+              marginBottom: 8,
               lineHeight: fontSizes.md * 1.2,
             }}
           >
@@ -54,7 +64,7 @@ export default function ParkListItem({ park, onPress, index }: ParkListItemProps
           </Text>
 
           {/* Type and State */}
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
             {park.state && (
               <View
                 style={{
@@ -88,7 +98,7 @@ export default function ParkListItem({ park, onPress, index }: ParkListItemProps
           </View>
 
           {/* Address */}
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
             <Ionicons name="location-outline" size={12} color="#8A9580" />
             <Text
               style={{

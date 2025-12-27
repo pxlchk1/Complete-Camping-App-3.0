@@ -21,6 +21,7 @@ import { getGearItemById, updateGearItem, deleteGearItem, deleteGearImages } fro
 import { GearItem, GEAR_CATEGORIES } from "../types/gear";
 import { RootStackNavigationProp, RootStackParamList } from "../navigation/types";
 import ModalHeader from "../components/ModalHeader";
+import TripPickerModal from "../components/TripPickerModal";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -43,6 +44,7 @@ export default function GearDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingFavorite, setUpdatingFavorite] = useState(false);
+  const [showTripPicker, setShowTripPicker] = useState(false);
 
   useEffect(() => {
     loadGear();
@@ -151,7 +153,7 @@ export default function GearDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="Gear Detail" showTitle />
+        <ModalHeader title="Gear detail" showTitle />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={DEEP_FOREST} />
           <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
@@ -165,7 +167,7 @@ export default function GearDetailScreen() {
   if (error || !gear) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="Gear Detail" showTitle />
+        <ModalHeader title="Gear detail" showTitle />
         <View className="flex-1 items-center justify-center px-5">
           <Ionicons name="alert-circle-outline" size={64} color={TEXT_MUTED} />
           <Text
@@ -182,7 +184,7 @@ export default function GearDetailScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="Gear Detail"
+        title="Gear detail"
         showTitle
         rightAction={{
           icon: "pencil",
@@ -208,7 +210,7 @@ export default function GearDetailScreen() {
             <View className="flex-1 pr-4">
               <Text
                 className="text-3xl"
-                style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+                style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
               >
                 {gear.name}
               </Text>
@@ -294,10 +296,27 @@ export default function GearDetailScreen() {
             )}
           </View>
 
+          {/* Add to Packing List Button */}
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowTripPicker(true);
+            }}
+            className="mb-4 py-3 rounded-lg flex-row items-center justify-center active:opacity-90"
+            style={{ backgroundColor: EARTH_GREEN }}
+          >
+            <Ionicons name="cube-outline" size={18} color={PARCHMENT} style={{ marginRight: 8 }} />
+            <Text
+              style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+            >
+              Add to Packing List
+            </Text>
+          </Pressable>
+
           {/* Edit Button */}
           <Pressable
             onPress={handleEdit}
-            className="mb-4 py-4 rounded-xl active:opacity-90"
+            className="mb-4 py-3 rounded-lg active:opacity-90"
             style={{ backgroundColor: DEEP_FOREST }}
           >
             <Text
@@ -311,7 +330,7 @@ export default function GearDetailScreen() {
           {/* Delete Button */}
           <Pressable
             onPress={handleDelete}
-            className="mb-8 py-4 rounded-xl border active:opacity-70"
+            className="mb-8 py-3 rounded-lg border active:opacity-70"
             style={{ backgroundColor: PARCHMENT, borderColor: BORDER_SOFT }}
           >
             <Text
@@ -323,6 +342,13 @@ export default function GearDetailScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* Trip Picker Modal */}
+      <TripPickerModal
+        visible={showTripPicker}
+        onClose={() => setShowTripPicker(false)}
+        gearItem={gear}
+      />
     </View>
   );
 }

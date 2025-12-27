@@ -1,9 +1,9 @@
 /**
  * Add People to Trip Modal
- * Multi-select contacts from My Campground with role assignment
+ * Multi-select contacts from My Campground
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,16 +12,18 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { auth } from "../config/firebase";
 import { getCampgroundContacts } from "../services/campgroundContactsService";
 import { addTripParticipantsWithRoles } from "../services/tripParticipantsService";
-import { CampgroundContact, ParticipantRole } from "../types/campground";
+import { CampgroundContact } from "../types/campground";
 import { RootStackParamList, RootStackNavigationProp } from "../navigation/types";
 import { useTripsStore } from "../state/tripsStore";
 import ModalHeader from "../components/ModalHeader";
+import { requirePro } from "../utils/gating";
+import AccountRequiredModal from "../components/AccountRequiredModal";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -33,15 +35,6 @@ import {
   TEXT_MUTED,
 } from "../constants/colors";
 
-const ROLE_OPTIONS: { value: ParticipantRole; label: string }[] = [
-  { value: "guest", label: "Guest" },
-  { value: "host", label: "Host" },
-  { value: "co_host", label: "Co-host" },
-  { value: "kid", label: "Kid" },
-  { value: "pet", label: "Pet" },
-  { value: "other", label: "Other" },
-];
-
 export default function AddPeopleToTripScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const route = useRoute<RouteProp<RootStackParamList, "AddPeopleToTrip">>();
@@ -51,14 +44,22 @@ export default function AddPeopleToTripScreen() {
 
   const [contacts, setContacts] = useState<CampgroundContact[]>([]);
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
-  const [contactRoles, setContactRoles] = useState<Map<string, ParticipantRole>>(new Map());
-  const [step, setStep] = useState<"select" | "roles">("select");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Gating modal state
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   useEffect(() => {
     loadContacts();
   }, []);
+
+  // Reload contacts when screen comes back into focus (e.g., after adding new person)
+  useFocusEffect(
+    useCallback(() => {
+      loadContacts();
+    }, [])
+  );
 
   const loadContacts = async () => {
     const user = auth.currentUser;
@@ -85,46 +86,11 @@ export default function AddPeopleToTripScreen() {
       const newSet = new Set(prev);
       if (newSet.has(contactId)) {
         newSet.delete(contactId);
-        // Remove role when deselecting
-        setContactRoles(prevRoles => {
-          const newRoles = new Map(prevRoles);
-          newRoles.delete(contactId);
-          return newRoles;
-        });
       } else {
         newSet.add(contactId);
-        // Set default role to guest
-        setContactRoles(prevRoles => {
-          const newRoles = new Map(prevRoles);
-          newRoles.set(contactId, "guest");
-          return newRoles;
-        });
       }
       return newSet;
     });
-  };
-
-  const setRole = (contactId: string, role: ParticipantRole) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setContactRoles(prev => {
-      const newRoles = new Map(prev);
-      newRoles.set(contactId, role);
-      return newRoles;
-    });
-  };
-
-  const handleNext = () => {
-    if (selectedContactIds.size === 0) {
-      Alert.alert("No Selection", "Please select at least one person to add");
-      return;
-    }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setStep("roles");
-  };
-
-  const handleBack = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setStep("select");
   };
 
   const handleSubmit = async () => {
@@ -133,11 +99,20 @@ export default function AddPeopleToTripScreen() {
       return;
     }
 
+    // Gate: PRO required to add people to trips
+    if (!requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: () => navigation.navigate("Paywall"),
+    })) {
+      return;
+    }
+
     try {
       setSubmitting(true);
+      // Add all selected contacts as "guest" role
       const participantsWithRoles = Array.from(selectedContactIds).map(contactId => ({
         contactId,
-        role: contactRoles.get(contactId) || "guest",
+        role: "guest" as const,
       }));
 
       const tripStartDate = trip?.startDate ? new Date(trip.startDate) : new Date();
@@ -152,10 +127,16 @@ export default function AddPeopleToTripScreen() {
     }
   };
 
+  const handleAddNewPerson = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Navigate to AddCamper screen to add a new person to campground
+    navigation.navigate("AddCamper" as any);
+  };
+
   if (loading) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="Add People" showTitle />
+        <ModalHeader title="Add people" showTitle />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={DEEP_FOREST} />
           <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
@@ -166,98 +147,14 @@ export default function AddPeopleToTripScreen() {
     );
   }
 
-  if (step === "roles") {
-    const selectedContacts = contacts.filter(c => selectedContactIds.has(c.id));
-
-    return (
-      <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader
-          title="Assign Roles"
-          showTitle
-          onBack={handleBack}
-          rightAction={{
-            icon: "checkmark",
-            onPress: handleSubmit,
-          }}
-        />
-
-        <ScrollView className="flex-1 px-5 pt-5">
-          <Text
-            className="mb-4"
-            style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-          >
-            Assign a role to each person
-          </Text>
-
-          {selectedContacts.map(contact => {
-            const currentRole = contactRoles.get(contact.id) || "guest";
-            return (
-              <View key={contact.id} className="mb-4">
-                <Text
-                  className="mb-2"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
-                >
-                  {contact.contactName}
-                </Text>
-                <View className="flex-row flex-wrap gap-2">
-                  {ROLE_OPTIONS.map(roleOption => {
-                    const isSelected = currentRole === roleOption.value;
-                    return (
-                      <Pressable
-                        key={roleOption.value}
-                        onPress={() => setRole(contact.id, roleOption.value)}
-                        className="px-4 py-2 rounded-full border active:opacity-70"
-                        style={{
-                          backgroundColor: isSelected ? EARTH_GREEN : CARD_BACKGROUND_LIGHT,
-                          borderColor: isSelected ? EARTH_GREEN : BORDER_SOFT,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontFamily: "SourceSans3_600SemiBold",
-                            color: isSelected ? PARCHMENT : TEXT_PRIMARY_STRONG,
-                          }}
-                        >
-                          {roleOption.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            );
-          })}
-
-          <Pressable
-            onPress={handleSubmit}
-            disabled={submitting}
-            className="mt-4 mb-8 py-4 rounded-xl active:opacity-90"
-            style={{ backgroundColor: DEEP_FOREST }}
-          >
-            {submitting ? (
-              <ActivityIndicator size="small" color={PARCHMENT} />
-            ) : (
-              <Text
-                className="text-center"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
-              >
-                Add {selectedContactIds.size} {selectedContactIds.size === 1 ? "Person" : "People"}
-              </Text>
-            )}
-          </Pressable>
-        </ScrollView>
-      </View>
-    );
-  }
-
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="Add People"
+        title="Add people"
         showTitle
         rightAction={{
-          icon: "arrow-forward",
-          onPress: handleNext,
+          icon: "add",
+          onPress: handleAddNewPerson,
         }}
       />
 
@@ -333,7 +230,7 @@ export default function AddPeopleToTripScreen() {
                     </View>
 
                     <View
-                      className="w-6 h-6 rounded-full border-2 items-center justify-center"
+                      className="w-6 h-6 rounded border-2 items-center justify-center"
                       style={{
                         borderColor: isSelected ? PARCHMENT : BORDER_SOFT,
                         backgroundColor: isSelected ? PARCHMENT : "transparent",
@@ -347,23 +244,39 @@ export default function AddPeopleToTripScreen() {
             })}
 
             <Pressable
-              onPress={handleNext}
-              disabled={selectedContactIds.size === 0}
-              className="mt-4 mb-8 py-4 rounded-xl active:opacity-90"
+              onPress={handleSubmit}
+              disabled={selectedContactIds.size === 0 || submitting}
+              className="mt-4 mb-8 py-3 rounded-lg active:opacity-90"
               style={{
                 backgroundColor: selectedContactIds.size > 0 ? DEEP_FOREST : BORDER_SOFT,
               }}
             >
-              <Text
-                className="text-center"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
-              >
-                Next: Assign Roles
-              </Text>
+              {submitting ? (
+                <ActivityIndicator size="small" color={PARCHMENT} />
+              ) : (
+                <Text
+                  className="text-center"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                >
+                  {selectedContactIds.size > 0 
+                    ? `Add ${selectedContactIds.size} ${selectedContactIds.size === 1 ? "person" : "people"} to trip`
+                    : "Select people to add"}
+                </Text>
+              )}
             </Pressable>
           </>
         )}
       </ScrollView>
+
+      {/* Gating Modals */}
+      <AccountRequiredModal
+        visible={showAccountModal}
+        onCreateAccount={() => {
+          setShowAccountModal(false);
+          navigation.navigate("Auth" as any);
+        }}
+        onMaybeLater={() => setShowAccountModal(false)}
+      />
     </View>
   );
 }

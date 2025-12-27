@@ -1,6 +1,8 @@
 /**
  * Question Detail Screen
  * Shows question with all answers and allows posting new answers
+ * 
+ * Connect-only actions: Edit/Delete for owners, Remove for admins/mods
  */
 
 import React, { useState, useEffect } from "react";
@@ -8,17 +10,21 @@ import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator, Keyboa
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import ModalHeader from "../../components/ModalHeader";
+import VotePill from "../../components/VotePill";
+import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { ContentActionsAffordance } from "../../components/contentActions";
+import { requireEmailVerification } from "../../utils/authHelper";
 import * as Haptics from "expo-haptics";
 import {
   getQuestionById,
   getAnswers,
   createAnswer,
-  upvoteQuestion,
   upvoteAnswer,
   incrementQuestionViews,
 } from "../../services/questionsService";
-import { getUser } from "../../services/userService";
+import { getUser, isAdmin, isModerator, canModerateContent } from "../../services/userService";
 import { Question, Answer } from "../../types/community";
+import { User } from "../../types/user";
 import { useCurrentUser } from "../../state/userStore";
 import { RootStackScreenProps } from "../../navigation/types";
 import {
@@ -47,6 +53,26 @@ export default function QuestionDetailScreen() {
   const [answerText, setAnswerText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [authorName, setAuthorName] = useState<string | null>(null);
+  const [showAccountRequired, setShowAccountRequired] = useState(false);
+
+  // Permission checks for content actions
+  const canModerate = currentUser ? canModerateContent(currentUser as User) : false;
+  const roleLabel = currentUser 
+    ? isAdmin(currentUser as User) 
+      ? "ADMIN" as const
+      : isModerator(currentUser as User) 
+        ? "MOD" as const 
+        : null 
+    : null;
+
+  // Content action handlers
+  const handleDeleteQuestion = async () => {
+    navigation.goBack();
+  };
+
+  const handleRemoveQuestion = async () => {
+    navigation.goBack();
+  };
 
   useEffect(() => {
     loadQuestionData();
@@ -70,30 +96,28 @@ export default function QuestionDetailScreen() {
       setQuestion(questionData);
       setAnswers(answersData);
 
-      // Increment view count
-      await incrementQuestionViews(questionId);
+      // Increment view count (optional - may fail for non-authenticated users)
+      try {
+        await incrementQuestionViews(questionId);
+      } catch (viewErr) {
+        // Silently ignore - view count increment is not critical
+        console.log("[QuestionDetail] Could not increment views:", viewErr);
+      }
 
-      // Load author info
-      const author = await getUser(questionData.authorId);
-      if (author) {
-        setAuthorName(author.displayName || author.handle);
+      // Load author info (optional - may fail for non-authenticated users)
+      try {
+        const author = await getUser(questionData.authorId);
+        if (author) {
+          setAuthorName(author.displayName || author.handle);
+        }
+      } catch (authorErr) {
+        // Silently ignore - author name is not critical for viewing
+        console.log("[QuestionDetail] Could not load author:", authorErr);
       }
     } catch (err: any) {
       setError(err.message || "Failed to load question");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleUpvoteQuestion = async () => {
-    if (!currentUser || !question) return;
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await upvoteQuestion(questionId);
-      setQuestion({ ...question, upvotes: question.upvotes + 1 });
-    } catch (err) {
-      // Silently fail
     }
   };
 
@@ -105,7 +129,7 @@ export default function QuestionDetailScreen() {
         [
           { text: "Cancel", style: "cancel" },
           {
-            text: "Log In / Sign Up",
+            text: "Log in / Sign up",
             onPress: () => navigation.navigate("Account"),
           },
         ]
@@ -132,13 +156,17 @@ export default function QuestionDetailScreen() {
         [
           { text: "Cancel", style: "cancel" },
           {
-            text: "Log In / Sign Up",
+            text: "Log in / Sign up",
             onPress: () => navigation.navigate("Account"),
           },
         ]
       );
       return;
     }
+
+    // Require email verification for posting answers
+    const isVerified = await requireEmailVerification("answer questions");
+    if (!isVerified) return;
     
     if (!answerText.trim() || submitting) return;
 
@@ -227,16 +255,32 @@ export default function QuestionDetailScreen() {
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 20 }}>
           {/* Question Card */}
           <View className="mx-5 mt-5 rounded-xl p-5 border" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}>
-            {question.hasAcceptedAnswer && (
-              <View className="flex-row items-center mb-3 px-3 py-2 bg-green-100 rounded-lg">
-                <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
-                <Text className="ml-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: "#16a34a" }}>
-                  Answered
-                </Text>
+            {/* Header with actions */}
+            <View className="flex-row items-start justify-between mb-3">
+              <View className="flex-1">
+                {question.hasAcceptedAnswer && (
+                  <View className="flex-row items-center mb-2 px-3 py-2 bg-green-100 rounded-lg self-start">
+                    <Ionicons name="checkmark-circle" size={20} color="#16a34a" />
+                    <Text className="ml-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: "#16a34a" }}>
+                      Answered
+                    </Text>
+                  </View>
+                )}
               </View>
-            )}
+              <ContentActionsAffordance
+                itemId={questionId}
+                itemType="question"
+                createdByUserId={question.authorId}
+                currentUserId={currentUser?.id}
+                canModerate={canModerate}
+                roleLabel={roleLabel}
+                onRequestDelete={handleDeleteQuestion}
+                onRequestRemove={handleRemoveQuestion}
+                layout="cardHeader"
+              />
+            </View>
 
-            <Text className="text-2xl mb-3" style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}>
+            <Text className="text-2xl mb-3" style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}>
               {question.title}
             </Text>
 
@@ -266,22 +310,18 @@ export default function QuestionDetailScreen() {
                 </Text>
               </View>
 
-              <Pressable
-                onPress={handleUpvoteQuestion}
-                className="flex-row items-center px-3 py-2 rounded-lg bg-white border active:opacity-70"
-                style={{ borderColor: BORDER_SOFT }}
-              >
-                <Ionicons name="arrow-up-circle" size={20} color={EARTH_GREEN} />
-                <Text className="ml-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                  {question.upvotes}
-                </Text>
-              </Pressable>
+              <VotePill
+                collectionPath="questions"
+                itemId={questionId}
+                initialScore={question.score || (question.upvotes || 0) - (question.downvotes || 0)}
+                onRequireAccount={() => setShowAccountRequired(true)}
+              />
             </View>
           </View>
 
           {/* Answers Section */}
           <View className="mx-5 mt-6">
-            <Text className="text-xl mb-4" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
+            <Text className="text-xl mb-4" style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}>
               {answers.length} {answers.length === 1 ? "Answer" : "Answers"}
             </Text>
 
@@ -300,14 +340,34 @@ export default function QuestionDetailScreen() {
                     className="rounded-xl p-4 border"
                     style={{ backgroundColor: answer.isAccepted ? "#f0fdf4" : CARD_BACKGROUND_LIGHT, borderColor: answer.isAccepted ? "#16a34a" : BORDER_SOFT }}
                   >
-                    {answer.isAccepted && (
-                      <View className="flex-row items-center mb-2">
-                        <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
-                        <Text className="ml-1 text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: "#16a34a" }}>
-                          Accepted Answer
-                        </Text>
-                      </View>
-                    )}
+                    {/* Answer header with actions */}
+                    <View className="flex-row items-start justify-between mb-2">
+                      {answer.isAccepted && (
+                        <View className="flex-row items-center">
+                          <Ionicons name="checkmark-circle" size={18} color="#16a34a" />
+                          <Text className="ml-1 text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: "#16a34a" }}>
+                            Accepted Answer
+                          </Text>
+                        </View>
+                      )}
+                      <View className="flex-1" />
+                      <ContentActionsAffordance
+                        itemId={answer.id}
+                        itemType="answer"
+                        createdByUserId={answer.authorId}
+                        currentUserId={currentUser?.id}
+                        canModerate={canModerate}
+                        roleLabel={roleLabel}
+                        onRequestDelete={async () => {
+                          setAnswers(prev => prev.filter(a => a.id !== answer.id));
+                        }}
+                        onRequestRemove={async () => {
+                          setAnswers(prev => prev.filter(a => a.id !== answer.id));
+                        }}
+                        layout="commentRow"
+                        iconSize={16}
+                      />
+                    </View>
 
                     <Text className="mb-3 leading-6" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
                       {answer.body}
@@ -337,7 +397,7 @@ export default function QuestionDetailScreen() {
           {/* Answer Input */}
           {currentUser && (
             <View className="mx-5 mt-6 mb-5">
-              <Text className="text-lg mb-3" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
+              <Text className="text-lg mb-3" style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}>
                 Your Answer
               </Text>
               <View className="rounded-xl border" style={{ backgroundColor: "white", borderColor: BORDER_SOFT }}>
@@ -365,7 +425,7 @@ export default function QuestionDetailScreen() {
                       <ActivityIndicator size="small" color="white" />
                     ) : (
                       <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
-                        Post Answer
+                        Post answer
                       </Text>
                     )}
                   </Pressable>
@@ -375,6 +435,15 @@ export default function QuestionDetailScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <AccountRequiredModal
+        visible={showAccountRequired}
+        onCreateAccount={() => {
+          setShowAccountRequired(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowAccountRequired(false)}
+      />
     </View>
   );
 }

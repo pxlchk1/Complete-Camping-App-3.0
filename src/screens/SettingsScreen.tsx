@@ -40,6 +40,7 @@ import {
   TEXT_MUTED,
   EARTH_GREEN,
   DEEP_FOREST,
+  GRANITE_GOLD,
 } from "../constants/colors";
 
 // Reserved handles
@@ -68,6 +69,10 @@ export default function SettingsScreen() {
   const [displayName, setDisplayName] = useState("");
   const [handle, setHandle] = useState("");
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<"unknown" | "granted" | "denied">("unknown");
+  const [emailTransactionalEnabled, setEmailTransactionalEnabled] = useState(true);
+  const [emailMarketingEnabled, setEmailMarketingEnabled] = useState(true);
+  // Legacy - keep for backward compatibility
   const [emailSubscribed, setEmailSubscribed] = useState(false);
   const [profilePublic, setProfilePublic] = useState(true);
   const [showUsernamePublicly, setShowUsernamePublicly] = useState(true);
@@ -105,6 +110,11 @@ export default function SettingsScreen() {
         setHandle(data.handle || "");
         // Default to true if missing (null/undefined) - preselected ON
         setNotificationsEnabled(data.notificationsEnabled !== false);
+        setNotificationPermissionStatus(data.notificationPermissionStatus || "unknown");
+        // New split email preferences (with fallback to legacy emailSubscribed)
+        setEmailTransactionalEnabled(data.emailTransactionalEnabled !== false);
+        setEmailMarketingEnabled(data.emailMarketingEnabled !== false && data.emailSubscribed !== false);
+        // Legacy field for backward compatibility
         setEmailSubscribed(data.emailSubscribed !== false);
         setProfilePublic(data.profilePublic !== false); // default true
         setShowUsernamePublicly(data.showUsernamePublicly !== false); // default true
@@ -174,7 +184,11 @@ export default function SettingsScreen() {
         displayName: displayName.trim(),
         handle: handle.trim().toLowerCase() || null,
         notificationsEnabled,
-        emailSubscribed,
+        // New split email preferences
+        emailTransactionalEnabled,
+        emailMarketingEnabled,
+        // Legacy field for backward compatibility
+        emailSubscribed: emailMarketingEnabled,
         profilePublic,
         showUsernamePublicly,
         updatedAt: serverTimestamp(),
@@ -194,8 +208,8 @@ export default function SettingsScreen() {
         });
       }
 
-      // Update email subscriber document
-      await updateEmailSubscription(user.uid, user.email || "", emailSubscribed);
+      // Update email subscriber document (using marketing preference)
+      await updateEmailSubscription(user.uid, user.email || "", emailMarketingEnabled);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Success", "Settings saved successfully");
@@ -212,7 +226,85 @@ export default function SettingsScreen() {
     }
   };
 
-  const updateEmailSubscription = async (userId: string, email: string, subscribed: boolean) => {
+  const updateEmailSubscription = async (userId: string, email: string, marketingEnabled: boolean) => {
+    if (!email) return;
+
+    try {
+      // Use userId as document ID for easier lookups
+      const emailSubRef = doc(db, "emailSubscribers", userId);
+      await setDoc(emailSubRef, {
+        email,
+        userId,
+        unsubscribed: !marketingEnabled,
+        marketingUnsubscribed: !marketingEnabled,
+        source: "app-settings",
+        updatedAt: serverTimestamp(),
+        ...(marketingEnabled ? {} : { unsubscribedAt: serverTimestamp() }),
+      }, { merge: true });
+    } catch (error) {
+      console.error("[Settings] Error updating email subscription:", error);
+      // Don't throw - this is a secondary operation
+    }
+  };
+
+  // Email marketing toggle handler
+  const handleEmailMarketingToggle = async (value: boolean) => {
+    const user = auth.currentUser;
+    if (!user || !user.email) return;
+
+    try {
+      setEmailMarketingEnabled(value);
+      
+      // Update users document
+      await updateDoc(doc(db, "users", user.uid), {
+        emailMarketingEnabled: value,
+        emailSubscribed: value, // Keep legacy field in sync
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update emailSubscribers document
+      await updateEmailSubscription(user.uid, user.email, value);
+
+      if (value) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch (error: any) {
+      console.error("[Settings] Error toggling email marketing:", error);
+      // Revert state on error
+      setEmailMarketingEnabled(!value);
+      Alert.alert("Error", "Failed to update email preferences");
+    }
+  };
+
+  // Transactional email toggle handler
+  const handleEmailTransactionalToggle = async (value: boolean) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      setEmailTransactionalEnabled(value);
+      
+      await updateDoc(doc(db, "users", user.uid), {
+        emailTransactionalEnabled: value,
+        updatedAt: serverTimestamp(),
+      });
+
+      if (value) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    } catch (error: any) {
+      console.error("[Settings] Error toggling transactional email:", error);
+      setEmailTransactionalEnabled(!value);
+      Alert.alert("Error", "Failed to update email preferences");
+    }
+  };
+
+  // Legacy update function - keep for backward compatibility with handleEmailToggle
+  const updateEmailSubscriptionLegacy = async (userId: string, email: string, subscribed: boolean) => {
     if (!email) return;
 
     try {
@@ -560,7 +652,7 @@ export default function SettingsScreen() {
             {/* Profile Section */}
             <Text
               className="text-lg mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
             >
               Profile
             </Text>
@@ -627,7 +719,7 @@ export default function SettingsScreen() {
             {/* Notifications Section */}
             <Text
               className="text-lg mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
             >
               App Settings
             </Text>
@@ -649,8 +741,17 @@ export default function SettingsScreen() {
                     <Text
                       style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
                     >
-                      Get notified about trip updates and campground changes
+                      Trip reminders and tips
                     </Text>
+                    {/* Show OS permission status message */}
+                    {notificationsEnabled && notificationPermissionStatus === "denied" && (
+                      <Text
+                        className="mt-1"
+                        style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: "#dc2626" }}
+                      >
+                        ⚠️ Notifications blocked in device settings. Tap to enable.
+                      </Text>
+                    )}
                   </View>
                   <Switch
                     value={notificationsEnabled}
@@ -731,7 +832,7 @@ export default function SettingsScreen() {
                         className="ml-3"
                         style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
                       >
-                        {restoringPurchases ? "Restoring..." : "Restore Purchases"}
+                        {restoringPurchases ? "Restoring..." : "Restore purchases"}
                       </Text>
                     </View>
                     <Text
@@ -748,42 +849,70 @@ export default function SettingsScreen() {
             {/* Email Section */}
             <Text
               className="text-lg mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
             >
               Email Preferences
             </Text>
 
             <View
-              className="mb-6 p-4 rounded-xl border"
+              className="mb-6 rounded-xl border"
               style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
             >
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1 mr-4">
-                  <Text
-                    className="mb-1"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
-                  >
-                    Email Updates
-                  </Text>
-                  <Text
-                    style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-                  >
-                    Get product updates and gentle first-month onboarding tips
-                  </Text>
+              {/* Transactional Emails */}
+              <View className="p-4 border-b" style={{ borderColor: BORDER_SOFT }}>
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 mr-4">
+                    <Text
+                      className="mb-1"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                    >
+                      Trip Planning Emails
+                    </Text>
+                    <Text
+                      style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                    >
+                      Invites, trip reminders, and account notices
+                    </Text>
+                  </View>
+                  <Switch
+                    value={emailTransactionalEnabled}
+                    onValueChange={handleEmailTransactionalToggle}
+                    trackColor={{ false: BORDER_SOFT, true: EARTH_GREEN }}
+                    thumbColor={PARCHMENT}
+                  />
                 </View>
-                <Switch
-                  value={emailSubscribed}
-                  onValueChange={handleEmailToggle}
-                  trackColor={{ false: BORDER_SOFT, true: EARTH_GREEN }}
-                  thumbColor={PARCHMENT}
-                />
+              </View>
+
+              {/* Marketing Emails */}
+              <View className="p-4">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 mr-4">
+                    <Text
+                      className="mb-1"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                    >
+                      Tips & Updates
+                    </Text>
+                    <Text
+                      style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                    >
+                      Product updates and gentle first-month onboarding tips
+                    </Text>
+                  </View>
+                  <Switch
+                    value={emailMarketingEnabled}
+                    onValueChange={handleEmailMarketingToggle}
+                    trackColor={{ false: BORDER_SOFT, true: EARTH_GREEN }}
+                    thumbColor={PARCHMENT}
+                  />
+                </View>
               </View>
             </View>
 
             {/* Security Section */}
             <Text
               className="text-lg mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
             >
               Security
             </Text>
@@ -851,7 +980,7 @@ export default function SettingsScreen() {
               <>
                 <Text
                   className="text-lg mb-3"
-                  style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+                  style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
                 >
                   Admin
                 </Text>
@@ -895,7 +1024,7 @@ export default function SettingsScreen() {
             {/* Privacy Section */}
             <Text
               className="text-lg mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
             >
               Privacy
             </Text>
@@ -990,7 +1119,7 @@ export default function SettingsScreen() {
               <View className="flex-row items-center justify-between mb-6">
                 <Text
                   className="text-2xl"
-                  style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+                  style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
                 >
                   Change Email
                 </Text>
@@ -1067,7 +1196,7 @@ export default function SettingsScreen() {
               <Pressable
                 onPress={handleChangeEmail}
                 disabled={updatingEmail}
-                className="py-4 rounded-xl items-center active:opacity-80"
+                className="py-3 rounded-lg items-center active:opacity-80"
                 style={{ backgroundColor: EARTH_GREEN }}
               >
                 {updatingEmail ? (
@@ -1076,7 +1205,7 @@ export default function SettingsScreen() {
                   <Text
                     style={{
                       fontFamily: "SourceSans3_600SemiBold",
-                      fontSize: 16,
+                      fontSize: 15,
                       color: PARCHMENT,
                     }}
                   >
@@ -1114,7 +1243,7 @@ export default function SettingsScreen() {
               <View className="flex-row items-center justify-between mb-6">
                 <Text
                   className="text-2xl"
-                  style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+                  style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
                 >
                   Change Password
                 </Text>
@@ -1218,7 +1347,7 @@ export default function SettingsScreen() {
               <Pressable
                 onPress={handleChangePassword}
                 disabled={updatingPassword}
-                className="py-4 rounded-xl items-center active:opacity-80"
+                className="py-3 rounded-lg items-center active:opacity-80"
                 style={{ backgroundColor: EARTH_GREEN }}
               >
                 {updatingPassword ? (
@@ -1227,7 +1356,7 @@ export default function SettingsScreen() {
                   <Text
                     style={{
                       fontFamily: "SourceSans3_600SemiBold",
-                      fontSize: 16,
+                      fontSize: 15,
                       color: PARCHMENT,
                     }}
                   >

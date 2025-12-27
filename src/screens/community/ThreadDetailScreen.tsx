@@ -15,6 +15,7 @@ import ModalHeader from "../../components/ModalHeader";
 import type { RootStackParamList, RootStackNavigationProp } from "../../navigation/types";
 import { getQuestionById, getAnswers, addAnswer, type Question, type Answer } from "../../api/qa-service";
 import { useAuthStore } from "../../state/authStore";
+import { requireEmailVerification } from "../../utils/authHelper";
 import { useToast } from "../../components/ToastManager";
 import { DEEP_FOREST, PARCHMENT } from "../../constants/colors";
 
@@ -58,6 +59,10 @@ export default function ThreadDetailScreen() {
     if (!user) {
       return;
     }
+
+    // Require email verification for posting answers
+    const isVerified = await requireEmailVerification("post answers");
+    if (!isVerified) return;
 
     try {
       setPosting(true);
@@ -107,7 +112,7 @@ export default function ThreadDetailScreen() {
         <ScrollView className="flex-1 px-6 py-4" showsVerticalScrollIndicator={false}>
           {/* Question Card */}
           <View className="bg-cream-50 rounded-xl p-4 mb-6 border border-cream-200">
-            <Text className="text-lg text-forest-800 mb-3" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+            <Text className="text-lg text-forest-800 mb-3" style={{ fontFamily: "Raleway_700Bold" }}>
               {question.question}
             </Text>
 
@@ -130,7 +135,7 @@ export default function ThreadDetailScreen() {
 
           {/* Answers Section */}
           <View className="mb-6">
-            <Text className="text-lg text-forest-800 mb-4" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+            <Text className="text-lg text-forest-800 mb-4" style={{ fontFamily: "Raleway_700Bold" }}>
               {answers.length} {answers.length === 1 ? "Answer" : "Answers"}
             </Text>
 

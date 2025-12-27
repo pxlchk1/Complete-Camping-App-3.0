@@ -2,6 +2,8 @@
  * Packing List Screen
  * Shows packing items for a selected trip with Firebase integration
  * Structure: /users/{userId}/trips/{tripId}/packingList/{itemId}
+ * 
+ * V2: Now uses packingListServiceV2 for weather-based suggestions
  */
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
@@ -24,8 +26,11 @@ import * as Haptics from "expo-haptics";
 import { useTripsStore } from "../state/tripsStore";
 import { useUserStatus } from "../utils/authHelper";
 import AccountButton from "../components/AccountButton";
+import { requirePro } from "../utils/gating";
+import AccountRequiredModal from "../components/AccountRequiredModal";
 import { RootStackParamList } from "../navigation/types";
 import { PackingItem } from "../types/camping";
+import { TripPackingItem, PackingSuggestion, PackingCategoryGroup } from "../types/packingLibrary";
 import {
   getPackingList,
   addPackingItem,
@@ -34,6 +39,9 @@ import {
   generatePackingListFromTemplate,
 } from "../api/packing-service";
 import * as LocalPackingService from "../services/localPackingService";
+import * as PackingV2 from "../services/packingListServiceV2";
+import { getCategoryLabel } from "../data/packingLibrarySeed";
+import { normalizeCategoryId } from "../utils/packingUtils";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -59,6 +67,64 @@ const DEFAULT_CATEGORIES = [
   "Trip Specific",
 ];
 
+/**
+ * Determine weather conditions based on trip start date and camping style
+ * Used to add seasonal packing items (cold weather gear, rain gear, etc.)
+ */
+function determineWeatherConditions(
+  startDate?: string,
+  campingStyle?: string
+): { isCold: boolean; isRainy: boolean; isHot: boolean } {
+  const conditions = {
+    isCold: false,
+    isRainy: false,
+    isHot: false,
+  };
+
+  // If camping style is explicitly WINTER, mark as cold
+  if (campingStyle === "WINTER") {
+    conditions.isCold = true;
+    return conditions;
+  }
+
+  // Determine conditions based on trip start date
+  if (startDate) {
+    try {
+      const date = new Date(startDate);
+      const month = date.getMonth(); // 0-11
+
+      // Winter months (December, January, February) - cold weather
+      if (month === 11 || month === 0 || month === 1) {
+        conditions.isCold = true;
+      }
+      // Spring months (March, April, May) - can be rainy
+      else if (month >= 2 && month <= 4) {
+        conditions.isRainy = true;
+        // Early spring can still be cold
+        if (month === 2) {
+          conditions.isCold = true;
+        }
+      }
+      // Summer months (June, July, August) - hot weather
+      else if (month >= 5 && month <= 7) {
+        conditions.isHot = true;
+      }
+      // Fall months (September, October, November) - can be rainy and cool
+      else if (month >= 8 && month <= 10) {
+        conditions.isRainy = true;
+        // Late fall is cold
+        if (month >= 9) {
+          conditions.isCold = true;
+        }
+      }
+    } catch (e) {
+      console.warn("Error parsing trip date for weather conditions:", e);
+    }
+  }
+
+  return conditions;
+}
+
 export default function PackingListScreen() {
   const navigation = useNavigation<PackingListScreenNavigationProp>();
   const route = useRoute<PackingListScreenRouteProp>();
@@ -72,6 +138,11 @@ export default function PackingListScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [useLocalStorage, setUseLocalStorage] = useState(false);
+  
+  // V2: Suggestions state
+  const [suggestions, setSuggestions] = useState<PackingSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false);
 
   const [showAddItem, setShowAddItem] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
@@ -80,6 +151,9 @@ export default function PackingListScreen() {
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [filterUnpackedOnly, setFilterUnpackedOnly] = useState(false);
   const [editMode, setEditMode] = useState(false);
+
+  // Gating modal state
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   // Add item form state
   const [newItemCategory, setNewItemCategory] = useState(DEFAULT_CATEGORIES[0]);
@@ -90,6 +164,24 @@ export default function PackingListScreen() {
   // Add category form state
   const [newCategoryName, setNewCategoryName] = useState("");
 
+  // V2: Build categories from items using categoryId
+  const categoryGroups = useMemo(() => {
+    if (!packingItems.length) return [];
+    return PackingV2.groupItemsByCategory(
+      packingItems.map(item => ({
+        id: item.id,
+        name: item.label,
+        categoryId: normalizeCategoryId(item.category),
+        qty: item.quantity || 1,
+        isPacked: item.isPacked,
+        source: (item as any).source || "base",
+        libraryItemId: (item as any).libraryItemId,
+        addedReason: (item as any).addedReason,
+      }))
+    );
+  }, [packingItems]);
+
+  // Legacy category support for UI
   const allCategories = useMemo(() => {
     const fromItems = packingItems.map((i) => i.category).filter(Boolean);
     const merged = Array.from(new Set([...DEFAULT_CATEGORIES, ...fromItems]));
@@ -122,7 +214,71 @@ export default function PackingListScreen() {
     setNewItemNotes("");
   }, []);
 
-  // Load packing list
+  // V2: Load suggestions based on trip context
+  const loadSuggestions = useCallback(async () => {
+    if (!trip) return;
+    
+    try {
+      const result = await PackingV2.computeSuggestions(userId, tripId, trip);
+      setSuggestions(result.suggestions);
+      console.log(`[PackingV2] Loaded ${result.suggestions.length} suggestions for ${result.context.season} season, ${result.context.tempBand} temps`);
+    } catch (err) {
+      console.error("Error loading suggestions:", err);
+      // Don't show error for suggestions - they're optional
+    }
+  }, [userId, tripId, trip]);
+
+  // V2: Add a suggestion to the packing list
+  const handleAddSuggestion = useCallback(async (suggestion: PackingSuggestion) => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await PackingV2.addSuggestion(userId, tripId, suggestion, suggestion.reason);
+      
+      // Reload items and suggestions
+      const items = await getPackingList(userId, tripId);
+      setPackingItems(items);
+      await loadSuggestions();
+      
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      console.error("Error adding suggestion:", err);
+    }
+  }, [userId, tripId, loadSuggestions]);
+
+  // V2: Dismiss a suggestion
+  const handleDismissSuggestion = useCallback(async (libraryItemId: string) => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await PackingV2.dismissSuggestion(userId, tripId, libraryItemId);
+      
+      // Remove from local state immediately
+      setSuggestions(prev => prev.filter(s => s.id !== libraryItemId));
+    } catch (err) {
+      console.error("Error dismissing suggestion:", err);
+    }
+  }, [userId, tripId]);
+
+  // V2: Add all suggestions at once
+  const handleAddAllSuggestions = useCallback(async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      for (const suggestion of suggestions) {
+        await PackingV2.addSuggestion(userId, tripId, suggestion, suggestion.reason);
+      }
+      
+      // Reload items and suggestions
+      const items = await getPackingList(userId, tripId);
+      setPackingItems(items);
+      setSuggestions([]);
+      
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      console.error("Error adding all suggestions:", err);
+    }
+  }, [userId, tripId, suggestions]);
+
+  // Load packing list with V2 initialization
   const loadPackingList = useCallback(async () => {
     if (!trip) return;
 
@@ -132,19 +288,30 @@ export default function PackingListScreen() {
     try {
       if (!useLocalStorage) {
         try {
-          const items = await getPackingList(userId, tripId);
-
-          if (items.length === 0 && trip.campingStyle) {
-            await generatePackingListFromTemplate(
-              userId,
-              tripId,
-              trip.campingStyle
-            );
-            const newItems = await getPackingList(userId, tripId);
-            setPackingItems(newItems);
-          } else {
-            setPackingItems(items);
+          // V2: Check if needs initialization
+          const needsInit = await PackingV2.needsInitialization(userId, tripId);
+          
+          if (needsInit) {
+            console.log("[PackingV2] Initializing packing list for trip:", tripId);
+            setIsInitializing(true);
+            const initResult = await PackingV2.initializeTripPackingList(userId, tripId, trip);
+            setIsInitializing(false);
+            
+            if (!initResult.success) {
+              console.warn("[PackingV2] Init failed, falling back to legacy:", initResult.error);
+              // Fall back to legacy initialization
+              if (trip.campingStyle) {
+                const conditions = determineWeatherConditions(trip.startDate, trip.campingStyle);
+                await generatePackingListFromTemplate(userId, tripId, trip.campingStyle, conditions);
+              }
+            }
           }
+          
+          const items = await getPackingList(userId, tripId);
+          setPackingItems(items);
+          
+          // V2: Load suggestions
+          await loadSuggestions();
 
           // Expand any categories we just learned about
           setExpandedCategories((prev) => {
@@ -184,7 +351,7 @@ export default function PackingListScreen() {
     } finally {
       setLoading(false);
     }
-  }, [userId, tripId, trip, useLocalStorage]);
+  }, [userId, tripId, trip, useLocalStorage, loadSuggestions]);
 
   useEffect(() => {
     loadPackingList();
@@ -236,9 +403,11 @@ export default function PackingListScreen() {
   const handleAddItem = async () => {
     if (!newItemLabel.trim()) return;
 
-    // Gate: Login required to add items
-    if (isGuest) {
-      navigation.navigate("Auth" as any);
+    // Gate: PRO required to add items
+    if (!requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: () => navigation.navigate("Paywall"),
+    })) {
       return;
     }
 
@@ -290,9 +459,11 @@ export default function PackingListScreen() {
   };
 
   const handleDeleteItem = async (item: PackingItem) => {
-    // Gate: Login required to delete items
-    if (isGuest) {
-      navigation.navigate("Auth" as any);
+    // Gate: PRO required to delete items
+    if (!requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: () => navigation.navigate("Paywall"),
+    })) {
       return;
     }
 
@@ -353,7 +524,7 @@ export default function PackingListScreen() {
                 <Text
                   className="text-xl font-bold flex-1"
                   style={{
-                    fontFamily: "JosefinSlab_700Bold",
+                    fontFamily: "Raleway_700Bold",
                     color: PARCHMENT,
                   }}
                 >
@@ -420,7 +591,7 @@ export default function PackingListScreen() {
               </View>
               <View
                 className="h-2 rounded-full overflow-hidden"
-                style={{ backgroundColor: "rgba(229, 220, 192, 0.3)" }}
+                style={{ backgroundColor: "#FFFFFF" }}
               >
                 <View
                   className="h-full rounded-full"
@@ -509,6 +680,110 @@ export default function PackingListScreen() {
             className="flex-1 px-5"
             contentContainerStyle={{ paddingBottom: 28 }}
           >
+            {/* V2: Suggestions Section */}
+            {suggestions.length > 0 && showSuggestions && (
+              <View className="mt-4 mb-2 bg-amber-50 rounded-xl p-4 border border-amber-200">
+                <View className="flex-row items-center justify-between mb-3">
+                  <View className="flex-row items-center">
+                    <Ionicons name="bulb-outline" size={20} color={GRANITE_GOLD} />
+                    <Text
+                      className="ml-2 text-base font-bold"
+                      style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
+                    >
+                      Suggested for this trip
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => setShowSuggestions(false)}
+                    className="p-1 active:opacity-70"
+                  >
+                    <Ionicons name="close" size={18} color={EARTH_GREEN} />
+                  </Pressable>
+                </View>
+                
+                <Text
+                  className="text-xs mb-3"
+                  style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
+                >
+                  Based on your trip dates and location
+                </Text>
+
+                {suggestions.slice(0, 6).map((suggestion) => (
+                  <View
+                    key={suggestion.id}
+                    className="flex-row items-center justify-between py-2 border-b border-amber-100"
+                  >
+                    <View className="flex-1 mr-2">
+                      <Text
+                        className="text-sm"
+                        style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+                      >
+                        {suggestion.name}
+                      </Text>
+                      <Text
+                        className="text-xs"
+                        style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
+                      >
+                        {suggestion.reason}
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center" style={{ gap: 8 }}>
+                      <Pressable
+                        onPress={() => handleDismissSuggestion(suggestion.id)}
+                        className="p-2 active:opacity-70"
+                      >
+                        <Ionicons name="close-circle-outline" size={22} color={EARTH_GREEN} />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleAddSuggestion(suggestion)}
+                        className="bg-forest rounded-lg px-3 py-1.5 active:opacity-90"
+                      >
+                        <Text
+                          className="text-xs"
+                          style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                        >
+                          Add
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+
+                {suggestions.length > 1 && (
+                  <Pressable
+                    onPress={handleAddAllSuggestions}
+                    className="mt-3 bg-forest rounded-lg py-2 items-center active:opacity-90"
+                  >
+                    <Text
+                      className="text-sm"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                    >
+                      Add All ({suggestions.length})
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            {/* Collapsed suggestions indicator */}
+            {suggestions.length > 0 && !showSuggestions && (
+              <Pressable
+                onPress={() => setShowSuggestions(true)}
+                className="mt-4 mb-2 bg-amber-50 rounded-xl p-3 flex-row items-center justify-between border border-amber-200 active:opacity-80"
+              >
+                <View className="flex-row items-center">
+                  <Ionicons name="bulb-outline" size={18} color={GRANITE_GOLD} />
+                  <Text
+                    className="ml-2 text-sm"
+                    style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+                  >
+                    {suggestions.length} suggestions available
+                  </Text>
+                </View>
+                <Ionicons name="chevron-down" size={18} color={EARTH_GREEN} />
+              </Pressable>
+            )}
+
             {categories.length === 0 ? (
               <View className="flex-1 items-center justify-center py-12">
                 <Ionicons name="bag-outline" size={48} color={EARTH_GREEN} />
@@ -559,7 +834,7 @@ export default function PackingListScreen() {
                         <Text
                           className="ml-2 text-base font-bold"
                           style={{
-                            fontFamily: "JosefinSlab_700Bold",
+                            fontFamily: "Raleway_700Bold",
                             color: DEEP_FOREST,
                           }}
                         >
@@ -719,7 +994,7 @@ export default function PackingListScreen() {
                 <Text
                   className="text-xl font-bold mb-4"
                   style={{
-                    fontFamily: "JosefinSlab_700Bold",
+                    fontFamily: "Raleway_700Bold",
                     color: DEEP_FOREST,
                   }}
                 >
@@ -974,6 +1249,16 @@ export default function PackingListScreen() {
             </Pressable>
           </KeyboardAvoidingView>
         </Modal>
+
+        {/* Gating Modals */}
+        <AccountRequiredModal
+          visible={showAccountModal}
+          onCreateAccount={() => {
+            setShowAccountModal(false);
+            navigation.navigate("Auth" as any);
+          }}
+          onMaybeLater={() => setShowAccountModal(false)}
+        />
       </SafeAreaView>
     </>
   );

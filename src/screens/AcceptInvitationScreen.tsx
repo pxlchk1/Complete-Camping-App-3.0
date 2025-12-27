@@ -161,7 +161,7 @@ export default function AcceptInvitationScreen() {
           <Ionicons name="alert-circle" size={64} color={TEXT_MUTED} />
           <Text
             className="text-xl mt-4 mb-2 text-center"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+            style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
           >
             Invitation Not Available
           </Text>
@@ -198,7 +198,7 @@ export default function AcceptInvitationScreen() {
           </View>
           <Text
             className="text-3xl text-center"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+            style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
           >
             You're Invited!
           </Text>
@@ -281,13 +281,13 @@ export default function AcceptInvitationScreen() {
         <Pressable
           onPress={handleAccept}
           disabled={accepting}
-          className="py-4 rounded-xl items-center active:opacity-70 mb-4"
+          className="py-3 rounded-lg items-center active:opacity-70 mb-4"
           style={{ backgroundColor: EARTH_GREEN }}
         >
           {accepting ? (
             <ActivityIndicator color={PARCHMENT} />
           ) : (
-            <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 16, color: PARCHMENT }}>
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: PARCHMENT }}>
               Accept Invitation
             </Text>
           )}

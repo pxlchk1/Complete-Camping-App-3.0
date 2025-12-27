@@ -17,6 +17,7 @@ import * as Haptics from "expo-haptics";
 
 import { auth } from "../../config/firebase";
 import { createGearReview } from "../../services/gearReviewsService";
+import { requireEmailVerification } from "../../utils/authHelper";
 import {
   BORDER_SOFT,
   CARD_BACKGROUND_LIGHT,
@@ -113,6 +114,10 @@ export default function CreateGearReviewScreen() {
       return;
     }
 
+    // Require email verification for posting content
+    const isVerified = await requireEmailVerification("post gear reviews");
+    if (!isVerified) return;
+
     const trimmedGearName = gearName.trim();
     const trimmedSummary = summary.trim();
     const trimmedBody = body.trim();
@@ -179,7 +184,7 @@ export default function CreateGearReviewScreen() {
           <Ionicons name="close" size={26} color={DEEP_FOREST} />
         </Pressable>
 
-        <Text style={{ fontFamily: "JosefinSlab_700Bold", fontSize: 18, color: TEXT_PRIMARY_STRONG }}>
+        <Text style={{ fontFamily: "Raleway_700Bold", fontSize: 16, color: TEXT_PRIMARY_STRONG }}>
           New Gear Review
         </Text>
 

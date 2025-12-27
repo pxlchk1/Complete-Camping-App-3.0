@@ -20,14 +20,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Alert,
+  Switch,
+  Linking,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { auth, db, storage } from "../config/firebase";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useCurrentUser, useUserStore } from "../state/userStore";
 import ModalHeader from "../components/ModalHeader";
@@ -89,6 +92,13 @@ export default function EditProfileScreen() {
 
   // Modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  // Danger Zone state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [optOutNewsletter, setOptOutNewsletter] = useState(currentUser?.emailSubscribed === false);
+  const [optOutNotifications, setOptOutNotifications] = useState(currentUser?.notificationsEnabled === false);
 
   const handleSave = async () => {
     const user = auth.currentUser;
@@ -211,11 +221,110 @@ export default function EditProfileScreen() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    const user = auth.currentUser;
+    if (!user || !user.email) return;
+
+    // Verify email matches
+    if (deleteConfirmEmail.toLowerCase() !== user.email.toLowerCase()) {
+      Alert.alert("Email Mismatch", "The email you entered doesn't match your account email.");
+      return;
+    }
+
+    Alert.alert(
+      "Final Confirmation",
+      "This action is irreversible. All your data will be permanently deleted. Are you absolutely sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Forever",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setDeleting(true);
+
+              // Delete user profile from Firestore
+              await deleteDoc(doc(db, "profiles", user.uid));
+
+              // Delete the user account
+              await deleteUser(user);
+
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert("Account Deleted", "Your account has been permanently deleted.");
+              
+              setShowDeleteConfirm(false);
+            } catch (error: any) {
+              console.error("[EditProfile] Error deleting account:", error);
+              
+              if (error.code === "auth/requires-recent-login") {
+                Alert.alert(
+                  "Re-authentication Required",
+                  "For security, please sign out and sign back in, then try again."
+                );
+              } else {
+                Alert.alert("Delete Failed", "Unable to delete account. Please contact support.");
+              }
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleManageSubscription = async () => {
+    try {
+      // Open app store subscription management
+      if (Platform.OS === "ios") {
+        await Linking.openURL("https://apps.apple.com/account/subscriptions");
+      } else {
+        await Linking.openURL("https://play.google.com/store/account/subscriptions");
+      }
+    } catch (error) {
+      console.error("[EditProfile] Error opening subscription management:", error);
+      Alert.alert("Error", "Unable to open subscription management.");
+    }
+  };
+
+  const handleToggleNewsletter = async (value: boolean) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setOptOutNewsletter(value);
+    
+    try {
+      await updateDoc(doc(db, "profiles", user.uid), {
+        emailSubscribed: !value,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("[EditProfile] Error updating newsletter preference:", error);
+      setOptOutNewsletter(!value); // Revert on error
+    }
+  };
+
+  const handleToggleNotifications = async (value: boolean) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setOptOutNotifications(value);
+    
+    try {
+      await updateDoc(doc(db, "profiles", user.uid), {
+        notificationsEnabled: !value,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("[EditProfile] Error updating notifications preference:", error);
+      setOptOutNotifications(!value); // Revert on error
+    }
+  };
+
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: DEEP_FOREST }} edges={["top"]}>
-      <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader
-          title="Edit Profile"
+    <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
+      <ModalHeader
+          title="Edit profile"
           showTitle
           rightAction={{
             icon: "checkmark",
@@ -230,13 +339,6 @@ export default function EditProfileScreen() {
           <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
           <View className="px-5 pt-5 pb-8">
             {/* Photos Section */}
-            <Text
-              className="text-lg mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
-            >
-              Photos
-            </Text>
-
             <View
               className="mb-6 p-4 rounded-xl border"
               style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
@@ -334,7 +436,7 @@ export default function EditProfileScreen() {
             {/* About Section */}
             <Text
               className="text-lg mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
             >
               About
             </Text>
@@ -365,7 +467,7 @@ export default function EditProfileScreen() {
             {/* Favorite Camping Style */}
             <Text
               className="text-lg mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
             >
               Favorite Camping Style
             </Text>
@@ -418,7 +520,7 @@ export default function EditProfileScreen() {
             {/* Favorite Gear */}
             <Text
               className="text-lg mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
             >
               Favorite Gear
             </Text>
@@ -469,6 +571,107 @@ export default function EditProfileScreen() {
                 </View>
               ))}
             </View>
+
+            {/* Danger Zone */}
+            <View className="mt-8 mb-2">
+              <Text
+                className="text-lg mb-3"
+                style={{ fontFamily: "Raleway_700Bold", color: "#dc2626" }}
+              >
+                Danger Zone
+              </Text>
+
+              <View
+                className="p-4 rounded-xl border"
+                style={{ backgroundColor: "#fef2f2", borderColor: "#fecaca" }}
+              >
+                {/* Opt-out Toggles */}
+                <View className="mb-4">
+                  <View className="flex-row items-center justify-between mb-3">
+                    <View className="flex-1 mr-3">
+                      <Text
+                        style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                      >
+                        Opt out of newsletters
+                      </Text>
+                      <Text
+                        className="text-sm"
+                        style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                      >
+                        Stop receiving email updates
+                      </Text>
+                    </View>
+                    <Switch
+                      value={optOutNewsletter}
+                      onValueChange={handleToggleNewsletter}
+                      trackColor={{ false: BORDER_SOFT, true: "#dc2626" }}
+                      thumbColor={PARCHMENT}
+                    />
+                  </View>
+
+                  <View className="flex-row items-center justify-between mb-4">
+                    <View className="flex-1 mr-3">
+                      <Text
+                        style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                      >
+                        Opt out of notifications
+                      </Text>
+                      <Text
+                        className="text-sm"
+                        style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                      >
+                        Disable all push notifications
+                      </Text>
+                    </View>
+                    <Switch
+                      value={optOutNotifications}
+                      onValueChange={handleToggleNotifications}
+                      trackColor={{ false: BORDER_SOFT, true: "#dc2626" }}
+                      thumbColor={PARCHMENT}
+                    />
+                  </View>
+                </View>
+
+                {/* Manage Subscription */}
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    handleManageSubscription();
+                  }}
+                  className="py-3 px-4 rounded-xl border mb-3 flex-row items-center justify-between active:opacity-70"
+                  style={{ backgroundColor: PARCHMENT, borderColor: BORDER_SOFT }}
+                >
+                  <View className="flex-row items-center">
+                    <Ionicons name="card-outline" size={20} color={TEXT_PRIMARY_STRONG} />
+                    <Text
+                      className="ml-3"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                    >
+                      Manage Subscription
+                    </Text>
+                  </View>
+                  <Ionicons name="open-outline" size={18} color={TEXT_SECONDARY} />
+                </Pressable>
+
+                {/* Delete Account */}
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setShowDeleteConfirm(true);
+                  }}
+                  className="py-3 px-4 rounded-xl flex-row items-center justify-center active:opacity-70"
+                  style={{ backgroundColor: "#dc2626" }}
+                >
+                  <Ionicons name="trash-outline" size={20} color={PARCHMENT} />
+                  <Text
+                    className="ml-2"
+                    style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                  >
+                    Delete My Account
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -513,7 +716,7 @@ export default function EditProfileScreen() {
               </View>
               <Text
                 className="text-xl mb-2"
-                style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+                style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
               >
                 Profile Updated
               </Text>
@@ -544,7 +747,110 @@ export default function EditProfileScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-      </View>
-    </SafeAreaView>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        visible={showDeleteConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteConfirm(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/50 items-center justify-center px-4"
+          onPress={() => setShowDeleteConfirm(false)}
+        >
+          <Pressable
+            className="rounded-2xl p-6 w-full max-w-sm"
+            style={{ backgroundColor: PARCHMENT }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View className="items-center mb-4">
+              <View
+                className="w-16 h-16 rounded-full items-center justify-center mb-3"
+                style={{ backgroundColor: "#dc2626" }}
+              >
+                <Ionicons name="warning" size={32} color={PARCHMENT} />
+              </View>
+              <Text
+                className="text-xl mb-2"
+                style={{ fontFamily: "Raleway_700Bold", color: "#dc2626" }}
+              >
+                Delete Account
+              </Text>
+              <Text
+                className="text-center"
+                style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY, lineHeight: 20 }}
+              >
+                This action cannot be undone. All your data, trips, and preferences will be permanently deleted.
+              </Text>
+            </View>
+
+            <View className="mb-4">
+              <Text
+                className="mb-2"
+                style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+              >
+                Enter your email to confirm:
+              </Text>
+              <TextInput
+                value={deleteConfirmEmail}
+                onChangeText={setDeleteConfirmEmail}
+                placeholder={auth.currentUser?.email || "your@email.com"}
+                placeholderTextColor={TEXT_MUTED}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                className="px-4 py-3 rounded-xl border"
+                style={{
+                  backgroundColor: PARCHMENT,
+                  borderColor: "#dc2626",
+                  fontFamily: "SourceSans3_400Regular",
+                  color: TEXT_PRIMARY_STRONG,
+                }}
+              />
+            </View>
+
+            <View className="flex-row gap-3">
+              <Pressable
+                onPress={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteConfirmEmail("");
+                }}
+                className="flex-1 rounded-xl py-3 border active:opacity-70"
+                style={{ borderColor: BORDER_SOFT }}
+              >
+                <Text
+                  className="text-center"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  Cancel
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleDeleteAccount}
+                disabled={deleting || !deleteConfirmEmail}
+                className="flex-1 rounded-xl py-3 active:opacity-70"
+                style={{ 
+                  backgroundColor: deleteConfirmEmail ? "#dc2626" : "#f87171",
+                  opacity: deleting ? 0.5 : 1,
+                }}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color={PARCHMENT} />
+                ) : (
+                  <Text
+                    className="text-center"
+                    style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                  >
+                    Delete
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
   );
 }

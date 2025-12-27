@@ -23,8 +23,8 @@ export default function AccountButton({ color = DEEP_FOREST, size = 28 }: Accoun
       // Not logged in - go straight to Auth screen
       navigation.navigate("Auth");
     } else {
-      // Logged in - go to Account screen
-      navigation.navigate("Account");
+      // Logged in - go to MyCampsite screen
+      navigation.navigate("MyCampsite");
     }
   };
 

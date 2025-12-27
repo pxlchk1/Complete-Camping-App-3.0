@@ -56,7 +56,7 @@ export default function AccountScreen() {
           <Ionicons name="person-circle-outline" size={80} color={EARTH_GREEN} />
           <Text
             className="mt-4 text-xl text-center"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+            style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
           >
             Not Signed In
           </Text>
@@ -254,7 +254,7 @@ export default function AccountScreen() {
             <View className="flex-row items-center flex-wrap mb-1">
               <Text
                 className="text-2xl"
-                style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+                style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
               >
                 {currentUser.displayName}
               </Text>
@@ -366,7 +366,7 @@ export default function AccountScreen() {
                       <Text
                         className="text-lg mb-1"
                         style={{
-                          fontFamily: "JosefinSlab_700Bold",
+                          fontFamily: "Raleway_700Bold",
                           color: PARCHMENT,
                         }}
                       >
@@ -392,7 +392,7 @@ export default function AccountScreen() {
             <View className="px-4 py-3 border-b border-neutral-200">
               <Text
                 className="text-lg"
-                style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+                style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
               >
                 Your Posts
               </Text>
@@ -430,7 +430,7 @@ export default function AccountScreen() {
             <View className="px-4 py-4 border-b border-neutral-200">
               <Text
                 className="text-lg mb-3"
-                style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+                style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
               >
                 Overview
               </Text>
@@ -507,7 +507,7 @@ export default function AccountScreen() {
             <View className="px-4 py-4 border-b border-neutral-200">
               <Text
                 className="text-lg mb-3"
-                style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+                style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
               >
                 Camping Stats
               </Text>
@@ -588,7 +588,7 @@ export default function AccountScreen() {
               <View className="px-4 py-4 border-b border-neutral-200">
                 <Text
                   className="text-lg mb-3"
-                  style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+                  style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
                 >
                   Camping Preferences
                 </Text>
@@ -639,7 +639,7 @@ export default function AccountScreen() {
             <View className="px-4 py-4">
               <Text
                 className="text-lg mb-3"
-                style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+                style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
               >
                 Account Settings
               </Text>

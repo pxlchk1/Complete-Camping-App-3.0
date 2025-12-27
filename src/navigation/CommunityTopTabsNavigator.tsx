@@ -43,15 +43,15 @@ const getHeroImage = (routeName: string) => {
 const getHeroContent = (routeName: string) => {
   switch (routeName) {
     case "Tips":
-      return { title: "Camping Tips", description: "Discover expert advice and helpful camping tips" };
+      return { title: "Community", description: "Discover expert advice and helpful camping tips" };
     case "Gear":
-      return { title: "Gear Reviews", description: "Read and share honest gear reviews from fellow campers" };
+      return { title: "Community", description: "Read and share honest gear reviews from fellow campers" };
     case "Ask":
-      return { title: "Ask the Community", description: "Get answers to your camping questions" };
+      return { title: "Community", description: "Get answers to your camping questions" };
     case "Photos":
-      return { title: "Camping Photos", description: "Share and explore beautiful camping moments" };
+      return { title: "Community", description: "Share and explore beautiful camping moments" };
     case "Feedback":
-      return { title: "Feedback", description: "Help us improve with your suggestions" };
+      return { title: "Community", description: "Help us improve with your suggestions" };
     default:
       return { title: "Community", description: "Share tips, gear reviews, and connect with fellow campers" };
   }
@@ -77,7 +77,7 @@ function HeroHeader({ activeTab }: { activeTab: string }) {
 
           <View className="flex-1 justify-end px-6 pb-4">
             <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.4)"]}
+              colors={["transparent", "rgba(0,0,0,0.5)"]}
               style={{
                 position: "absolute",
                 bottom: 0,
@@ -89,7 +89,7 @@ function HeroHeader({ activeTab }: { activeTab: string }) {
             <Text
               className="text-parchment text-3xl"
               style={{
-                fontFamily: "JosefinSlab_700Bold",
+                fontFamily: "Raleway_700Bold",
                 textShadowColor: "rgba(0, 0, 0, 0.5)",
                 textShadowOffset: { width: 0, height: 1 },
                 textShadowRadius: 4,
@@ -117,7 +117,11 @@ function HeroHeader({ activeTab }: { activeTab: string }) {
   );
 }
 
-export default function CommunityTopTabsNavigator() {
+interface CommunityTopTabsNavigatorProps {
+  initialRouteName?: string;
+}
+
+export default function CommunityTopTabsNavigator({ initialRouteName }: CommunityTopTabsNavigatorProps = {}) {
   // Use navigation state to track active tab
   const activeTabIndex = useNavigationState(state => state?.index ?? 0);
   const tabNames = ["Tips", "Gear", "Ask", "Photos", "Feedback"];
@@ -130,6 +134,7 @@ export default function CommunityTopTabsNavigator() {
 
       {/* Material Top Tabs */}
       <Tab.Navigator
+        initialRouteName={initialRouteName}
         screenOptions={{
           tabBarStyle: {
             backgroundColor: PARCHMENT,

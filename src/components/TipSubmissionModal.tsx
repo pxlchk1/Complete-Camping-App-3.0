@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTipStore, TIP_CATEGORIES } from "../state/tipStore";
 import { useAuthStore } from "../state/authStore";
 import { useToast } from "./ToastManager";
+import { DEEP_FOREST, PARCHMENT } from "../constants/colors";
 
 interface TipSubmissionModalProps {
   visible: boolean;
@@ -81,31 +82,53 @@ export default function TipSubmissionModal({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView className="flex-1 bg-parchment" edges={["top"]}>
+      <SafeAreaView className="flex-1 bg-parchment" edges={["bottom"]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           className="flex-1"
         >
-          {/* Header */}
-          <View className="px-6 py-4 border-b border-cream-200">
-            <View className="flex-row justify-between items-center">
-              <Pressable onPress={onClose} className="active:opacity-70">
-                <Ionicons name="close" size={28} color="#1F1F1F" />
-              </Pressable>
-              <Text className="text-lg text-forest-800" style={{ fontFamily: "JosefinSlab_700Bold" }}>Submit a Tip</Text>
-              <Pressable
-                onPress={handleSubmit}
-                disabled={submitting || !title.trim() || !tipText.trim() || !category}
-                className={`px-4 py-2 rounded-full ${
-                  submitting || !title.trim() || !tipText.trim() || !category
-                    ? "bg-stone-300"
-                    : "bg-forest-800 active:bg-forest-900"
-                }`}
-              >
-                <Text className="text-parchment" style={{ fontFamily: "SourceSans3_600SemiBold" }}>
-                  {submitting ? "Posting..." : "Post"}
-                </Text>
-              </Pressable>
+          {/* Header - Deep Forest Green background */}
+          <View
+            style={{
+              paddingTop: 30,
+              paddingHorizontal: 20,
+              paddingBottom: 20,
+              backgroundColor: DEEP_FOREST,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={{ fontFamily: "Raleway_700Bold", fontSize: 24, color: PARCHMENT, flex: 1, marginRight: 12 }}>Submit a tip</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <Pressable
+                  onPress={handleSubmit}
+                  disabled={submitting || !title.trim() || !tipText.trim() || !category}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                    backgroundColor: submitting || !title.trim() || !tipText.trim() || !category
+                      ? "rgba(255, 255, 255, 0.3)"
+                      : "rgba(255, 255, 255, 0.15)",
+                  }}
+                >
+                  <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
+                    {submitting ? "Posting..." : "Post"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={onClose}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: "rgba(255, 255, 255, 0.15)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons name="close" size={20} color={PARCHMENT} />
+                </Pressable>
+              </View>
             </View>
           </View>
 

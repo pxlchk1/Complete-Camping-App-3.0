@@ -25,7 +25,7 @@ interface ImageLibraryState {
     userName?: string,
     isPrivate?: boolean
   ) => Promise<string>;
-  removeImage: (imageId: string, userId: string) => Promise<void>;
+  removeImage: (imageId: string, userId: string, isAdmin?: boolean) => Promise<void>;
   voteImage: (imageId: string, userId: string, voteType: "up" | "down") => Promise<void>;
   toggleFavorite: (imageId: string) => void;
   setSearchQuery: (query: string) => void;
@@ -76,9 +76,9 @@ export const useImageLibraryStore = create<ImageLibraryState>()(
         }
       },
 
-      removeImage: async (imageId, userId) => {
+      removeImage: async (imageId, userId, isAdmin = false) => {
         try {
-          await deletePhoto(imageId, userId);
+          await deletePhoto(imageId, userId, isAdmin);
           set((state) => ({
             images: state.images.filter((img) => img.id !== imageId),
             favorites: state.favorites.filter((id) => id !== imageId),

@@ -3,7 +3,7 @@
  * Shows list of gear reviews with category filtering
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,12 +19,12 @@ import { DocumentSnapshot } from "firebase/firestore";
 import * as Haptics from "expo-haptics";
 import { getGearReviews } from "../../services/gearReviewsService";
 import { gearReviewVotesService } from "../../services/firestore/gearReviewVotesService";
-import VoteButtons from "../../components/VoteButtons";
 import { GearReview, GearCategory } from "../../types/community";
 import { RootStackNavigationProp } from "../../navigation/types";
 import { useCurrentUser } from "../../state/userStore";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
-import { requireAuth } from "../../utils/gating";
+import { requirePro } from "../../utils/gating";
+import { shouldShowInFeed } from "../../services/moderationService";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
 import {
   DEEP_FOREST,
@@ -103,9 +103,14 @@ export default function GearReviewsListScreen() {
         refresh ? undefined : lastDoc || undefined
       );
 
+      // Filter out hidden content (unless user is author)
+      const visibleReviews = result.reviews.filter(review => 
+        shouldShowInFeed(review, currentUser?.id)
+      );
+
       // Fetch votes for each review
       const reviewsWithVotes = await Promise.all(
-        result.reviews.map(async (review) => {
+        visibleReviews.map(async (review) => {
           let voteScore = 0;
           let userVote: "up" | "down" | null = null;
           try {
@@ -115,7 +120,7 @@ export default function GearReviewsListScreen() {
               const vote = await gearReviewVotesService.getUserVote(review.id);
               userVote = vote?.voteType || null;
             }
-          } catch (e) {
+          } catch {
             voteScore = review.upvoteCount || 0;
           }
           return { ...review, voteScore, userVote };
@@ -180,21 +185,6 @@ export default function GearReviewsListScreen() {
     }
   }, [searchQuery, reviews]);
 
-  const handleVote = async (reviewId: string, voteType: "up" | "down") => {
-    try {
-      await gearReviewVotesService.vote(reviewId, voteType);
-      setReviews((prev) =>
-        prev.map((review) =>
-          review.id === reviewId
-            ? { ...review, userVote: voteType, voteScore: review.voteScore + (voteType === "up" ? 1 : -1) }
-            : review
-        )
-      );
-    } catch (e) {
-      // TODO: show error toast
-    }
-  };
-
   const renderReviewItem = ({ item }: { item: GearReview & { voteScore: number; userVote: "up" | "down" | null } }) => (
     <Pressable
       onPress={() => {
@@ -212,7 +202,7 @@ export default function GearReviewsListScreen() {
           <Text
             className="text-lg mb-1"
             style={{
-              fontFamily: "JosefinSlab_700Bold",
+              fontFamily: "Raleway_700Bold",
               color: TEXT_PRIMARY_STRONG,
             }}
             numberOfLines={1}
@@ -273,19 +263,14 @@ export default function GearReviewsListScreen() {
         </View>
       )}
 
-      <View className="flex-row items-center justify-between">
-        <Text
-          className="text-xs"
-          style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}
-        >
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
+          {item.authorName || "Anonymous"}
+        </Text>
+        <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
+        <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
           {formatTimeAgo(toDateString(item.createdAt))}
         </Text>
-        <VoteButtons
-          score={item.voteScore}
-          userVote={item.userVote}
-          onVote={(voteType) => handleVote(item.id, voteType)}
-          layout="vertical"
-        />
       </View>
     </Pressable>
   );
@@ -299,11 +284,11 @@ export default function GearReviewsListScreen() {
         <Text
           className="text-lg mt-4 mb-2 text-center"
           style={{
-            fontFamily: "JosefinSlab_700Bold",
+            fontFamily: "Raleway_700Bold",
             color: TEXT_PRIMARY_STRONG,
           }}
         >
-          No Reviews Yet
+          No reviews yet
         </Text>
         <Text
           className="text-center mb-6"
@@ -313,9 +298,16 @@ export default function GearReviewsListScreen() {
             ? "No reviews match your search"
             : "Be the first to review camping gear"}
         </Text>
-        {currentUser && !searchQuery && (
+        {!searchQuery && (
           <Pressable
             onPress={() => {
+              // Gear Reviews require PRO subscription
+              const canProceed = requirePro({
+                openAccountModal: () => setShowLoginModal(true),
+                openPaywallModal: () => navigation.navigate("Paywall"),
+              });
+              if (!canProceed) return;
+              
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               navigation.navigate("CreateGearReview");
             }}
@@ -339,7 +331,7 @@ export default function GearReviewsListScreen() {
       <Text
         className="text-lg mt-4 mb-2 text-center"
         style={{
-          fontFamily: "JosefinSlab_700Bold",
+          fontFamily: "Raleway_700Bold",
           color: TEXT_PRIMARY_STRONG,
         }}
       >
@@ -370,14 +362,18 @@ export default function GearReviewsListScreen() {
 
   return (
     <View className="flex-1 bg-parchment">
-      {/* Header */}
+      {/* Action Bar */}
       <CommunitySectionHeader
-        title="Gear Reviews"
+        title="Gear reviews"
         onAddPress={() => {
+          // Gear Reviews require PRO subscription
+          const canProceed = requirePro({
+            openAccountModal: () => setShowLoginModal(true),
+            openPaywallModal: () => navigation.navigate("Paywall"),
+          });
+          if (!canProceed) return;
+          
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          if (!requireAuth(() => setShowLoginModal(true))) {
-            return;
-          }
           navigation.navigate("CreateGearReview");
         }}
       />

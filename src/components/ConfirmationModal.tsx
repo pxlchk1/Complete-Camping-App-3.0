@@ -38,7 +38,7 @@ export default function ConfirmationModal({
               <View className="w-9 h-9 rounded-full bg-[#f0f9f4] items-center justify-center mr-3">
                 <Ionicons name="checkmark" size={20} color={DEEP_FOREST} />
               </View>
-              <Text className="text-lg font-semibold text-[#16492f]" style={{ fontFamily: "JosefinSlab_600SemiBold" }} numberOfLines={1}>
+              <Text className="text-lg font-semibold text-[#16492f]" style={{ fontFamily: "Raleway_600SemiBold" }} numberOfLines={1}>
                 {title}
               </Text>
             </View>

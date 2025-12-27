@@ -12,6 +12,7 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { db, auth } from '../../config/firebase';
+import { checkAndApplyAutoHide, AUTO_HIDE_DOWNVOTE_THRESHOLD } from '../moderationService';
 
 export interface TipVote {
   userId: string;
@@ -59,11 +60,15 @@ export const tipVotesService = {
   },
 
   // Transactional voting (handles toggling and score update)
-  async vote(tipId: string, voteType: 'up' | 'down'): Promise<void> {
+  // Also checks downvote threshold for auto-hide moderation.
+  async vote(tipId: string, voteType: 'up' | 'down'): Promise<{ wasAutoHidden?: boolean }> {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to vote');
     const voteDocRef = doc(db, 'tips', tipId, 'votes', user.uid);
     const tipDocRef = doc(db, 'tips', tipId);
+    
+    let finalDownvotes = 0;
+    
     await runTransaction(db, async (transaction) => {
       const voteSnap = await transaction.get(voteDocRef);
       const tipSnap = await transaction.get(tipDocRef);
@@ -82,6 +87,16 @@ export const tipVotesService = {
       transaction.set(voteDocRef, { userId: user.uid, voteType });
       // Update tip doc
       transaction.update(tipDocRef, { upvotes, downvotes });
+      
+      finalDownvotes = downvotes;
     });
+    
+    // After transaction completes, check if we need to auto-hide
+    let wasAutoHidden = false;
+    if (finalDownvotes >= AUTO_HIDE_DOWNVOTE_THRESHOLD) {
+      wasAutoHidden = await checkAndApplyAutoHide('tips', tipId, finalDownvotes);
+    }
+    
+    return { wasAutoHidden };
   },
 };

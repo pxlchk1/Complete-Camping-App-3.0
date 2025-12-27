@@ -85,17 +85,23 @@ export async function getFeedbackPosts(
 }
 
 export async function getFeedbackPostById(postId: string): Promise<FeedbackPost | null> {
-  const postRef = doc(db, "feedbackPosts", postId);
-  const postSnap = await getDoc(postRef);
+  try {
+    const postRef = doc(db, "feedbackPosts", postId);
+    const postSnap = await getDoc(postRef);
 
-  if (!postSnap.exists()) {
-    return null;
+    if (!postSnap.exists()) {
+      return null;
+    }
+
+    return {
+      id: postSnap.id,
+      ...postSnap.data()
+    } as FeedbackPost;
+  } catch (error: any) {
+    console.error("Error fetching feedback post:", error);
+    // Throw a user-friendly error message
+    throw new Error("Unable to load feedback post. Please try again.");
   }
-
-  return {
-    id: postSnap.id,
-    ...postSnap.data()
-  } as FeedbackPost;
 }
 
 export async function createFeedbackPost(data: {
@@ -152,7 +158,11 @@ export async function getFeedbackComments(
     console.error("Error fetching feedback comments:", error);
 
     // If index is missing, try a simpler query
-    if (error.code === "failed-precondition" || error.message?.includes("index")) {
+    // Safely check error properties to avoid "Cannot read property of undefined" errors
+    const errorCode = error?.code;
+    const errorMessage = typeof error?.message === 'string' ? error.message : '';
+    
+    if (errorCode === "failed-precondition" || errorMessage.includes("index")) {
       const simpleQuery = query(commentsRef, where("feedbackId", "==", feedbackId));
       const snapshot = await getDocs(simpleQuery);
 

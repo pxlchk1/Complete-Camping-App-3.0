@@ -13,6 +13,7 @@ import MyTripsScreen from "../screens/MyTripsScreen";
 import CommunityTopTabsNavigator from "./CommunityTopTabsNavigator";
 import PlanTopTabsNavigator from "./PlanTopTabsNavigator";
 import { PlanErrorBoundary } from "../components/PlanErrorBoundary";
+import { CommunityErrorBoundary } from "../components/CommunityErrorBoundary";
 import FirstAidScreen from "../screens/FirstAidScreen";
 import CreateTripScreen from "../screens/CreateTripScreen";
 import TripDetailScreen from "../screens/TripDetailScreen";
@@ -21,12 +22,16 @@ import GearListsScreen from "../screens/GearListsScreen";
 import CreateGearListScreen from "../screens/CreateGearListScreen";
 import GearListDetailScreen from "../screens/GearListDetailScreen";
 import MyCampsiteScreen from "../screens/MyCampsiteScreen";
+import AccountScreen from "../screens/AccountScreen";
 import MyCampgroundScreen from "../screens/MyCampgroundScreen";
 import AddCamperScreen from "../screens/AddCamperScreen";
 import EditCamperScreen from "../screens/EditCamperScreen";
 import AddPeopleToTripScreen from "../screens/AddPeopleToTripScreen";
 import AuthLanding from "../screens/AuthLanding";
 import PackingListScreen from "../screens/PackingListScreen";
+import PackingListGenerateScreenV2 from "../screens/PackingListGenerateScreenV2";
+import PackingListCreateScreen from "../screens/PackingListCreateScreen";
+import PackingListEditorScreen from "../screens/PackingListEditorScreen";
 import MealPlanningScreen from "../screens/MealPlanningScreen";
 import ShoppingListScreen from "../screens/ShoppingListScreen";
 import PaywallScreen from "../screens/PaywallScreen";
@@ -52,6 +57,7 @@ import CreateQuestionScreen from "../screens/community/CreateQuestionScreen";
 import PhotosListScreen from "../screens/community/PhotosListScreen";
 import PhotoDetailScreen from "../screens/community/PhotoDetailScreen";
 import UploadPhotoScreen from "../screens/community/UploadPhotoScreen";
+import PhotoComposerScreen from "../screens/community/PhotoComposerScreen";
 import FeedbackListScreen from "../screens/community/FeedbackListScreen";
 import FeedbackDetailScreen from "../screens/community/FeedbackDetailScreen";
 import CreateFeedbackScreen from "../screens/community/CreateFeedbackScreen";
@@ -69,6 +75,11 @@ import AdminReportsScreen from "../screens/AdminReportsScreen";
 import AdminUsersScreen from "../screens/AdminUsersScreen";
 import AdminSubscriptionsScreen from "../screens/AdminSubscriptionsScreen";
 import AdminPhotosScreen from "../screens/AdminPhotosScreen";
+import AdminContentScreen from "../screens/AdminContentScreen";
+
+// Invite screens
+import AcceptInviteScreen from "../screens/AcceptInviteScreen";
+import AcceptInvitationScreen from "../screens/AcceptInvitationScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -90,6 +101,17 @@ function PlanStackNavigator(props: any) {
   );
 }
 
+function CommunityStackNavigator(props: any) {
+  console.log("[CommunityStackNavigator] mount");
+  // Extract screen param to pass as initialRouteName to the top tabs
+  const initialTab = props?.route?.params?.screen;
+  return (
+    <CommunityErrorBoundary navigation={props.navigation}>
+      <CommunityTopTabsNavigator initialRouteName={initialTab} />
+    </CommunityErrorBoundary>
+  );
+}
+
 function HomeTabs() {
   return (
     <Tab.Navigator
@@ -101,7 +123,7 @@ function HomeTabs() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Learn" component={LearnScreen} />
       <Tab.Screen name="Plan" component={PlanStackNavigator} />
-      <Tab.Screen name="Connect" component={CommunityTopTabsNavigator} />
+      <Tab.Screen name="Connect" component={CommunityStackNavigator} />
       <Tab.Screen name="FirstAid" component={FirstAidScreen} />
     </Tab.Navigator>
   );
@@ -125,7 +147,8 @@ export default function RootNavigator() {
       <Stack.Screen name="GearLists" component={GearListsScreen} />
       <Stack.Screen name="CreateGearList" component={CreateGearListScreen} />
       <Stack.Screen name="GearListDetail" component={GearListDetailScreen} />
-      <Stack.Screen name="Account" component={MyCampsiteScreen} />
+      <Stack.Screen name="Account" component={AccountScreen} />
+      <Stack.Screen name="MyCampsite" component={MyCampsiteScreen} />
       <Stack.Screen name="MyCampground" component={MyCampgroundScreen} options={{ title: "My Campground" }} />
       <Stack.Screen name="AddCamper" component={AddCamperScreen} />
       <Stack.Screen name="EditCamper" component={EditCamperScreen} />
@@ -133,6 +156,20 @@ export default function RootNavigator() {
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="SeedData" component={SeedDataScreen} />
+
+      {/* Accept Invite (from deep link - new format: /join?token=...) */}
+      <Stack.Screen 
+        name="AcceptInvite" 
+        component={AcceptInviteScreen} 
+        options={{ headerShown: false, presentation: 'modal' }} 
+      />
+
+      {/* Accept Invitation (from deep link - old format: /invite/...) */}
+      <Stack.Screen 
+        name="AcceptInvitation" 
+        component={AcceptInvitationScreen} 
+        options={{ headerShown: false, presentation: 'modal' }} 
+      />
 
       {/* Learning */}
       <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
@@ -154,6 +191,10 @@ export default function RootNavigator() {
       <Stack.Screen name="MealPlanning" component={MealPlanningScreen} />
       <Stack.Screen name="ShoppingList" component={ShoppingListScreen} />
       <Stack.Screen name="MealPlan" component={MyCampsiteScreen} />
+
+      {/* New Packing List screens (local-first) */}
+      <Stack.Screen name="PackingListCreate" component={PackingListCreateScreen} />
+      <Stack.Screen name="PackingListEditor" component={PackingListEditorScreen} />
 
       {/* Community screens */}
       <Stack.Screen name="AskQuestionModal" component={AskQuestionModal} />
@@ -180,6 +221,7 @@ export default function RootNavigator() {
       <Stack.Screen name="PhotosListScreen" component={PhotosListScreen} />
       <Stack.Screen name="PhotoDetail" component={PhotoDetailScreen} />
       <Stack.Screen name="UploadPhoto" component={UploadPhotoScreen} />
+      <Stack.Screen name="PhotoComposer" component={PhotoComposerScreen} />
 
       {/* Feedback */}
       <Stack.Screen name="FeedbackListScreen" component={FeedbackListScreen} />
@@ -199,6 +241,7 @@ export default function RootNavigator() {
       <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
       <Stack.Screen name="AdminSubscriptions" component={AdminSubscriptionsScreen} />
       <Stack.Screen name="AdminPhotos" component={AdminPhotosScreen} />
+      <Stack.Screen name="AdminContent" component={AdminContentScreen} />
     </Stack.Navigator>
   );
 }

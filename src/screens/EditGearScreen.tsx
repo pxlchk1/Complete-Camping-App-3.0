@@ -217,7 +217,7 @@ export default function EditGearScreen() {
   if (loading) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="Edit Gear" showTitle />
+        <ModalHeader title="Edit gear" showTitle />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={DEEP_FOREST} />
           <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
@@ -233,7 +233,7 @@ export default function EditGearScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="Edit Gear"
+        title="Edit gear"
         showTitle
         rightAction={{
           icon: "checkmark",
@@ -481,7 +481,7 @@ export default function EditGearScreen() {
           <Pressable
             onPress={handleSubmit}
             disabled={!name.trim() || submitting}
-            className="mt-4 mb-8 py-4 rounded-xl active:opacity-90"
+            className="mt-4 mb-8 py-3 rounded-lg active:opacity-90"
             style={{
               backgroundColor: name.trim() ? DEEP_FOREST : BORDER_SOFT,
             }}

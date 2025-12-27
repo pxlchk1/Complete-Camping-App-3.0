@@ -22,8 +22,17 @@ export interface TipPost {
   content: string;
   category: string;
   upvotes: number;
+  downvotes?: number;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
+  // Moderation fields
+  isHidden?: boolean;
+  hiddenReason?: string;
+  hiddenAt?: Timestamp;
+  needsReview?: boolean;
+  reviewQueueStatus?: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  // For moderation filter - authorId is an alias for userId
+  authorId?: string;
 }
 
 export const tipsService = {
@@ -38,13 +47,18 @@ export const tipsService = {
 
     const tipData = {
       userId: user.uid,
+      authorId: user.uid, // Alias for moderation filtering
       userName: user.displayName || 'Anonymous',
       userAvatar: user.photoURL || null,
       title: data.title,
       content: data.content,
       category: data.category,
       upvotes: 0,
+      downvotes: 0,
       createdAt: serverTimestamp(),
+      // Moderation fields
+      isHidden: false,
+      needsReview: false,
     };
 
     const docRef = await addDoc(collection(db, 'tips'), tipData);

@@ -37,11 +37,13 @@ import {
 } from "../constants/colors";
 
 const PRO_FEATURES = [
-  "Unlimited trip planning",
-  "Unlimited saved parks",
-  "Advanced gear management",
-  "Custom packing templates",
-  "Priority support",
+  "Share trip plans with your camping buddies in My Campground",
+  "Build a day-by-day itinerary with trail and map links",
+  "Plan trips end-to-end: meals, packing lists, and weather in one place",
+  "Get packing help based on season and camping style",
+  "Connect with campers for tips, photos, and gear reviews",
+  "Offline first aid reference",
+  "Track your gear closet and add items to trips fast",
 ];
 
 export default function PaywallScreen() {
@@ -206,7 +208,7 @@ export default function PaywallScreen() {
       <View className="flex-row items-center justify-between px-5 py-4 border-b" style={{ borderColor: BORDER_SOFT }}>
         <Text
           className="text-2xl"
-          style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+          style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
         >
           Go Pro
         </Text>
@@ -288,7 +290,7 @@ export default function PaywallScreen() {
                     color: PARCHMENT,
                   }}
                 >
-                  Try Again
+                  Try again
                 </Text>
               </Pressable>
             </View>
@@ -343,7 +345,7 @@ export default function PaywallScreen() {
                   <View className="flex-1">
                     <Text
                       style={{
-                        fontFamily: "JosefinSlab_700Bold",
+                        fontFamily: "Raleway_700Bold",
                         fontSize: 18,
                         color: TEXT_PRIMARY_STRONG,
                         marginBottom: 2,
@@ -403,7 +405,7 @@ export default function PaywallScreen() {
                   <View className="flex-1">
                     <Text
                       style={{
-                        fontFamily: "JosefinSlab_700Bold",
+                        fontFamily: "Raleway_700Bold",
                         fontSize: 18,
                         color: TEXT_PRIMARY_STRONG,
                         marginBottom: 2,
@@ -494,7 +496,7 @@ export default function PaywallScreen() {
                 color: restoring ? TEXT_MUTED : DEEP_FOREST,
               }}
             >
-              {restoring ? "Restoring..." : "Restore Purchases"}
+              {restoring ? "Restoring..." : "Restore purchases"}
             </Text>
           </Pressable>
         </View>

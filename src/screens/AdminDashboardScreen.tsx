@@ -4,14 +4,15 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, ScrollView, Pressable, Alert } from "react-native";
+import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { auth, db } from "../config/firebase";
-import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, deleteDoc, writeBatch } from "firebase/firestore";
 import ModalHeader from "../components/ModalHeader";
+import { seedLearningContent } from "../services/seedLearningContent";
 import {
   PARCHMENT,
   CARD_BACKGROUND_LIGHT,
@@ -33,6 +34,8 @@ export default function AdminDashboardScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+  const [clearingPhotos, setClearingPhotos] = useState(false);
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalPosts: 0,
@@ -124,9 +127,94 @@ export default function AdminDashboardScreen() {
     },
   ];
 
+  const handleSeedLearningContent = async () => {
+    Alert.alert(
+      "Seed Learning Content",
+      "This will populate Firestore with learning tracks and modules. Continue?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Seed Content",
+          onPress: async () => {
+            setSeeding(true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            
+            try {
+              const result = await seedLearningContent();
+              
+              if (result.success) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert("Success", result.message);
+              } else {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                Alert.alert("Error", result.message);
+              }
+            } catch (error) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              Alert.alert("Error", error instanceof Error ? error.message : "Failed to seed content");
+            } finally {
+              setSeeding(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearAllPhotos = async () => {
+    Alert.alert(
+      "Clear All Photos",
+      "This will permanently delete ALL photos from the photos, stories, and photoPosts collections. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete All Photos",
+          style: "destructive",
+          onPress: async () => {
+            setClearingPhotos(true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            
+            try {
+              let totalDeleted = 0;
+              
+              // Delete from 'photos' collection
+              const photosSnapshot = await getDocs(collection(db, "photos"));
+              for (const docSnap of photosSnapshot.docs) {
+                await deleteDoc(docSnap.ref);
+                totalDeleted++;
+              }
+              
+              // Delete from 'stories' collection
+              const storiesSnapshot = await getDocs(collection(db, "stories"));
+              for (const docSnap of storiesSnapshot.docs) {
+                await deleteDoc(docSnap.ref);
+                totalDeleted++;
+              }
+              
+              // Delete from 'photoPosts' collection
+              const photoPostsSnapshot = await getDocs(collection(db, "photoPosts"));
+              for (const docSnap of photoPostsSnapshot.docs) {
+                await deleteDoc(docSnap.ref);
+                totalDeleted++;
+              }
+              
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert("Success", `Deleted ${totalDeleted} photos from all collections.`);
+            } catch (error) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              Alert.alert("Error", error instanceof Error ? error.message : "Failed to clear photos");
+            } finally {
+              setClearingPhotos(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-      <ModalHeader title="Admin Dashboard" showTitle />
+      <ModalHeader title="Admin dashboard" showTitle />
 
       <ScrollView className="flex-1">
         <View className="px-5 pt-5 pb-8">
@@ -196,7 +284,7 @@ export default function AdminDashboardScreen() {
           {/* Admin Actions */}
           <Text
             className="text-lg mb-3"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+            style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
           >
             Admin Actions
           </Text>
@@ -236,6 +324,84 @@ export default function AdminDashboardScreen() {
               </View>
             </Pressable>
           ))}
+
+          {/* Data Seeding Section */}
+          <Text
+            className="text-lg mb-3 mt-4"
+            style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
+          >
+            Data Management
+          </Text>
+
+          <Pressable
+            onPress={handleSeedLearningContent}
+            disabled={seeding}
+            className="mb-3 p-4 rounded-xl border active:opacity-70"
+            style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT, opacity: seeding ? 0.7 : 1 }}
+          >
+            <View className="flex-row items-center">
+              <View
+                className="w-12 h-12 rounded-full items-center justify-center mr-3"
+                style={{ backgroundColor: EARTH_GREEN + "20" }}
+              >
+                {seeding ? (
+                  <ActivityIndicator size="small" color={EARTH_GREEN} />
+                ) : (
+                  <Ionicons name="book" size={24} color={EARTH_GREEN} />
+                )}
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-base mb-1"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  Seed Learning Content
+                </Text>
+                <Text
+                  className="text-sm"
+                  style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                >
+                  Populate tracks, modules, and quizzes
+                </Text>
+              </View>
+              <Ionicons name="cloud-upload" size={20} color={TEXT_SECONDARY} />
+            </View>
+          </Pressable>
+
+          <Pressable
+            onPress={handleClearAllPhotos}
+            disabled={clearingPhotos}
+            className="mb-3 p-4 rounded-xl border active:opacity-70"
+            style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: "#D32F2F40", opacity: clearingPhotos ? 0.7 : 1 }}
+          >
+            <View className="flex-row items-center">
+              <View
+                className="w-12 h-12 rounded-full items-center justify-center mr-3"
+                style={{ backgroundColor: "#D32F2F20" }}
+              >
+                {clearingPhotos ? (
+                  <ActivityIndicator size="small" color="#D32F2F" />
+                ) : (
+                  <Ionicons name="trash" size={24} color="#D32F2F" />
+                )}
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-base mb-1"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  Clear All Photos
+                </Text>
+                <Text
+                  className="text-sm"
+                  style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                >
+                  Delete all photos from Connect
+                </Text>
+              </View>
+              <Ionicons name="alert-circle" size={20} color="#D32F2F" />
+            </View>
+          </Pressable>
         </View>
       </ScrollView>
     </View>

@@ -37,6 +37,31 @@ export function parseInvitationLink(url: string): string | null {
 }
 
 /**
+ * Parse campground invite token from deep link URL
+ * Handles the new invite format: https://tentandlantern.com/join?token=<token>
+ */
+export function parseCampgroundInviteToken(url: string): string | null {
+  try {
+    const parsed = Linking.parse(url);
+    
+    // Handle https://tentandlantern.com/join?token=<token>
+    if (parsed.path === "/join" || parsed.path === "join") {
+      return parsed.queryParams?.token as string || null;
+    }
+    
+    // Handle tentlantern://join?token=<token>
+    if (parsed.hostname === "join") {
+      return parsed.queryParams?.token as string || null;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("[DeepLink] Error parsing invite token:", error);
+    return null;
+  }
+}
+
+/**
  * Get invitation data from Firestore
  */
 export async function getInvitationData(

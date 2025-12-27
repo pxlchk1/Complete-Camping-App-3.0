@@ -1,5 +1,6 @@
-import { collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, runTransaction } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, runTransaction, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../config/firebase';
+import { checkAndApplyAutoHide, AUTO_HIDE_DOWNVOTE_THRESHOLD } from '../moderationService';
 
 export interface FeedbackVote {
   userId: string;
@@ -50,16 +51,21 @@ export const feedbackVoteService = {
   },
 
   // Transactional voting: ensures karmaScore is updated atomically
-  async vote(postId: string, value: 1 | -1): Promise<void> {
+  // Also checks downvote threshold for auto-hide moderation.
+  async vote(postId: string, value: 1 | -1): Promise<{ wasAutoHidden?: boolean }> {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to vote');
     const postRef = doc(db, 'feedbackPosts', postId);
     const voteRef = doc(db, 'feedbackPosts', postId, 'votes', user.uid);
+    
+    let finalDownvotes = 0;
+    
     await runTransaction(db, async (transaction) => {
       const postSnap = await transaction.get(postRef);
       if (!postSnap.exists) throw new Error('Post not found');
       const voteSnap = await transaction.get(voteRef);
       let karmaScore = postSnap.data().karmaScore || 0;
+      let downvotes = postSnap.data().downvotes || 0;
       let prevValue = 0;
       if (voteSnap.exists) {
         prevValue = voteSnap.data().value;
@@ -68,11 +74,25 @@ export const feedbackVoteService = {
       if (prevValue === value) {
         transaction.delete(voteRef);
         karmaScore -= value;
+        // Track downvotes for moderation
+        if (value === -1) downvotes--;
       } else {
         transaction.set(voteRef, { value });
         karmaScore += value - prevValue;
+        // Track downvotes for moderation
+        if (value === -1) downvotes++;
+        if (prevValue === -1) downvotes--;
       }
-      transaction.update(postRef, { karmaScore });
+      transaction.update(postRef, { karmaScore, downvotes });
+      finalDownvotes = downvotes;
     });
+    
+    // After transaction completes, check if we need to auto-hide
+    let wasAutoHidden = false;
+    if (finalDownvotes >= AUTO_HIDE_DOWNVOTE_THRESHOLD) {
+      wasAutoHidden = await checkAndApplyAutoHide('feedbackPosts', postId, finalDownvotes);
+    }
+    
+    return { wasAutoHidden };
   },
 };

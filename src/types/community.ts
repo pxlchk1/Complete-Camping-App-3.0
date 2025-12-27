@@ -58,6 +58,7 @@ export interface GearReview {
   cons?: string;
   tags: string[];
   authorId: string;
+  authorName?: string; // Display name of the author
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
   upvoteCount: number;
@@ -124,13 +125,18 @@ export interface Story {
   id: string;
   imageUrl: string;
   thumbnailUrl?: string;
+  title?: string;
   caption: string;
   tags: string[];
   authorId: string;
+  displayName?: string;
   createdAt: Timestamp | string;
   locationLabel?: string;
+  locationName?: string;
   likeCount: number;
   commentCount: number;
+  upvotes?: number;
+  downvotes?: number;
 }
 
 export interface StoryComment {

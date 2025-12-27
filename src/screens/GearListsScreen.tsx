@@ -28,7 +28,7 @@ export default function GearListsScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-3 border-b border-parchmentDark">
         <View className="flex-row items-center justify-between mb-2">
-          <Heading2>Packing Lists</Heading2>
+          <Heading2>Packing lists</Heading2>
           <View className="flex-row items-center gap-2">
             <Pressable
               onPress={() => navigation.navigate("CreateGearList", {})}
@@ -50,7 +50,7 @@ export default function GearListsScreen() {
               style={{ width: 200, height: 200, marginBottom: 16 }}
               resizeMode="contain"
             />
-            <Text className="text-[#16492f] text-lg font-semibold mb-2" style={{ fontFamily: "JosefinSlab_600SemiBold" }}>
+            <Text className="text-[#16492f] text-lg font-semibold mb-2" style={{ fontFamily: "Raleway_600SemiBold" }}>
               No packing lists yet
             </Text>
             <BodyText className="text-center mb-6 px-8">

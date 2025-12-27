@@ -1,6 +1,7 @@
 /**
  * Add Camper Screen
  * Form to add a new contact to My Campground
+ * After adding, shows invite options sheet
  */
 
 import React, { useState } from "react";
@@ -14,17 +15,16 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Switch,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { auth, db } from "../config/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { auth } from "../config/firebase";
 import { createCampgroundContact } from "../services/campgroundContactsService";
-import { sendCampgroundInvitation } from "../services/emailService";
+import { CampgroundContact } from "../types/campground";
 import { RootStackNavigationProp } from "../navigation/types";
 import ModalHeader from "../components/ModalHeader";
+import InviteOptionsSheet from "../components/InviteOptionsSheet";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -43,8 +43,11 @@ export default function AddCamperScreen() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
-  const [sendInvite, setSendInvite] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Invite sheet state
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
+  const [newContact, setNewContact] = useState<CampgroundContact | null>(null);
 
   const handleSubmit = async () => {
     const user = auth.currentUser;
@@ -58,53 +61,32 @@ export default function AddCamperScreen() {
       return;
     }
 
-    // Validate email if sending invite
-    if (sendInvite && !email.trim()) {
-      Alert.alert("Email Required", "Please enter an email address to send the invitation");
-      return;
-    }
-
-    if (sendInvite && email.trim() && !isValidEmail(email.trim())) {
-      Alert.alert("Invalid Email", "Please enter a valid email address");
-      return;
-    }
-
     try {
       setSubmitting(true);
 
       // Create the contact
-      await createCampgroundContact(user.uid, {
+      const contactId = await createCampgroundContact(user.uid, {
         contactName: displayName.trim(),
         contactEmail: email.trim() || undefined,
         contactNote: notes.trim() || undefined,
       });
 
-      // Send invitation email if requested
-      if (sendInvite && email.trim()) {
-        try {
-          // Get inviter's display name
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          const inviterName = userDoc.exists()
-            ? userDoc.data().displayName || "A camper"
-            : "A camper";
+      // Create a contact object for the invite sheet
+      const contact: CampgroundContact = {
+        id: contactId,
+        ownerId: user.uid,
+        contactName: displayName.trim(),
+        contactEmail: email.trim() || null,
+        contactNote: notes.trim() || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
-          await sendCampgroundInvitation(
-            email.trim(),
-            displayName.trim(),
-            inviterName
-          );
-        } catch (emailError) {
-          console.error("Error sending invitation email:", emailError);
-          // Don't fail the whole operation if email fails
-          Alert.alert(
-            "Contact Added",
-            "Contact was added successfully, but we could not send the invitation email. You can manually share the app with them."
-          );
-        }
-      }
-
+      setNewContact(contact);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      navigation.goBack();
+      
+      // Show invite options sheet
+      setShowInviteSheet(true);
     } catch (error: any) {
       console.error("Error adding contact:", error);
       Alert.alert("Error", error.message || "Failed to add contact");
@@ -113,15 +95,20 @@ export default function AddCamperScreen() {
     }
   };
 
-  const isValidEmail = (email: string): boolean => {
+  const handleInviteSheetClose = () => {
+    setShowInviteSheet(false);
+    navigation.goBack();
+  };
+
+  const isValidEmail = (emailStr: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    return emailRegex.test(emailStr);
   };
 
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="Add Camper"
+        title="Add camper"
         showTitle
         rightAction={{
           icon: "checkmark",
@@ -164,7 +151,7 @@ export default function AddCamperScreen() {
               className="mb-2"
               style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
             >
-              Email {sendInvite && "*"}
+              Email
             </Text>
             <TextInput
               value={email}
@@ -181,44 +168,12 @@ export default function AddCamperScreen() {
                 color: TEXT_PRIMARY_STRONG,
               }}
             />
-          </View>
-
-          {/* Send Invitation Checkbox */}
-          <View
-            className="mb-4 p-4 rounded-xl border"
-            style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
-          >
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setSendInvite(!sendInvite);
-              }}
-              className="flex-row items-start active:opacity-70"
+            <Text
+              className="mt-1 text-xs"
+              style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
             >
-              <View
-                className="w-6 h-6 rounded border-2 items-center justify-center mr-3 mt-0.5"
-                style={{
-                  borderColor: sendInvite ? EARTH_GREEN : BORDER_SOFT,
-                  backgroundColor: sendInvite ? EARTH_GREEN : "transparent",
-                }}
-              >
-                {sendInvite && <Ionicons name="checkmark" size={18} color={PARCHMENT} />}
-              </View>
-              <View className="flex-1">
-                <Text
-                  className="mb-1"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
-                >
-                  Send invitation email
-                </Text>
-                <Text
-                  style={{ fontFamily: "SourceSans3_400Regular", fontSize: 14, color: TEXT_SECONDARY }}
-                >
-                  Adding this person will send an email with instructions for how they can join your
-                  campground and be included in all your camping trip plans & details.
-                </Text>
-              </View>
-            </Pressable>
+              Needed to send email invitations
+            </Text>
           </View>
 
           {/* Phone Field */}
@@ -276,7 +231,7 @@ export default function AddCamperScreen() {
           <Pressable
             onPress={handleSubmit}
             disabled={!displayName.trim() || submitting}
-            className="mt-4 mb-8 py-4 rounded-xl active:opacity-90"
+            className="mt-4 mb-8 py-3 rounded-lg active:opacity-90"
             style={{
               backgroundColor: displayName.trim() ? DEEP_FOREST : BORDER_SOFT,
             }}
@@ -294,6 +249,15 @@ export default function AddCamperScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Invite Options Sheet */}
+      {newContact && (
+        <InviteOptionsSheet
+          visible={showInviteSheet}
+          onClose={handleInviteSheetClose}
+          contact={newContact}
+        />
+      )}
     </View>
   );
 }

@@ -207,7 +207,7 @@ export default function AdminPanel({ currentUserId }: AdminPanelProps) {
     <ScrollView className="flex-1 px-5 py-6">
       <Text
         className="text-lg mb-4"
-        style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+        style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
       >
         Administrator Panel
       </Text>

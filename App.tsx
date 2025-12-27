@@ -1,12 +1,15 @@
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, LinkingOptions } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFonts } from "expo-font";
+import * as Linking from "expo-linking";
 import {
-  JosefinSlab_600SemiBold,
-  JosefinSlab_700Bold,
-} from "@expo-google-fonts/josefin-slab";
+  Raleway_400Regular,
+  Raleway_500Medium,
+  Raleway_600SemiBold,
+  Raleway_700Bold,
+} from "@expo-google-fonts/raleway";
 import {
   SourceSans3_400Regular,
   SourceSans3_600SemiBold,
@@ -20,10 +23,36 @@ import { View, ImageBackground } from "react-native";
 import { useEffect, useState } from "react";
 import { initSubscriptions, identifyUser } from "./src/services/subscriptionService";
 import { useAuthStore } from "./src/state/authStore";
+import { useTripsStore } from "./src/state/tripsStore";
 import { auth } from "./src/config/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { getDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "./src/config/firebase";
+import { RootStackParamList } from "./src/navigation/types";
+
+// Deep linking configuration
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: [
+    Linking.createURL('/'), // tentlantern:// (app scheme)
+    'https://tentandlantern.com',
+    'https://tentlantern.app',
+  ],
+  config: {
+    screens: {
+      // New campground invite format: /join?token=<token>
+      AcceptInvite: {
+        path: 'join',
+        parse: {
+          token: (token: string) => token,
+        },
+      },
+      // Old invitation format: /invite/<token>
+      AcceptInvitation: {
+        path: 'invite/:invitationToken',
+      },
+    },
+  },
+};
 
 /*
 IMPORTANT NOTICE: DO NOT REMOVE
@@ -48,9 +77,11 @@ const openai_api_key = Constants.expoConfig.extra.apikey;
 
 export default function App() {
   const [fontsLoaded] = useFonts({
-    // Display Font: Josefin Slab (NEVER use 400Regular - use SemiBold instead)
-    JosefinSlab_600SemiBold,
-    JosefinSlab_700Bold,
+    // Heading Font: Raleway
+    Raleway_400Regular,
+    Raleway_500Medium,
+    Raleway_600SemiBold,
+    Raleway_700Bold,
     // Body Font: Source Sans 3
     SourceSans3_400Regular,
     SourceSans3_600SemiBold,
@@ -58,6 +89,11 @@ export default function App() {
     // Accent Font: Satisfy (use very sparingly)
     Satisfy_400Regular,
   });
+
+  // Log when fonts are loaded for verification
+  if (fontsLoaded) {
+    console.log("Fonts loaded: Raleway + SourceSans3 + Satisfy");
+  }
 
   const [appReady, setAppReady] = useState(false);
   const [subscriptionsInitialized, setSubscriptionsInitialized] = useState(false);
@@ -122,6 +158,9 @@ export default function App() {
         }
       } else {
         console.log("[App] Firebase user signed out");
+        // Clear user-specific data from local stores
+        useTripsStore.getState().clearTrips();
+        useAuthStore.getState().signOut();
         // User remains anonymous in RevenueCat or call logOut if needed
       }
     });
@@ -156,6 +195,7 @@ export default function App() {
         <SafeAreaProvider>
           <ToastProvider>
             <NavigationContainer
+              linking={linking}
               onStateChange={(state) => {
                 console.log('[Navigation] State changed:', state);
               }}

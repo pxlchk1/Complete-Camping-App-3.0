@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontFamily: "JosefinSlab_700Bold",
+    fontFamily: "Raleway_700Bold",
     fontSize: 20,
     color: "#485952",
     marginLeft: 8,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     borderColor: "#D5C8A2",
   },
   cardTitle: {
-    fontFamily: "JosefinSlab_700Bold",
+    fontFamily: "Raleway_700Bold",
     fontSize: 24,
     color: "#485952",
     marginBottom: 12,
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: "#485952",
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
   },
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontFamily: "SourceSans3_600SemiBold",
-    fontSize: 18,
+    fontSize: 15,
     color: "#F4EBD0",
   },
   successBox: {

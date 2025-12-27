@@ -97,7 +97,7 @@ export default function CreateGearListScreen() {
         {/* Header */}
         <View className="px-5 pt-4 pb-3 border-b border-parchmentDark">
           <View className="flex-row items-center justify-between">
-            <Heading2>Create Packing List</Heading2>
+            <Heading2>Create packing list</Heading2>
             <View className="flex-row items-center gap-2">
               <Pressable
                 onPress={() => navigation.goBack()}

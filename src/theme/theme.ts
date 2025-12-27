@@ -1,88 +1,132 @@
-import { StyleSheet } from "react-native";
+// src/theme/theme.ts
+import { Platform, StyleSheet } from "react-native";
+import {
+  INK,
+  PARCHMENT,
+  PARCHMENT_SOFT,
+  DEEP_FOREST,
+  DEEP_FOREST_PRESSED,
+  EARTH_GREEN,
+  RIVER_ROCK,
+  GRANITE_GOLD,
+  RUST,
+  RUST_DEEP,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+  TEXT_ON_DARK,
+  BORDER_SOFT,
+  CARD_BACKGROUND_LIGHT,
+  DISABLED_BG,
+  DISABLED_TEXT,
+} from "../constants/colors";
 
-/**
- * Complete Camping App - Master Theme
- *
- * This is the single source of truth for all design tokens.
- * DO NOT define colors, fonts, or spacing elsewhere.
- * All screens and components must import from this file.
- */
-
-// ============================================================================
-// COLORS
-// ============================================================================
-
-export const colors = {
-  // Primary palette
-  deepForest: "#485952",   // Primary text, headings, icons, buttons
-  earthGreen: "#828872",   // Secondary text, muted labels
-  graniteGold: "#AC9A6D",  // Accents, highlights (use sparingly)
-  riverRock: "#607A77",    // Status badges, card accents
-  sierraSky: "#92AFB1",    // Soft backgrounds, dividers
-  parchment: "#F4EBD0",    // Universal background
-  darkBrown: "#3D2817",    // Primary body text (AA contrast)
-
-  // Derived neutrals
-  borderSoft: "#D5C8A2",   // Card borders, dividers
-  cardFill: "#F7EFD8",     // Slightly warmer than parchment for cards
-  hairline: "#B26A4A",     // Hairline separators, subtle accents with warmth
-};
-
-// ============================================================================
-// TYPOGRAPHY
-// ============================================================================
-
+// Font family strings must match what we load in the app.
+// If they differ, adjust only these strings (do not change usage across screens).
 export const fonts = {
-  // Display fonts (Josefin Slab) - for headers and titles
-  displayRegular: "JosefinSlab_600SemiBold",  // Note: Regular is actually SemiBold
-  displaySemibold: "JosefinSlab_600SemiBold",
-  displayBold: "JosefinSlab_700Bold",
-
-  // Body fonts (Source Sans 3) - for body text, labels, buttons
+  display: Platform.select({
+    ios: "Satisfy_400Regular",
+    android: "Satisfy_400Regular",
+    default: "Satisfy_400Regular",
+  }),
+  // Heading fonts: Raleway
+  heading: Platform.select({
+    ios: "Raleway_600SemiBold",
+    android: "Raleway_600SemiBold",
+    default: "Raleway_600SemiBold",
+  }),
+  headingSemi: Platform.select({
+    ios: "Raleway_600SemiBold",
+    android: "Raleway_600SemiBold",
+    default: "Raleway_600SemiBold",
+  }),
+  body: Platform.select({
+    ios: "SourceSans3_400Regular",
+    android: "SourceSans3_400Regular",
+    default: "SourceSans3_400Regular",
+  }),
+  bodySemi: Platform.select({
+    ios: "SourceSans3_600SemiBold",
+    android: "SourceSans3_600SemiBold",
+    default: "SourceSans3_600SemiBold",
+  }),
+  // Legacy aliases for backward compatibility - now using Raleway
+  displayRegular: "Raleway_600SemiBold",
+  displaySemibold: "Raleway_600SemiBold",
+  displayBold: "Raleway_700Bold",
   bodyRegular: "SourceSans3_400Regular",
   bodySemibold: "SourceSans3_600SemiBold",
   bodyBold: "SourceSans3_700Bold",
-
-  // Accent font (Satisfy) - decorative only, very sparingly
   accent: "Satisfy_400Regular",
 };
 
 export const fontSizes = {
-  xl: 38,  // Hero titles
-  lg: 30,  // Section headers
-  md: 20,  // Card titles
-  sm: 16,  // Body text
-  xs: 13,  // Labels, metadata
+  xs: 12,
+  sm: 14,
+  md: 16,
+  lg: 18,
+  xl: 22,
+  xxl: 28,
+  hero: 34,
 };
-
-// ============================================================================
-// SPACING SCALE
-// ============================================================================
 
 export const spacing = {
   xxs: 4,
-  xs: 8,
-  sm: 12,
-  md: 16,
-  lg: 24,
-  xl: 32,
+  xs: 6,
+  sm: 10,
+  md: 14,
+  lg: 18,
+  xl: 24,
+  xxl: 32,
 };
 
-// ============================================================================
-// BORDER RADIUS
-// ============================================================================
-
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
+  sm: 10,
+  md: 14,
+  lg: 18,
+  xl: 22,
   pill: 999,
 };
 
-// ============================================================================
-// SHADOWS (soft, print-inspired)
-// ============================================================================
+// Compatibility object. Keep both semantic tokens and legacy-style aliases.
+export const colors = {
+  // Text
+  ink: INK,
+  text: TEXT_PRIMARY,
+  textSecondary: TEXT_SECONDARY,
+  textOnDark: TEXT_ON_DARK,
+  darkBrown: INK,
 
+  // Surfaces
+  parchment: PARCHMENT,
+  parchmentSoft: PARCHMENT_SOFT,
+  background: PARCHMENT,
+  surface: PARCHMENT_SOFT,
+  cardBgLight: CARD_BACKGROUND_LIGHT,
+  cardFill: PARCHMENT_SOFT,
+
+  // Brand
+  deepForest: DEEP_FOREST,
+  deepForestPressed: DEEP_FOREST_PRESSED,
+  earthGreen: EARTH_GREEN,
+  riverRock: RIVER_ROCK,
+
+  graniteGold: GRANITE_GOLD,
+  rust: RUST,
+  rustDeep: RUST_DEEP,
+
+  // Lines and states
+  borderSoft: BORDER_SOFT,
+  border: BORDER_SOFT,
+
+  disabledBg: DISABLED_BG,
+  disabledText: DISABLED_TEXT,
+
+  // Common semantic aliases some screens use
+  primary: DEEP_FOREST,
+  primaryPressed: DEEP_FOREST_PRESSED,
+};
+
+// Shadows (soft, print-inspired)
 export const shadows = {
   card: {
     shadowColor: "#000",
@@ -93,115 +137,73 @@ export const shadows = {
   },
 };
 
-// ============================================================================
-// TEXT STYLES
-// ============================================================================
-
+// Optional text presets if our Typography components support them.
 export const textStyles = StyleSheet.create({
-  // Hero title - welcome and section landings
+  h1: { fontFamily: fonts.heading, fontSize: fontSizes.xxl, lineHeight: 34, color: colors.text },
+  h2: { fontFamily: fonts.heading, fontSize: fontSizes.xl, lineHeight: 28, color: colors.text },
+  h3: { fontFamily: fonts.headingSemi, fontSize: fontSizes.lg, lineHeight: 24, color: colors.text },
+  body: { fontFamily: fonts.body, fontSize: fontSizes.md, lineHeight: 22, color: colors.text },
+  bodySecondary: { fontFamily: fonts.body, fontSize: fontSizes.md, lineHeight: 22, color: colors.textSecondary },
+  label: { fontFamily: fonts.bodySemi, fontSize: fontSizes.sm, lineHeight: 18, color: colors.text },
+  caption: { fontFamily: fonts.body, fontSize: fontSizes.xs, lineHeight: 16, color: colors.textSecondary },
+  // Legacy text style aliases for backward compatibility
   headingHero: {
     fontFamily: fonts.displayBold,
-    fontSize: fontSizes.xl,
-    lineHeight: 44,
+    fontSize: fontSizes.xxl,
+    lineHeight: 34,
     textAlign: "center" as const,
     color: colors.deepForest,
   },
-
-  // Section titles on content screens
   headingSection: {
     fontFamily: fonts.displaySemibold,
-    fontSize: fontSizes.lg,
-    lineHeight: 36,
-    color: colors.deepForest,
+    fontSize: fontSizes.xl,
+    lineHeight: 28,
+    color: colors.text,
   },
-
-  // Card titles, list item titles
   headingCard: {
     fontFamily: fonts.displayRegular,
-    fontSize: fontSizes.md,
-    lineHeight: 25,
-    color: colors.deepForest,
+    fontSize: fontSizes.lg,
+    lineHeight: 24,
+    color: colors.text,
   },
-
-  // Normal body copy
-  body: {
-    fontFamily: fonts.bodyRegular,
-    fontSize: fontSizes.sm,
-    lineHeight: 22,
-    color: colors.darkBrown,
-  },
-
-  // Secondary body (subtle text, helper copy)
-  bodySecondary: {
-    fontFamily: fonts.bodyRegular,
-    fontSize: fontSizes.sm,
-    lineHeight: 22,
-    color: colors.earthGreen,
-  },
-
-  // Labels and metadata (time, XP, difficulty)
-  label: {
-    fontFamily: fonts.bodySemibold,
-    fontSize: fontSizes.xs,
-    letterSpacing: 0.13,
-    color: colors.darkBrown,
-  },
-
-  // Small muted labels
   labelSoft: {
     fontFamily: fonts.bodyRegular,
     fontSize: fontSizes.xs,
-    color: colors.earthGreen,
+    color: colors.textSecondary,
   },
-
-  // Accent script - tiny decorative only
   accentScript: {
     fontFamily: fonts.accent,
     fontSize: fontSizes.sm,
     color: colors.graniteGold,
   },
-
-  // Button text - primary
   buttonPrimary: {
     fontFamily: fonts.bodySemibold,
     fontSize: fontSizes.sm,
     color: colors.parchment,
   },
-
-  // Button text - secondary
   buttonSecondary: {
     fontFamily: fonts.bodySemibold,
     fontSize: fontSizes.sm,
-    color: colors.darkBrown,
+    color: colors.text,
   },
-
-  // Button text - text link
   buttonText: {
     fontFamily: fonts.bodySemibold,
     fontSize: fontSizes.sm,
-    color: colors.darkBrown,
+    color: colors.text,
   },
 });
 
-// ============================================================================
-// COMPONENT STYLES
-// ============================================================================
-
+// Component styles for backward compatibility
 export const componentStyles = StyleSheet.create({
-  // Screen wrapper
   screen: {
     flex: 1,
     backgroundColor: colors.parchment,
   },
-
-  // Safe padding for screen content
   screenInner: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
-
-  // Card container
   card: {
     backgroundColor: colors.cardFill,
     borderRadius: radius.md,
@@ -211,22 +213,16 @@ export const componentStyles = StyleSheet.create({
     marginBottom: spacing.md,
     ...shadows.card,
   },
-
-  // Card header row
   cardHeader: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
     marginBottom: spacing.sm,
   },
-
-  // Card divider
   cardDivider: {
     height: 1,
     backgroundColor: colors.borderSoft,
     marginVertical: spacing.sm,
   },
-
-  // Primary button
   buttonPrimary: {
     backgroundColor: colors.deepForest,
     borderRadius: radius.pill,
@@ -235,8 +231,6 @@ export const componentStyles = StyleSheet.create({
     alignItems: "center" as const,
     justifyContent: "center" as const,
   },
-
-  // Secondary button (outline)
   buttonSecondary: {
     borderRadius: radius.pill,
     borderWidth: 1,
@@ -246,27 +240,20 @@ export const componentStyles = StyleSheet.create({
     alignItems: "center" as const,
     justifyContent: "center" as const,
   },
-
-  // Text button
   buttonText: {
     paddingVertical: spacing.xs,
   },
-
-  // Status pill/chip
   pill: {
     borderRadius: radius.pill,
     paddingVertical: 4,
     paddingHorizontal: 10,
-    backgroundColor: colors.riverRock,
+    backgroundColor: colors.deepForest,
   },
-
   pillText: {
     fontFamily: fonts.bodySemibold,
     fontSize: fontSizes.xs,
     color: colors.parchment,
   },
-
-  // Tab bar
   tabBar: {
     backgroundColor: colors.parchment,
     borderTopWidth: 1,
@@ -277,22 +264,16 @@ export const componentStyles = StyleSheet.create({
     justifyContent: "space-between" as const,
     alignItems: "center" as const,
   },
-
-  // Tab item
   tabItem: {
     flex: 1,
     alignItems: "center" as const,
     justifyContent: "center" as const,
   },
-
-  // Hero illustration wrapper
   heroImage: {
     width: "100%" as const,
     height: undefined,
     aspectRatio: 16 / 9,
   },
-
-  // Content below hero
   heroContent: {
     paddingTop: spacing.lg,
     paddingHorizontal: spacing.lg,
@@ -300,32 +281,17 @@ export const componentStyles = StyleSheet.create({
   },
 });
 
-// ============================================================================
-// LAYOUT CONSTANTS
-// ============================================================================
-
+// Layout constants
 export const layout = {
-  // Screen horizontal padding
   screenPadding: spacing.lg,
-
-  // Section spacing
   sectionMarginTop: spacing.lg,
   sectionHeaderMarginBottom: spacing.sm,
-
-  // Card spacing
   cardSpacing: spacing.md,
-
-  // Bottom padding in scroll views
   scrollBottomPadding: spacing.xl,
-
-  // Minimum tap target
   minTapTarget: 44,
 };
 
-// ============================================================================
-// ICON COLORS
-// ============================================================================
-
+// Icon colors
 export const iconColors = {
   default: colors.deepForest,
   muted: colors.earthGreen,
@@ -333,17 +299,3 @@ export const iconColors = {
   active: colors.deepForest,
   inactive: colors.earthGreen,
 };
-
-// ============================================================================
-// ACCESSIBILITY RULES (enforced by theme)
-// ============================================================================
-
-/**
- * ACCESSIBILITY RULES:
- *
- * 1. Body text must use deepForest on parchment for maximum contrast
- * 2. Do not use graniteGold for body copy - only for accents/headings
- * 3. Never place light text on mid-tone backgrounds
- * 4. Minimum body size: 16px (fontSizes.sm)
- * 5. Minimum tap target height: 44px (layout.minTapTarget)
- */

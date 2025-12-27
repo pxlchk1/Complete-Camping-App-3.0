@@ -29,32 +29,32 @@ export default function PlanTopNav({ activeTab, onTabChange }: PlanTopNavProps) 
   };
 
   const navItems: { id: NavItem; icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
-    { id: "trips", icon: "calendar", label: "Trips" },
+    { id: "trips", icon: "calendar", label: "Plan" },
     { id: "parks", icon: "earth", label: "Parks" },
     { id: "weather", icon: "cloud", label: "Weather" },
-    { id: "packing", icon: "bag", label: "Packing" },
+    { id: "packing", icon: "bag", label: "Pack" },
     { id: "meals", icon: "restaurant", label: "Meals" },
   ];
 
   return (
     <View className="bg-parchment border-b border-cream-200">
-      <View className="flex-row px-4">
+      <View className="flex-row px-2">
         {navItems.map((tab) => (
           <Pressable
             key={tab.id}
             onPress={() => handleTabPress(tab.id)}
-            className={`flex-1 py-4 items-center border-b-2 ${
+            className={`flex-1 py-3 items-center border-b-2 ${
               activeTab === tab.id ? "border-amber-600" : "border-transparent"
             }`}
           >
             <View className="items-center justify-center">
               <Ionicons
                 name={tab.icon}
-                size={20}
+                size={18}
                 color={activeTab === tab.id ? DEEP_FOREST : "#696969"}
               />
               <Text
-                className={`text-sm mt-1 text-center ${
+                className={`text-xs mt-0.5 text-center ${
                   activeTab === tab.id ? "text-forest-800" : "text-stone-600"
                 }`}
                 style={{ fontFamily: fonts.bodySemibold }}

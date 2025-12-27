@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { MealCategory, PrepType, Difficulty } from "../types/meal";
-import { DEEP_FOREST, EARTH_GREEN, PARCHMENT, RIVER_ROCK } from "../constants/colors";
+import { DEEP_FOREST, EARTH_GREEN, PARCHMENT, TEXT_SECONDARY, TEXT_MUTED } from "../constants/colors";
 import * as Haptics from "expo-haptics";
 
 interface AddCustomMealModalProps {
@@ -90,14 +90,35 @@ export default function AddCustomMealModal({ visible, onClose, onSave }: AddCust
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
           <View className="bg-parchment rounded-t-3xl" style={{ height: "85%" }}>
-            {/* Header */}
-            <View className="flex-row items-center justify-between px-6 py-4 border-b border-parchmentDark">
-              <Text className="text-xl font-bold" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
-                Add Custom Meal
-              </Text>
-              <Pressable onPress={handleClose} className="p-2 active:opacity-70">
-                <Ionicons name="close" size={24} color={DEEP_FOREST} />
-              </Pressable>
+            {/* Header - Deep Forest Green background */}
+            <View
+              style={{
+                paddingTop: 30,
+                paddingHorizontal: 20,
+                paddingBottom: 20,
+                backgroundColor: DEEP_FOREST,
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <Text style={{ fontFamily: "Raleway_700Bold", fontSize: 24, color: PARCHMENT, flex: 1, marginRight: 12 }}>
+                  Add Custom Meal
+                </Text>
+                <Pressable
+                  onPress={handleClose}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: "rgba(255, 255, 255, 0.15)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons name="close" size={20} color={PARCHMENT} />
+                </Pressable>
+              </View>
             </View>
 
             <ScrollView className="flex-1 px-6 py-4" showsVerticalScrollIndicator={false}>
@@ -112,7 +133,7 @@ export default function AddCustomMealModal({ visible, onClose, onSave }: AddCust
                   placeholder="e.g., My Special Pancakes"
                   className="bg-white border border-parchmentDark rounded-xl px-4 py-3 text-base"
                   style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST }}
-                  placeholderTextColor={RIVER_ROCK}
+                  placeholderTextColor={TEXT_MUTED}
                 />
               </View>
 
@@ -222,7 +243,7 @@ export default function AddCustomMealModal({ visible, onClose, onSave }: AddCust
                   numberOfLines={4}
                   className="bg-white border border-parchmentDark rounded-xl px-4 py-3 text-base"
                   style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST, minHeight: 100, textAlignVertical: "top" }}
-                  placeholderTextColor={RIVER_ROCK}
+                  placeholderTextColor={TEXT_MUTED}
                 />
               </View>
 
@@ -239,7 +260,7 @@ export default function AddCustomMealModal({ visible, onClose, onSave }: AddCust
                   numberOfLines={4}
                   className="bg-white border border-parchmentDark rounded-xl px-4 py-3 text-base"
                   style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST, minHeight: 100, textAlignVertical: "top" }}
-                  placeholderTextColor={RIVER_ROCK}
+                  placeholderTextColor={TEXT_MUTED}
                 />
               </View>
 
@@ -254,25 +275,25 @@ export default function AddCustomMealModal({ visible, onClose, onSave }: AddCust
                   placeholder="quick, healthy, kid-friendly"
                   className="bg-white border border-parchmentDark rounded-xl px-4 py-3 text-base"
                   style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST }}
-                  placeholderTextColor={RIVER_ROCK}
+                  placeholderTextColor={TEXT_SECONDARY}
                 />
-                <Text className="text-xs mt-1" style={{ fontFamily: "SourceSans3_400Regular", color: RIVER_ROCK }}>
+                <Text className="text-xs mt-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
                   Tags help you find and filter your meals
                 </Text>
               </View>
             </ScrollView>
 
             {/* Save Button */}
-            <View className="px-6 py-4 border-t border-parchmentDark">
+            <View className="px-6 py-3 border-t border-parchmentDark">
               <Pressable
                 onPress={handleSave}
                 disabled={!name.trim()}
-                className={`py-4 rounded-xl flex-row items-center justify-center ${
+                className={`py-3 rounded-lg flex-row items-center justify-center ${
                   name.trim() ? "bg-forest active:opacity-90" : "bg-stone-300"
                 }`}
               >
-                <Ionicons name="checkmark-circle" size={20} color={PARCHMENT} />
-                <Text className="text-base font-semibold ml-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
+                <Ionicons name="checkmark-circle" size={18} color={PARCHMENT} />
+                <Text className="text-sm font-semibold ml-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
                   Save Custom Meal
                 </Text>
               </Pressable>

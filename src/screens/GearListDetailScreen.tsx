@@ -86,7 +86,7 @@ export default function GearListDetailScreen() {
         <View className="py-4">
           {list.categories.map((category) => (
             <View key={category.id} className="mb-6">
-              <Text className="text-[#16492f] text-lg font-semibold mb-3" style={{ fontFamily: "JosefinSlab_600SemiBold" }}>
+              <Text className="text-[#16492f] text-lg font-semibold mb-3" style={{ fontFamily: "Raleway_600SemiBold" }}>
                 {category.name}
               </Text>
               {category.items.map((item) => (

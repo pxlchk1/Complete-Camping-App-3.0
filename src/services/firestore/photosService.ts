@@ -30,16 +30,17 @@ export interface Photo {
 }
 
 export const photosService = {
-  // Upload photo to Firebase Storage
-  async uploadPhoto(uri: string, userId: string, postId: string): Promise<string> {
+  // Upload photo to Firebase Storage (returns storagePath)
+  async uploadPhoto(uri: string, userId: string, postId: string): Promise<{ downloadUrl: string; storagePath: string }> {
     const response = await fetch(uri);
     const blob = await response.blob();
 
-    const storageRef = ref(storage, `stories/${userId}/${postId}/${Date.now()}.jpg`);
+    const storagePath = `stories/${userId}/${postId}/${Date.now()}.jpg`;
+    const storageRef = ref(storage, storagePath);
     await uploadBytes(storageRef, blob);
 
     const downloadUrl = await getDownloadURL(storageRef);
-    return downloadUrl;
+    return { downloadUrl, storagePath };
   },
 
   // Create photo post
@@ -55,9 +56,11 @@ export const photosService = {
     // Create document first to get ID
     const photoData = {
       userId: user.uid,
+      ownerUid: user.uid, // Consistent owner field for rules
       userName: user.displayName || 'Anonymous',
       userAvatar: user.photoURL || null,
       imageUrl: '', // Will be updated after upload
+      storagePath: '', // Will be updated after upload
       caption: data.caption,
       location: data.location || '',
       tags: data.tags || [],
@@ -67,15 +70,16 @@ export const photosService = {
 
     const docRef = await addDoc(collection(db, 'stories'), photoData);
 
-    // Upload image to Storage
-    const imageUrl = await photosService.uploadPhoto(
-      data.imageUri,
-      user.uid,
-      docRef.id
-    );
+    // Upload image to Storage with owner-scoped path
+    const storagePath = `stories/${user.uid}/${docRef.id}/${Date.now()}.jpg`;
+    const response = await fetch(data.imageUri);
+    const blob = await response.blob();
+    const storageRef = ref(storage, storagePath);
+    await uploadBytes(storageRef, blob);
+    const imageUrl = await getDownloadURL(storageRef);
 
-    // Update document with image URL
-    await updateDoc(docRef, { imageUrl });
+    // Update document with image URL and storage path
+    await updateDoc(docRef, { imageUrl, storagePath });
 
     return docRef.id;
   },
@@ -154,35 +158,76 @@ export const photosService = {
     });
   },
 
-  // Delete photo (admin only)
+  // Delete photo (owner OR admin)
   async deletePhoto(photoId: string): Promise<void> {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to delete a photo');
 
+    // Get photo doc to check ownership and get storage path
+    const photoDocRef = doc(db, 'stories', photoId);
+    const photoDoc = await getDoc(photoDocRef);
+    
+    if (!photoDoc.exists()) {
+      throw new Error('Photo not found');
+    }
+    
+    const photoData = photoDoc.data();
+    const ownerId = photoData.userId;
+
+    // Check if user is owner
+    const isOwner = ownerId === user.uid;
+
+    // Check if user is admin
     const userDoc = await getDoc(doc(db, 'users', user.uid));
-    const isAdmin = userDoc.exists() && userDoc.data().role === 'admin';
+    const isAdmin = userDoc.exists() && (
+      userDoc.data().role === 'admin' || 
+      userDoc.data().role === 'administrator' ||
+      userDoc.data().isAdmin === true
+    );
 
-    if (!isAdmin) throw new Error('Only admins can delete stories');
+    if (!isOwner && !isAdmin) {
+      throw new Error('You can only delete your own photos or must be an admin');
+    }
 
-    // Get photo doc to get userId for storage path
-    const photoDoc = await getDoc(doc(db, 'stories', photoId));
-    if (photoDoc.exists()) {
-      const photoData = photoDoc.data();
-
-      // Delete from Storage
+    // Delete from Storage using stored path or construct it
+    const storagePath = photoData.storagePath;
+    if (storagePath) {
       try {
-        const storageRef = ref(
-          storage,
-          `stories/${photoData.userId}/${photoId}.jpg`
-        );
+        const storageRef = ref(storage, storagePath);
         await deleteObject(storageRef);
-      } catch (error) {
-        console.error('Error deleting photo from storage:', error);
+        console.log('[photosService] Deleted from Storage:', storagePath);
+      } catch (storageError: any) {
+        // Log but continue - the file might already be deleted or path was wrong
+        console.warn('[photosService] Storage delete error (continuing):', storageError?.message || storageError);
+      }
+    } else {
+      // Fallback: try to delete using constructed path pattern
+      // Pattern: stories/{userId}/{photoId}/*.jpg
+      try {
+        // Try common patterns
+        const patterns = [
+          `stories/${ownerId}/${photoId}.jpg`,
+          `stories/${ownerId}/${photoId}/${photoId}.jpg`,
+        ];
+        
+        for (const pattern of patterns) {
+          try {
+            const storageRef = ref(storage, pattern);
+            await deleteObject(storageRef);
+            console.log('[photosService] Deleted from Storage (fallback):', pattern);
+            break;
+          } catch {
+            // Try next pattern
+          }
+        }
+      } catch (storageError: any) {
+        console.warn('[photosService] Fallback storage delete error:', storageError?.message || storageError);
       }
     }
 
     // Delete from Firestore
-    await deleteDoc(doc(db, 'stories', photoId));
+    await deleteDoc(photoDocRef);
+    console.log('[photosService] Successfully deleted photo:', photoId);
   },
 
   // Upvote photo

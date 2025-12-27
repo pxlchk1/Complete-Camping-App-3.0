@@ -20,35 +20,38 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useTripsStore } from "../state/tripsStore";
 import { usePlanTabStore } from "../state/planTabStore";
+import { useLocationStore } from "../state/locationStore";
 import { useUserStatus } from "../utils/authHelper";
 import {
   getTripParticipants,
-  updateParticipantRole,
 } from "../services/tripParticipantsService";
 import { getCampgroundContactById } from "../services/campgroundContactsService";
-import { ParticipantRole } from "../types/campground";
 import { Heading2, BodyText } from "../components/Typography";
 import Button from "../components/Button";
 import EditTripModal from "../components/EditTripModal";
 import DetailsCard, { DetailsLink } from "../components/DetailsCard";
 import EditNotesModal from "../components/EditNotesModal";
 import AddLinkModal from "../components/AddLinkModal";
+import ItineraryLinksSection from "../components/ItineraryLinksSection";
+import WeatherForecastSection from "../components/WeatherForecastSection";
+import ItineraryPromptPanel from "../components/ItineraryPromptPanel";
+import AddItineraryLinkModal from "../components/AddItineraryLinkModal";
+import { CreateItineraryLinkData } from "../types/itinerary";
+import { createItineraryLink } from "../services/itineraryLinksService";
 import * as WebBrowser from "expo-web-browser";
 import { v4 as uuidv4 } from "uuid";
 import { updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { RootStackParamList } from "../navigation/types";
 import { format } from "date-fns";
+import { requirePro } from "../utils/gating";
+import AccountRequiredModal from "../components/AccountRequiredModal";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
   GRANITE_GOLD,
   PARCHMENT,
   PARCHMENT_BORDER,
-  CARD_BACKGROUND_LIGHT,
-  BORDER_SOFT,
-  TEXT_PRIMARY_STRONG,
-  TEXT_SECONDARY,
 } from "../constants/colors";
 
 type TripDetailScreenRouteProp = RouteProp<RootStackParamList, "TripDetail">;
@@ -56,20 +59,6 @@ type TripDetailScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   "TripDetail"
 >;
-
-const ROLE_OPTIONS: { value: ParticipantRole; label: string }[] = [
-  { value: "guest", label: "Guest" },
-  { value: "host", label: "Host" },
-  { value: "co_host", label: "Co-host" },
-  { value: "kid", label: "Kid" },
-  { value: "pet", label: "Pet" },
-  { value: "other", label: "Other" },
-];
-
-const getRoleLabel = (role: ParticipantRole): string => {
-  const option = ROLE_OPTIONS.find((r) => r.value === role);
-  return option?.label || role;
-};
 
 function normalizeUrl(input: string) {
   const trimmed = input.trim();
@@ -81,26 +70,25 @@ function normalizeUrl(input: string) {
 export default function TripDetailScreen() {
   const navigation = useNavigation<TripDetailScreenNavigationProp>();
   const route = useRoute<TripDetailScreenRouteProp>();
-  const { tripId } = route.params;
+  const { tripId, showItineraryPrompt } = route.params;
   const { isGuest } = useUserStatus();
 
   const trip = useTripsStore((s) => s.getTripById(tripId));
   const setActivePlanTab = usePlanTabStore((s) => s.setActiveTab);
+  const setSelectedLocation = useLocationStore((s) => s.setSelectedLocation);
+
+  // Itinerary prompt state (shown after trip creation for PRO users)
+  const [showItineraryPromptPanel, setShowItineraryPromptPanel] = useState(showItineraryPrompt || false);
+  const [showAddItineraryModal, setShowAddItineraryModal] = useState(false);
 
   // Mock packing and meal stats (swap with real data later)
   const [packingStats] = useState({ packed: 0, total: 0 });
   const [mealStats] = useState({ planned: 0, total: 0 });
 
   const [participants, setParticipants] = useState<
-    Array<{ id: string; name: string; role: ParticipantRole }>
+    Array<{ id: string; name: string }>
   >([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
-  const [editingParticipant, setEditingParticipant] = useState<{
-    id: string;
-    name: string;
-    role: ParticipantRole;
-  } | null>(null);
-  const [savingRole, setSavingRole] = useState(false);
   const [showEditTripModal, setShowEditTripModal] = useState(false);
 
   // Details state
@@ -108,6 +96,9 @@ export default function TripDetailScreen() {
   const [showAddLink, setShowAddLink] = useState(false);
   const [detailsNotes, setDetailsNotes] = useState("");
   const [detailsLinks, setDetailsLinks] = useState<DetailsLink[]>([]);
+
+  // Gating modal state
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   const startDate = useMemo(() => (trip ? new Date(trip.startDate) : null), [trip]);
   const endDate = useMemo(() => (trip ? new Date(trip.endDate) : null), [trip]);
@@ -133,7 +124,6 @@ export default function TripDetailScreen() {
           return {
             id: p.id,
             name: contact?.contactName || "Unknown",
-            role: p.role,
           };
         })
       );
@@ -186,9 +176,19 @@ export default function TripDetailScreen() {
     } catch {
       // ignore
     }
+    
+    // If trip has a saved weather destination, set it as the selected location
+    if (trip?.weatherDestination) {
+      setSelectedLocation({
+        name: trip.weatherDestination.label,
+        latitude: trip.weatherDestination.lat,
+        longitude: trip.weatherDestination.lon,
+      });
+    }
+    
     setActivePlanTab("weather");
     navigation.goBack();
-  }, [navigation, setActivePlanTab]);
+  }, [navigation, setActivePlanTab, trip, setSelectedLocation]);
 
   const handleAddPeople = useCallback(async () => {
     try {
@@ -199,45 +199,15 @@ export default function TripDetailScreen() {
     if (trip) navigation.navigate("AddPeopleToTrip", { tripId: trip.id });
   }, [navigation, trip]);
 
-  const handleEditRole = useCallback(
-    async (participant: { id: string; name: string; role: ParticipantRole }) => {
-      try {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch {
-        // ignore
-      }
-      setEditingParticipant(participant);
-    },
-    []
-  );
-
-  const handleSaveRole = useCallback(
-    async (newRole: ParticipantRole) => {
-      if (!editingParticipant) return;
-
-      try {
-        setSavingRole(true);
-        await updateParticipantRole(tripId, editingParticipant.id, newRole);
-        try {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch {
-          // ignore
-        }
-        setEditingParticipant(null);
-        await loadParticipants();
-      } catch (error: any) {
-        console.error("Error updating role:", error);
-        Alert.alert("Error", "Failed to update role");
-      } finally {
-        setSavingRole(false);
-      }
-    },
-    [editingParticipant, tripId, loadParticipants]
-  );
-
   // Details handlers
   const handleEditNotes = useCallback(() => {
-    // If you want this gated, do it here. Right now, notes are not gated.
+    // Gate: PRO required to edit trip notes
+    if (!requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: () => navigation.navigate("Paywall"),
+    })) {
+      return;
+    }
     setShowEditNotes(true);
   }, []);
 
@@ -261,6 +231,13 @@ export default function TripDetailScreen() {
   );
 
   const handleAddLink = useCallback(() => {
+    // Gate: PRO required to add links
+    if (!requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: () => navigation.navigate("Paywall"),
+    })) {
+      return;
+    }
     setShowAddLink(true);
   }, []);
 
@@ -306,6 +283,14 @@ export default function TripDetailScreen() {
 
   const handleDeleteLink = useCallback(
     async (id: string) => {
+      // Gate: PRO required to delete links
+      if (!requirePro({
+        openAccountModal: () => setShowAccountModal(true),
+        openPaywallModal: () => navigation.navigate("Paywall"),
+      })) {
+        return;
+      }
+
       const newLinks = detailsLinks.filter((l) => l.id !== id);
       setDetailsLinks(newLinks);
 
@@ -376,7 +361,7 @@ export default function TripDetailScreen() {
               className="text-sm"
               style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
             >
-              Edit Trip
+              Edit trip
             </Text>
           </Pressable>
         </View>
@@ -385,29 +370,6 @@ export default function TripDetailScreen() {
       </View>
 
       <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
-        {/* Details Card */}
-        <DetailsCard
-          notes={detailsNotes}
-          links={detailsLinks}
-          onEditNotes={handleEditNotes}
-          onAddLink={handleAddLink}
-          onDeleteLink={handleDeleteLink}
-          onOpenLink={handleOpenLink}
-        />
-
-        <EditNotesModal
-          visible={showEditNotes}
-          initialValue={detailsNotes}
-          onSave={handleSaveNotes}
-          onClose={() => setShowEditNotes(false)}
-        />
-
-        <AddLinkModal
-          visible={showAddLink}
-          onSave={handleSaveLink}
-          onClose={() => setShowAddLink(false)}
-        />
-
         {/* Trip Overview */}
         <View className="py-6">
           {/* Dates */}
@@ -431,10 +393,27 @@ export default function TripDetailScreen() {
             </BodyText>
           </View>
 
-          {/* Destination */}
-          {trip.destination && (
-            <View className="mb-4">
-              <View className="flex-row items-center mb-2">
+          {/* Destination - uses tripDestination (new) with fallback to legacy destination */}
+          <Pressable 
+            className="mb-4"
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              // If has park destination, go to park detail
+              if (trip.tripDestination?.placeId && trip.tripDestination.sourceType === "parks") {
+                navigation.navigate("ParkDetail", { parkId: trip.tripDestination.placeId });
+              } else if (trip.parkId) {
+                // Legacy: use parkId
+                navigation.navigate("ParkDetail", { parkId: trip.parkId });
+              } else {
+                // No destination set - go to Plan > Parks to set one
+                setActivePlanTab("parks");
+                navigation.goBack();
+              }
+            }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+          >
+            <View className="flex-row items-center justify-between mb-2">
+              <View className="flex-row items-center">
                 <Ionicons name="location" size={20} color={DEEP_FOREST} />
                 <Text
                   className="text-base ml-2"
@@ -443,16 +422,64 @@ export default function TripDetailScreen() {
                   Destination
                 </Text>
               </View>
-
-              <BodyText>{trip.destination.name}</BodyText>
-
-              {trip.destination.city && trip.destination.state && (
-                <BodyText className="text-earthGreen">
-                  {trip.destination.city}, {trip.destination.state}
-                </BodyText>
-              )}
+              <Ionicons name="chevron-forward" size={20} color={EARTH_GREEN} />
             </View>
-          )}
+
+            {/* New tripDestination format */}
+            {trip.tripDestination ? (
+              <>
+                <BodyText style={{ color: EARTH_GREEN }}>
+                  {trip.tripDestination.name}
+                </BodyText>
+                {(trip.tripDestination.city || trip.tripDestination.state) && (
+                  <BodyText className="text-earthGreen">
+                    {[trip.tripDestination.city, trip.tripDestination.state].filter(Boolean).join(", ")}
+                  </BodyText>
+                )}
+                {trip.tripDestination.parkType && (
+                  <Text 
+                    className="mt-1"
+                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: EARTH_GREEN }}
+                  >
+                    {trip.tripDestination.parkType} • Tap for details
+                  </Text>
+                )}
+              </>
+            ) : trip.destination ? (
+              /* Legacy destination format fallback */
+              <>
+                <BodyText style={trip.parkId ? { color: EARTH_GREEN } : undefined}>
+                  {trip.destination.name}
+                </BodyText>
+                {trip.destination.city && trip.destination.state && (
+                  <BodyText className="text-earthGreen">
+                    {trip.destination.city}, {trip.destination.state}
+                  </BodyText>
+                )}
+                {trip.parkId && (
+                  <Text 
+                    className="mt-1"
+                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: EARTH_GREEN }}
+                  >
+                    Tap for park details, map & reservations
+                  </Text>
+                )}
+              </>
+            ) : (
+              /* No destination set - prompt to add one */
+              <>
+                <BodyText style={{ color: EARTH_GREEN }}>
+                  Add a destination
+                </BodyText>
+                <Text 
+                  className="mt-1"
+                  style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: EARTH_GREEN }}
+                >
+                  Tap to browse parks or add your campground
+                </Text>
+              </>
+            )}
+          </Pressable>
 
           {/* Party Size */}
           {trip.partySize ? (
@@ -497,25 +524,15 @@ export default function TripDetailScreen() {
             ) : (
               <View className="flex-row flex-wrap" style={{ gap: 8 }}>
                 {participants.map((person) => (
-                  <Pressable
+                  <View
                     key={person.id}
-                    onPress={() => handleEditRole(person)}
-                    className="px-3 py-1.5 rounded-full border active:opacity-70"
+                    className="px-3 py-1.5 rounded-full border"
                     style={{ backgroundColor: PARCHMENT, borderColor: PARCHMENT_BORDER }}
                   >
                     <Text style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST }}>
-                      {person.name} ·{" "}
-                      <Text
-                        style={{
-                          fontFamily: "SourceSans3_400Regular",
-                          color: EARTH_GREEN,
-                          fontSize: 12,
-                        }}
-                      >
-                        {getRoleLabel(person.role)}
-                      </Text>
+                      {person.name}
                     </Text>
-                  </Pressable>
+                  </View>
                 ))}
               </View>
             )}
@@ -560,7 +577,7 @@ export default function TripDetailScreen() {
         <View className="pb-6">
           <Text
             className="text-lg mb-4"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+            style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
           >
             Trip Planning
           </Text>
@@ -641,107 +658,124 @@ export default function TripDetailScreen() {
             </View>
           </Pressable>
 
-          {/* Weather */}
+          {/* Weather Forecast */}
+          <View className="mb-3">
+            {trip.weather && trip.weather.forecast && trip.weather.forecast.length > 0 ? (
+              <WeatherForecastSection
+                forecast={trip.weather.forecast}
+                locationName={trip.weatherDestination?.label || trip.destination?.name || "Unknown location"}
+                lastUpdated={trip.weather.lastUpdated}
+                onViewMore={handleOpenWeather}
+              />
+            ) : (
+              <Pressable
+                onPress={handleOpenWeather}
+                className="bg-white rounded-xl p-4 active:opacity-80"
+                style={{ borderWidth: 1, borderColor: "#e7e5e4" }}
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center flex-1">
+                    <View
+                      className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                      style={{ backgroundColor: DEEP_FOREST }}
+                    >
+                      <Ionicons name="partly-sunny-outline" size={20} color={PARCHMENT} />
+                    </View>
+
+                    <View className="flex-1">
+                      <Text
+                        className="text-base mb-1"
+                        style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+                      >
+                        Weather Forecast
+                      </Text>
+
+                      <Text
+                        className="text-sm"
+                        style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
+                        numberOfLines={1}
+                      >
+                        {trip.weatherDestination
+                          ? `Check weather for ${trip.weatherDestination.label}`
+                          : "Check weather for your location"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={20} color={EARTH_GREEN} />
+                </View>
+              </Pressable>
+            )}
+          </View>
+
+          {/* Itinerary Links */}
+          <View className="mb-3">
+            <ItineraryLinksSection
+              tripId={tripId}
+              tripStartDate={trip.startDate}
+              tripEndDate={trip.endDate}
+            />
+          </View>
+
+          {/* Notes Section */}
           <Pressable
-            onPress={handleOpenWeather}
+            onPress={handleEditNotes}
             className="bg-white rounded-xl p-4 mb-3 active:opacity-80"
             style={{ borderWidth: 1, borderColor: "#e7e5e4" }}
           >
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center flex-1">
+            <View className="flex-row items-center justify-between mb-2">
+              <View className="flex-row items-center">
                 <View
                   className="w-10 h-10 rounded-full items-center justify-center mr-3"
                   style={{ backgroundColor: DEEP_FOREST }}
                 >
-                  <Ionicons name="partly-sunny-outline" size={20} color={PARCHMENT} />
+                  <Ionicons name="document-text-outline" size={20} color={PARCHMENT} />
                 </View>
-
-                <View className="flex-1">
-                  <Text
-                    className="text-base mb-1"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                  >
-                    Weather Forecast
-                  </Text>
-
-                  <Text
-                    className="text-sm"
-                    style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
-                  >
-                    {trip.weather
-                      ? `Updated ${format(new Date(trip.weather.lastUpdated), "MMM d")}`
-                      : "Check weather for your location"}
-                  </Text>
-                </View>
+                <Text
+                  className="text-base"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+                >
+                  Notes
+                </Text>
               </View>
-
-              <Ionicons name="chevron-forward" size={20} color={EARTH_GREEN} />
+              <View className="flex-row items-center">
+                <Ionicons name="create-outline" size={18} color={EARTH_GREEN} />
+                <Text
+                  className="ml-1 text-sm"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: EARTH_GREEN }}
+                >
+                  Edit
+                </Text>
+              </View>
             </View>
+            
+            {detailsNotes ? (
+              <Text
+                className="text-sm"
+                style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY, lineHeight: 20 }}
+                numberOfLines={4}
+              >
+                {detailsNotes}
+              </Text>
+            ) : (
+              <Text
+                className="text-sm italic"
+                style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
+              >
+                Add notes (day-by-day plans, reminders, permit info...)
+              </Text>
+            )}
           </Pressable>
         </View>
       </ScrollView>
 
-      {/* Edit Role Modal */}
-      <Modal
-        visible={editingParticipant !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditingParticipant(null)}
-      >
-        <Pressable
-          className="flex-1 items-center justify-center"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
-          onPress={() => setEditingParticipant(null)}
-        >
-          <Pressable
-            className="w-11/12 max-w-md rounded-2xl p-6"
-            style={{ backgroundColor: PARCHMENT }}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <Text
-              className="text-xl mb-2"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
-            >
-              Edit Role
-            </Text>
-
-            <Text className="mb-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-              {editingParticipant?.name}
-            </Text>
-
-            <View className="flex-row flex-wrap mb-6" style={{ gap: 8 }}>
-              {ROLE_OPTIONS.map((roleOption) => {
-                const isSelected = editingParticipant?.role === roleOption.value;
-
-                return (
-                  <Pressable
-                    key={roleOption.value}
-                    onPress={() => editingParticipant && handleSaveRole(roleOption.value)}
-                    disabled={savingRole}
-                    className="px-4 py-2 rounded-full border active:opacity-70"
-                    style={{
-                      backgroundColor: isSelected ? EARTH_GREEN : CARD_BACKGROUND_LIGHT,
-                      borderColor: isSelected ? EARTH_GREEN : BORDER_SOFT,
-                      opacity: savingRole ? 0.7 : 1,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: "SourceSans3_600SemiBold",
-                        color: isSelected ? PARCHMENT : TEXT_PRIMARY_STRONG,
-                      }}
-                    >
-                      {roleOption.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            {savingRole ? <ActivityIndicator size="small" color={DEEP_FOREST} /> : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {/* Edit Notes Modal */}
+      <EditNotesModal
+        visible={showEditNotes}
+        initialValue={detailsNotes}
+        onSave={handleSaveNotes}
+        onClose={() => setShowEditNotes(false)}
+      />
 
       {/* Edit Trip Modal */}
       <EditTripModal
@@ -749,6 +783,41 @@ export default function TripDetailScreen() {
         onClose={() => setShowEditTripModal(false)}
         tripId={tripId}
       />
+
+      {/* Gating Modals */}
+      <AccountRequiredModal
+        visible={showAccountModal}
+        onCreateAccount={() => {
+          setShowAccountModal(false);
+          navigation.navigate("Auth" as any);
+        }}
+        onMaybeLater={() => setShowAccountModal(false)}
+      />
+
+      {/* Itinerary Prompt Panel (shown after trip creation for PRO users) */}
+      <ItineraryPromptPanel
+        visible={showItineraryPromptPanel}
+        onAddItinerary={() => {
+          setShowItineraryPromptPanel(false);
+          setShowAddItineraryModal(true);
+        }}
+        onDismiss={() => setShowItineraryPromptPanel(false)}
+      />
+
+      {/* Add Itinerary Link Modal */}
+      {trip && (
+        <AddItineraryLinkModal
+          visible={showAddItineraryModal}
+          onClose={() => setShowAddItineraryModal(false)}
+          onSave={async (data) => {
+            // Import and use the service to add the link
+            const { addItineraryLink } = await import('../services/itineraryLinksService');
+            await addItineraryLink(tripId, data);
+          }}
+          tripStartDate={trip.startDate}
+          tripEndDate={trip.endDate}
+        />
+      )}
     </SafeAreaView>
   );
 }

@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, Platform, ActivityIndicator, TextInput, KeyboardAvoidingView, ScrollView, Linking, Modal } from "react-native";
+import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, Platform, ActivityIndicator, TextInput, KeyboardAvoidingView, ScrollView, Linking, Modal, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
-import { OAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword, fetchSignInMethodsForEmail, linkWithCredential } from "firebase/auth";
+import { OAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword, fetchSignInMethodsForEmail, linkWithCredential, sendEmailVerification } from "firebase/auth";
 import { auth, db } from "../config/firebase";
 import { doc, setDoc, getDoc, serverTimestamp, collection } from "firebase/firestore";
 import { useAuthStore } from "../state/authStore";
@@ -277,20 +277,41 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       setLoading(true);
       setError("");
 
-      if (!email.trim() || !password.trim()) {
-        setError("Please enter email and password");
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email.trim()) {
+        setError("Please enter your email address.");
+        return;
+      }
+      if (!emailRegex.test(email.trim())) {
+        setError("Please enter a valid email address.");
+        return;
+      }
+
+      // Validate password
+      if (!password) {
+        setError("Please enter a password.");
+        return;
+      }
+      if (password.length < 6) {
+        setError("Password must be at least 6 characters.");
         return;
       }
 
       let userCredential;
 
       if (isSignUp) {
-        // Create new account
-        if (!handle.trim() || !displayName.trim()) {
-          setError("Please enter display name and handle");
+        // Create new account - validate additional fields
+        if (!displayName.trim()) {
+          setError("Please enter your display name.");
+          return;
+        }
+        if (!handle.trim()) {
+          setError("Please enter a handle (username).");
           return;
         }
 
+        console.log("[Auth] Creating account for:", email.trim());
         userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
 
         // Create user profile in Firestore (profiles + emailSubscribers)
@@ -312,6 +333,22 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
           createdAt: serverTimestamp(),
         });
         console.log("[Email Auth] Created email index for:", emailNormalized);
+
+        // Send email verification
+        try {
+          await sendEmailVerification(userCredential.user);
+          console.log("[Email Auth] Verification email sent to:", email.trim());
+          
+          // Notify user about verification email
+          Alert.alert(
+            "Verify Your Email",
+            "We've sent a verification link to your email address. Please check your inbox and verify your email to complete your account setup.",
+            [{ text: "OK" }]
+          );
+        } catch (verifyError) {
+          console.warn("[Email Auth] Failed to send verification email:", verifyError);
+          // Don't block sign-up if verification email fails
+        }
       } else {
         // Sign in existing user
         userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -361,6 +398,9 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       navigation.navigate("HomeTabs");
     } catch (error: any) {
       console.error("Email Auth Error:", error);
+      console.error("Email Auth Error Code:", error.code);
+      console.error("Email Auth Error Message:", error.message);
+      
       if (error.code === "auth/email-already-in-use") {
         setError("This email is already registered. Please sign in instead.");
       } else if (error.code === "auth/invalid-email") {
@@ -371,8 +411,18 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         setError("Invalid email or password.");
       } else if (error.code === "auth/invalid-credential") {
         setError("Invalid email or password.");
+      } else if (error.code === "auth/missing-password") {
+        setError("Please enter a password.");
+      } else if (error.code === "auth/network-request-failed") {
+        setError("Network error. Please check your connection.");
+      } else if (error.code === "auth/too-many-requests") {
+        setError("Too many attempts. Please try again later.");
+      } else if (error.code === "auth/operation-not-allowed") {
+        setError("Email/password sign-in is not enabled. Please contact support.");
       } else {
-        setError("Authentication failed. Please try again.");
+        // Log full error details for debugging
+        console.error("Unhandled auth error:", JSON.stringify(error, null, 2));
+        setError(`Authentication failed: ${error.message || error.code || "Unknown error"}`);
       }
     } finally {
       setLoading(false);
@@ -525,7 +575,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
                 setShowEmailAuth(true);
               }}
             >
-              <Text style={styles.primaryButtonText}>Create Account</Text>
+              <Text style={styles.primaryButtonText}>Create account</Text>
             </TouchableOpacity>
 
             {/* 2. Sign In - For existing users */}
@@ -536,7 +586,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
                 setShowEmailAuth(true);
               }}
             >
-              <Text style={styles.secondaryButtonText}>Sign In</Text>
+              <Text style={styles.secondaryButtonText}>Sign in</Text>
             </TouchableOpacity>
 
             {/* 3. Sign in with Apple - Apple Standard Style */}
@@ -562,7 +612,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
               style={styles.ghostButton}
               onPress={() => navigation.navigate("HomeTabs")}
             >
-              <Text style={styles.ghostButtonText}>Explore the App</Text>
+              <Text style={styles.ghostButtonText}>Explore the app</Text>
             </TouchableOpacity>
           </View>
 
@@ -594,7 +644,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Link Your Accounts</Text>
+            <Text style={styles.modalTitle}>Link your accounts</Text>
             <Text style={styles.modalMessage}>
               An account already exists with this email. Enter your password to link your Apple account.
             </Text>
@@ -640,7 +690,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
                 onPress={handlePasswordLinking}
                 disabled={!linkingPassword.trim()}
               >
-                <Text style={styles.modalLinkText}>Link Accounts</Text>
+                <Text style={styles.modalLinkText}>Link accounts</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -683,7 +733,7 @@ const styles = StyleSheet.create({
   },
 
   titleText: {
-    fontFamily: "JosefinSlab_700Bold",
+    fontFamily: "Raleway_700Bold",
     fontSize: 32,
     color: "#485952", // Deep Forest Green
     textAlign: "center",
@@ -703,7 +753,7 @@ const styles = StyleSheet.create({
   },
 
   authTitle: {
-    fontFamily: "JosefinSlab_700Bold",
+    fontFamily: "Raleway_700Bold",
     fontSize: 32,
     color: "#F4EBD0",
     textAlign: "center",
@@ -844,7 +894,7 @@ const styles = StyleSheet.create({
   },
 
   modalTitle: {
-    fontFamily: "JosefinSlab_700Bold",
+    fontFamily: "Raleway_700Bold",
     fontSize: 24,
     color: "#485952",
     textAlign: "center",

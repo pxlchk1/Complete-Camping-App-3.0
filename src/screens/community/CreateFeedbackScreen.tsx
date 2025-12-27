@@ -12,6 +12,7 @@ import ModalHeader from "../../components/ModalHeader";
 import * as Haptics from "expo-haptics";
 import { createFeedbackPost } from "../../services/feedbackService";
 import { useCurrentUser } from "../../state/userStore";
+import { requireEmailVerification } from "../../utils/authHelper";
 import { RootStackNavigationProp } from "../../navigation/types";
 import { FeedbackCategory } from "../../types/community";
 import {
@@ -66,6 +67,10 @@ export default function CreateFeedbackScreen() {
 
   const handleSubmit = async () => {
     if (!currentUser || !title.trim() || !body.trim() || submitting) return;
+
+    // Require email verification for posting content
+    const isVerified = await requireEmailVerification("submit feedback");
+    if (!isVerified) return;
 
     if (title.length < 10) {
       setError("Title must be at least 10 characters");

@@ -8,6 +8,7 @@ import { View, ImageBackground, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { usePlanTabStore } from "../state/planTabStore";
 
@@ -16,7 +17,7 @@ import AccountButtonHeader from "../components/AccountButtonHeader";
 import MyTripsScreen from "../screens/MyTripsScreen";
 import ParksBrowseScreen from "../screens/ParksBrowseScreen";
 import MealsScreen from "../screens/MealsScreen";
-import PackingTabScreen from "../screens/PackingTabScreen";
+import PackingTabScreenNew from "../screens/PackingTabScreenNew";
 import WeatherScreen from "../screens/WeatherScreen";
 import PlanSafeScreen from "../screens/PlanSafeScreen";
 
@@ -30,7 +31,7 @@ const getHeroImage = (routeName: string) => {
   switch (routeName) {
     case "Plan":
       return HERO_IMAGES.PLAN_TRIP;
-    case "Campgrounds":
+    case "Parks":
       return HERO_IMAGES.HEADER;
     case "Meals":
       return HERO_IMAGES.MEALS;
@@ -48,12 +49,12 @@ const getHeroContent = (routeName: string) => {
   switch (routeName) {
     case "Plan":
       return { title: "Plan your trip", description: "Organize trips, explore parks, and prepare for adventure" };
-    case "Campgrounds":
-      return { title: "Find a campground", description: "Discover campgrounds and parks for your next adventure" };
+    case "Parks":
+      return { title: "Find a park", description: "Search thousands of National Park, National Forest, and State Park campgrounds across all US states & territories." };
     case "Meals":
-      return { title: "Meal Planner", description: "Plan delicious meals for your camping adventure" };
+      return { title: "Meal planner", description: "Plan delicious meals for your camping adventure" };
     case "Pack":
-      return { title: "Packing List", description: "Build and organize your gear list for every trip" };
+      return { title: "Packing list", description: "Build and organize your gear list for every trip" };
     case "Weather":
       return { title: "Weather", description: "Check conditions for your camping destination" };
     default:
@@ -67,6 +68,13 @@ function HeroHeader({ activeTab }: { activeTab: string }) {
   const heroImage = getHeroImage(activeTab);
   const { title, description } = getHeroContent(activeTab);
 
+  // Darker gradient for Plan tab specifically
+  const gradientColors = activeTab === "Plan" 
+    ? ["rgba(0,0,0,0.25)", "rgba(0,0,0,0.7)"] as const
+    : ["rgba(0,0,0,0.1)", "rgba(0,0,0,0.6)"] as const;
+
+  console.log("[HERO_DEBUG] activeTab:", activeTab, "heroImage:", heroImage);
+
   return (
     <View style={{ height: 200 + insets.top }}>
       <ImageBackground
@@ -75,24 +83,25 @@ function HeroHeader({ activeTab }: { activeTab: string }) {
         resizeMode="cover"
         accessibilityLabel="Planning camping scene"
       >
+        {/* Gradient Overlay - covers full image including safe area */}
+        <LinearGradient
+          colors={gradientColors}
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+          }}
+        />
         <View style={{ flex: 1, paddingTop: insets.top }}>
           {/* Account Button - Top Right */}
           <AccountButtonHeader color={TEXT_ON_DARK} />
 
           <View style={{ flex: 1, justifyContent: "flex-end", paddingHorizontal: 24, paddingBottom: 16 }}>
-            <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.6)"]}
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 100,
-              }}
-            />
             <Text
               style={{
-                fontFamily: "JosefinSlab_700Bold",
+                fontFamily: "Raleway_700Bold",
                 fontSize: 30,
                 color: PARCHMENT,
                 textShadowColor: "rgba(0, 0, 0, 0.5)",
@@ -130,19 +139,24 @@ export default function PlanTopTabsNavigator() {
   const activeTab = usePlanTabStore((s) => s.activeTab);
   const setActiveTab = usePlanTabStore((s) => s.setActiveTab);
 
+  // Ref to store the tab navigator's navigation object
+  const tabNavigationRef = useRef<any>(null);
+  // State to trigger re-render when navigation ref is available
+  const [isNavigationReady, setIsNavigationReady] = useState(false);
+
   const tabKeyToRoute: Record<string, string> = {
-    plan: "Plan",
-    campgrounds: "Campgrounds",
+    trips: "Plan",
+    parks: "Parks",
     meals: "Meals",
-    pack: "Pack",
+    packing: "Pack",
     weather: "Weather",
   };
 
   const routeToTabKey: Record<string, string> = {
-    Plan: "plan",
-    Campgrounds: "campgrounds",
+    Plan: "trips",
+    Parks: "parks",
     Meals: "meals",
-    Pack: "pack",
+    Pack: "packing",
     Weather: "weather",
   };
 
@@ -150,12 +164,75 @@ export default function PlanTopTabsNavigator() {
   const isFirstRender = useRef(true);
   const [initialTab, setInitialTab] = useState(tabKeyToRoute[activeTab] || "Plan");
 
+  // Track the previous activeTab to detect external changes
+  const prevActiveTabRef = useRef(activeTab);
+  // Track pending navigation when ref wasn't ready
+  const pendingNavigationRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (isFirstRender.current) {
       setInitialTab(tabKeyToRoute[activeTab] || "Plan");
       isFirstRender.current = false;
     }
   }, [activeTab]);
+
+  // Navigate programmatically when activeTab changes from external source (e.g., HomeScreen Quick Actions)
+  useEffect(() => {
+    // Skip if this is the first render or if the tab hasn't changed
+    if (prevActiveTabRef.current !== activeTab) {
+      const targetRoute = tabKeyToRoute[activeTab];
+      if (targetRoute) {
+        if (tabNavigationRef.current) {
+          console.log("[PLAN_TRACE] Navigating to tab:", targetRoute);
+          try {
+            tabNavigationRef.current.navigate(targetRoute);
+          } catch (e) {
+            console.log("[PLAN_TRACE] Navigation error:", e);
+          }
+        } else {
+          // Store pending navigation for when ref becomes available
+          console.log("[PLAN_TRACE] Navigation pending, ref not ready:", targetRoute);
+          pendingNavigationRef.current = targetRoute;
+        }
+      }
+      prevActiveTabRef.current = activeTab;
+    }
+  }, [activeTab]);
+
+  // Handle pending navigation when ref becomes available
+  useEffect(() => {
+    if (isNavigationReady && pendingNavigationRef.current && tabNavigationRef.current) {
+      console.log("[PLAN_TRACE] Executing pending navigation:", pendingNavigationRef.current);
+      try {
+        tabNavigationRef.current.navigate(pendingNavigationRef.current);
+      } catch (e) {
+        console.log("[PLAN_TRACE] Pending navigation error:", e);
+      }
+      pendingNavigationRef.current = null;
+    }
+  }, [isNavigationReady]);
+
+  // When screen comes into focus, ensure the tab navigator is on the correct tab
+  // This handles the case where activeTab was changed while the screen was in the background
+  useFocusEffect(
+    React.useCallback(() => {
+      const targetRoute = tabKeyToRoute[activeTab];
+      if (tabNavigationRef.current && targetRoute) {
+        // Check if the current tab matches what we expect
+        const currentState = tabNavigationRef.current.getState?.();
+        const currentRouteName = currentState?.routes?.[currentState?.index]?.name;
+        
+        if (currentRouteName && currentRouteName !== targetRoute) {
+          console.log("[PLAN_TRACE] Focus: syncing tab from", currentRouteName, "to", targetRoute);
+          try {
+            tabNavigationRef.current.navigate(targetRoute);
+          } catch (e) {
+            console.log("[PLAN_TRACE] Focus navigation error:", e);
+          }
+        }
+      }
+    }, [activeTab])
+  );
 
   const activeRouteName = tabKeyToRoute[activeTab] || "Plan";
 
@@ -183,29 +260,34 @@ export default function PlanTopTabsNavigator() {
           },
           tabBarLabelStyle: {
             fontFamily: "SourceSans3_600SemiBold",
-            fontSize: 13,
+            fontSize: 11,
             textTransform: "none",
           },
-          tabBarScrollEnabled: true,
-          tabBarItemStyle: {
-            width: "auto",
-            minWidth: 80,
-          },
+          tabBarScrollEnabled: false,
         }}
-        screenListeners={{
-          state: (e) => {
-            const state = e.data.state;
-            const routeName = state.routes[state.index]?.name;
-            const tabKey = routeToTabKey[routeName];
-            if (tabKey && tabKey !== activeTab) setActiveTab(tabKey);
-          },
+        screenListeners={({ navigation }) => {
+          // Capture the navigation object for programmatic navigation
+          if (!tabNavigationRef.current) {
+            tabNavigationRef.current = navigation;
+            // Trigger re-render to handle any pending navigation
+            if (!isNavigationReady) {
+              setIsNavigationReady(true);
+            }
+          }
+          return {
+            state: (e) => {
+              const state = e.data.state;
+              const routeName = state.routes[state.index]?.name;
+              const tabKey = routeToTabKey[routeName];
+              if (tabKey && tabKey !== activeTab) setActiveTab(tabKey);
+            },
+          };
         }}
       >
-        {/* Isolation mode: keep PlanSafeScreen as the first tab until crash is identified */}
-        <Tab.Screen name="Plan" component={PlanSafeScreen} />
-        <Tab.Screen name="Campgrounds" component={ParksBrowseScreen} />
+        <Tab.Screen name="Plan" component={MyTripsScreen} />
+        <Tab.Screen name="Parks" component={ParksBrowseScreen} />
         <Tab.Screen name="Meals" component={MealsScreen} />
-        <Tab.Screen name="Pack" component={PackingTabScreen} />
+        <Tab.Screen name="Pack" component={PackingTabScreenNew} />
         <Tab.Screen name="Weather" component={WeatherScreen} />
       </Tab.Navigator>
     </View>

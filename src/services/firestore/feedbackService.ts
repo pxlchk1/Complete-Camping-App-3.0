@@ -63,11 +63,8 @@ export const feedbackService = {
     })) as FeedbackPost[];
   },
 
-  // Get feedback by ID
+  // Get feedback by ID (public read - anyone can view feedback details)
   async getFeedbackById(feedbackId: string): Promise<FeedbackPost | null> {
-    const user = auth.currentUser;
-    if (!user) throw new Error('Must be signed in to read feedback');
-
     const docRef = doc(db, 'feedbackPosts', feedbackId);
     const docSnap = await getDoc(docRef);
 

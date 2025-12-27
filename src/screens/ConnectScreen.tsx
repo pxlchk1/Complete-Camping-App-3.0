@@ -19,7 +19,7 @@ export default function ConnectScreen() {
           <View className="w-20 h-20 rounded-full bg-[#f0f9f4] items-center justify-center mb-4">
             <Ionicons name="people-outline" size={40} color={DEEP_FOREST} />
           </View>
-          <Text className="text-[#16492f] text-lg font-semibold mb-2" style={{ fontFamily: "JosefinSlab_600SemiBold" }}>
+          <Text className="text-[#16492f] text-lg font-semibold mb-2" style={{ fontFamily: "Raleway_600SemiBold" }}>
             Community
           </Text>
           <BodyText className="text-center px-8 mb-4">

@@ -85,7 +85,7 @@ export default function ModeratorPanel({ currentUserId }: ModeratorPanelProps) {
     <ScrollView className="flex-1 px-5 py-6">
       <Text
         className="text-lg mb-2"
-        style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+        style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
       >
         Content Moderation
       </Text>

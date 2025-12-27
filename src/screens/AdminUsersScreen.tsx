@@ -71,7 +71,7 @@ export default function AdminUsersScreen() {
       setSearchResults(results);
 
       if (results.length === 0) {
-        Alert.alert("No Results", "No users found matching your search");
+        Alert.alert("No results", "No users found matching your search");
       }
     } catch (error) {
       console.error("Error searching users:", error);
@@ -115,7 +115,7 @@ export default function AdminUsersScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-      <ModalHeader title="Manage Users" showTitle />
+      <ModalHeader title="Manage users" showTitle />
 
       <ScrollView className="flex-1">
         <View className="px-5 pt-5 pb-8">

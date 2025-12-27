@@ -8,6 +8,7 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { db, auth } from '../../config/firebase';
+import { checkAndApplyAutoHide, AUTO_HIDE_DOWNVOTE_THRESHOLD } from '../moderationService';
 
 export interface GearReviewVote {
   userId: string;
@@ -50,11 +51,16 @@ export const gearReviewVotesService = {
     return { score: up - down, up, down };
   },
 
-  async vote(reviewId: string, voteType: 'up' | 'down'): Promise<void> {
+  // Vote on a gear review with toggle behavior
+  // Also checks downvote threshold for auto-hide moderation.
+  async vote(reviewId: string, voteType: 'up' | 'down'): Promise<{ wasAutoHidden?: boolean }> {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to vote');
     const voteDocRef = doc(db, 'gearReviews', reviewId, 'votes', user.uid);
     const reviewDocRef = doc(db, 'gearReviews', reviewId);
+    
+    let finalDownvotes = 0;
+    
     await runTransaction(db, async (transaction) => {
       const voteSnap = await transaction.get(voteDocRef);
       const reviewSnap = await transaction.get(reviewDocRef);
@@ -69,6 +75,15 @@ export const gearReviewVotesService = {
       if (voteType === 'down') downvotes++;
       transaction.set(voteDocRef, { userId: user.uid, voteType });
       transaction.update(reviewDocRef, { upvotes, downvotes });
+      finalDownvotes = downvotes;
     });
+    
+    // After transaction completes, check if we need to auto-hide
+    let wasAutoHidden = false;
+    if (finalDownvotes >= AUTO_HIDE_DOWNVOTE_THRESHOLD) {
+      wasAutoHidden = await checkAndApplyAutoHide('gearReviews', reviewId, finalDownvotes);
+    }
+    
+    return { wasAutoHidden };
   },
 };

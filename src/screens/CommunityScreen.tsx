@@ -13,7 +13,6 @@ import AccountButtonHeader from "../components/AccountButtonHeader";
 import GearReviewCard from "../components/GearReviewCard";
 import ConnectAskScreen from "./community/ConnectAskScreen";
 import PhotosTabContent from "./community/PhotosTabContent";
-import VoteButtons from "../components/VoteButtons";
 
 // State and services
 import { useTips, TIP_CATEGORIES, useTipStore } from "../state/tipStore";
@@ -203,7 +202,7 @@ export default function CommunityScreen() {
       {/* Top Navigation Bar */}
       <View className="bg-forest" style={{ paddingVertical: 12 }}>
         <View className="flex-row items-center" style={{ paddingHorizontal: 16, minHeight: 44 }}>
-          <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "Raleway_700Bold" }}>
             Camping Tips
           </Text>
           {user && (
@@ -232,18 +231,18 @@ export default function CommunityScreen() {
             onPress={() => navigation.navigate("Auth")}
             className="bg-forest-800 rounded-xl px-6 py-3 active:opacity-70"
           >
-            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_ON_DARK }}>Sign In</Text>
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_ON_DARK }}>Sign in</Text>
           </Pressable>
         </View>
       ) : tipsLoading ? (
         <View className="rounded-xl p-8 items-center border" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}>
           <Ionicons name="sync" size={48} color={LODGE_FOREST} />
-          <Text className="text-lg mt-4" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>Loading Tips...</Text>
+          <Text className="text-lg mt-4" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>Loading tips...</Text>
         </View>
       ) : tips.length === 0 ? (
         <View className="rounded-xl p-8 items-center border" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}>
           <Ionicons name="bulb-outline" size={48} color={TL_BROWN} />
-          <Text className="text-lg mt-4 mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>No Tips Yet</Text>
+          <Text className="text-lg mt-4 mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>No tips yet</Text>
           <Text className="text-center mb-6" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
             Be the first to share a helpful camping tip!
           </Text>
@@ -251,7 +250,7 @@ export default function CommunityScreen() {
             onPress={handleSubmitTip}
             className="bg-forest-800 rounded-xl px-6 py-3"
           >
-            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_ON_DARK }}>Submit Your First Tip</Text>
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_ON_DARK }}>Submit your first tip</Text>
           </Pressable>
         </View>
       ) : (
@@ -265,24 +264,13 @@ export default function CommunityScreen() {
               className="rounded-xl p-4 border"
               style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
             >
-              <View className="flex-row items-start mb-3">
-                <View className="mr-3">
-                  <VoteButtons
-                    score={tip.score || (tip.upvoteCount || 0)}
-                    userVote={tip.userVote}
-                    onVote={(voteType) => handleTipVote(tip.id, voteType)}
-                    size="small"
-                    layout="vertical"
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="leading-5 mb-2" numberOfLines={5} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                    {tip.body || tip.text}
-                  </Text>
-                  <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                    {tip.userId}
-                  </Text>
-                </View>
+              <Text className="leading-5 mb-2" numberOfLines={5} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+                {tip.body || tip.text}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
+                <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
+                  {tip.userId}
+                </Text>
               </View>
             </Pressable>
           ))}
@@ -298,7 +286,7 @@ export default function CommunityScreen() {
         {/* Top Navigation Bar */}
         <View className="bg-forest" style={{ paddingVertical: 12 }}>
           <View className="flex-row items-center" style={{ paddingHorizontal: 16, minHeight: 44 }}>
-            <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+            <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "Raleway_700Bold" }}>
               Feedback
             </Text>
           </View>
@@ -319,13 +307,13 @@ export default function CommunityScreen() {
                 onPress={() => navigation.navigate("Auth")}
                 className="bg-forest-800 rounded-xl px-6 py-3 active:opacity-70"
               >
-                <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_ON_DARK }}>Sign In</Text>
+                <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_ON_DARK }}>Sign in</Text>
               </Pressable>
             </View>
           ) : feedbackLoading ? (
             <View className="rounded-xl p-8 items-center border" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}>
               <Ionicons name="sync" size={48} color={LODGE_FOREST} />
-              <Text className="text-lg mt-4" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>Loading Feedback...</Text>
+              <Text className="text-lg mt-4" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>Loading feedback...</Text>
             </View>
           ) : feedbackPosts.length === 0 ? (
             <View className="rounded-xl p-8 items-center border" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}>
@@ -346,34 +334,22 @@ export default function CommunityScreen() {
                   className="rounded-xl p-4 border active:opacity-70"
                   style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
                 >
-                  <View className="flex-row items-start">
-                    <View className="mr-3">
-                      <VoteButtons
-                        score={post.score || (post.voteCount || 0)}
-                        userVote={post.userVote}
-                        onVote={(voteType) => handleFeedbackVote(post.id, voteType)}
-                        size="small"
-                        layout="vertical"
-                      />
-                    </View>
-                    <View className="flex-1">
-                      <View className="mb-2">
-                        <Text className="text-lg mb-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                          {post.topic}
-                        </Text>
-                        <Text className="leading-5" numberOfLines={3} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                          {post.message}
-                        </Text>
-                      </View>
-                      <View className="flex-row items-center justify-between">
-                        <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                          {post.userId}
-                        </Text>
-                        <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                          {post.createdAt?.toDate ? post.createdAt.toDate().toLocaleDateString() : ""}
-                        </Text>
-                      </View>
-                    </View>
+                  <View className="mb-2">
+                    <Text className="text-lg mb-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+                      {post.topic}
+                    </Text>
+                    <Text className="leading-5" numberOfLines={3} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+                      {post.message}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
+                    <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
+                      {post.userId}
+                    </Text>
+                    <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
+                    <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
+                      {post.createdAt?.toDate ? post.createdAt.toDate().toLocaleDateString() : ""}
+                    </Text>
                   </View>
                 </Pressable>
               ))}
@@ -390,7 +366,7 @@ export default function CommunityScreen() {
         {/* Top Navigation Bar */}
         <View className="bg-forest" style={{ paddingVertical: 12 }}>
           <View className="flex-row items-center" style={{ paddingHorizontal: 16, minHeight: 44 }}>
-            <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+            <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "Raleway_700Bold" }}>
               Gear Reviews
             </Text>
           </View>
@@ -411,14 +387,14 @@ export default function CommunityScreen() {
                 onPress={() => navigation.navigate("Auth")}
                 className="bg-forest-800 rounded-xl px-6 py-3 active:opacity-70"
               >
-                <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_ON_DARK }}>Sign In</Text>
+                <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_ON_DARK }}>Sign in</Text>
               </Pressable>
             </View>
           ) : gearReviewsLoading ? (
             <View className="rounded-xl p-8 items-center border" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}>
               <Ionicons name="sync" size={48} color={LODGE_FOREST} />
               <Text className="text-lg mt-4" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                Loading Reviews...
+                Loading reviews...
               </Text>
             </View>
           ) : gearReviews.length === 0 ? (
@@ -442,45 +418,33 @@ export default function CommunityScreen() {
                   className="rounded-xl p-4 border active:opacity-70"
                   style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
                 >
-                  <View className="flex-row items-start mb-2">
-                    <View className="mr-3">
-                      <VoteButtons
-                        score={review.score || (review.upvoteCount || 0)}
-                        userVote={review.userVote}
-                        onVote={(voteType) => handleGearVote(review.id, voteType)}
-                        size="small"
-                        layout="vertical"
-                      />
-                    </View>
+                  <View className="flex-row items-start justify-between mb-2">
                     <View className="flex-1">
-                      <View className="flex-row items-start justify-between mb-2">
-                        <View className="flex-1">
-                          <Text className="text-lg mb-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                            {review.title}
-                          </Text>
-                          <Text className="text-sm mb-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                            {review.brand} • {review.category}
-                          </Text>
-                        </View>
-                        <View className="flex-row items-center ml-2">
-                          <Ionicons name="star" size={16} color="#f59e0b" />
-                          <Text className="ml-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                            {review.rating.toFixed(1)}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text className="leading-5" numberOfLines={3} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                        {review.text}
+                      <Text className="text-lg mb-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+                        {review.title}
                       </Text>
-                      <View className="flex-row items-center justify-between mt-3">
-                        <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                          {review.userId}
-                        </Text>
-                        <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                          {review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString() : ""}
-                        </Text>
-                      </View>
+                      <Text className="text-sm mb-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+                        {review.brand} • {review.category}
+                      </Text>
                     </View>
+                    <View className="flex-row items-center ml-2">
+                      <Ionicons name="star" size={16} color="#f59e0b" />
+                      <Text className="ml-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+                        {review.rating.toFixed(1)}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text className="leading-5" numberOfLines={3} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+                    {review.text}
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12 }}>
+                    <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
+                      {review.userId}
+                    </Text>
+                    <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
+                    <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
+                      {review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString() : ""}
+                    </Text>
                   </View>
                 </Pressable>
               ))}
@@ -502,23 +466,24 @@ export default function CommunityScreen() {
             resizeMode="cover"
             accessibilityLabel="Community camping scene"
           >
+            {/* Gradient Overlay - covers full image including safe area */}
+            <LinearGradient
+              colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.6)"]}
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+              }}
+            />
             <View className="flex-1" style={{ paddingTop: insets.top }}>
               {/* Account Button - Top Right */}
               <AccountButtonHeader color={TEXT_ON_DARK} />
               
               {/* Title at bottom left */}
               <View className="flex-1 justify-end px-6 pb-4">
-                <LinearGradient
-                  colors={["transparent", "rgba(0,0,0,0.4)"]}
-                  style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: 100,
-                  }}
-                />
-                <Text className="text-3xl" style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, zIndex: 1 }}>
+                <Text className="text-3xl" style={{ fontFamily: "Raleway_700Bold", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, zIndex: 1 }}>
                   Connect
                 </Text>
                 <Text className="mt-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3, zIndex: 1 }}>
@@ -616,7 +581,7 @@ const styles = {
     marginBottom: 16,
   },
   title: {
-    fontFamily: "JosefinSlab_700Bold",
+    fontFamily: "Raleway_700Bold",
     fontSize: 28,
     letterSpacing: 1,
     color: "#485952",

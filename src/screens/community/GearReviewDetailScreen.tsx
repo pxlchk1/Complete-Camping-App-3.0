@@ -21,11 +21,14 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { gearReviewVotesService } from "../../services/firestore/gearReviewVotesService";
-import VoteButtons from "../../components/VoteButtons";
+import VotePill from "../../components/VotePill";
 
 import ModalHeader from "../../components/ModalHeader";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { ContentActionsAffordance } from "../../components/contentActions";
+import { isAdmin, isModerator, canModerateContent } from "../../services/userService";
+import { User } from "../../types/user";
+import { useCurrentUser } from "../../state/userStore";
 import { auth, db } from "../../config/firebase";
 
 /** Fallback theme values (safe if your constants are not available here). */
@@ -33,6 +36,8 @@ const DEEP_FOREST = "#1F3B2C";
 // const PARCHMENT = "#F7F1E4";
 const TEXT_PRIMARY_STRONG = "#3D2817";
 const TEXT_SECONDARY = "#6B5A4A";
+const TEXT_MUTED = "#9CA3AF";
+const BORDER_SOFT = "#E5E7EB";
 
 type GearReview = {
   id: string;
@@ -45,8 +50,11 @@ type GearReview = {
   pros?: string[];
   cons?: string[];
   upvoteCount: number;
+  upvotes?: number;
+  downvotes?: number;
   createdAt?: any;
   authorId?: string;
+  displayName?: string | null;
 };
 
 type RouteParams = {
@@ -61,12 +69,28 @@ export default function GearReviewDetailScreen() {
 
   const [loading, setLoading] = useState(true);
   const [review, setReview] = useState<GearReview | null>(null);
-  const [voteScore, setVoteScore] = useState(0);
-  const [userVote, setUserVote] = useState<"up" | "down" | null>(null);
-  const [voteLoading, setVoteLoading] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  // const isSignedIn = useMemo(() => !!auth?.currentUser?.uid, []);
+  const currentUser = useCurrentUser();
+
+  // Permission checks for content actions
+  const canModerate = currentUser ? canModerateContent(currentUser as User) : false;
+  const roleLabel = currentUser 
+    ? isAdmin(currentUser as User) 
+      ? "ADMIN" as const
+      : isModerator(currentUser as User) 
+        ? "MOD" as const 
+        : null 
+    : null;
+
+  // Content action handlers
+  const handleDeleteReview = async () => {
+    navigation.goBack();
+  };
+
+  const handleRemoveReview = async () => {
+    navigation.goBack();
+  };
 
   const loadReview = useCallback(async () => {
     if (!reviewId) {
@@ -94,17 +118,13 @@ export default function GearReviewDetailScreen() {
         pros: Array.isArray(data.pros) ? data.pros : [],
         cons: Array.isArray(data.cons) ? data.cons : [],
         upvoteCount: typeof data.upvoteCount === "number" ? data.upvoteCount : 0,
+        upvotes: data.upvotes || 0,
+        downvotes: data.downvotes || 0,
         createdAt: data.createdAt,
         authorId: data.authorId,
+        displayName: data.displayName ?? data.authorName ?? null,
       };
       setReview(normalized);
-      // Voting state
-      try {
-        const summary = await gearReviewVotesService.getVoteSummary(snap.id);
-        setVoteScore(summary.score);
-        const userVoteObj = await gearReviewVotesService.getUserVote(snap.id);
-        setUserVote(userVoteObj?.voteType || null);
-      } catch {}
     } catch {
       Alert.alert("Error", "Failed to load review");
       navigation.goBack();
@@ -126,42 +146,11 @@ export default function GearReviewDetailScreen() {
     return true;
   };
 
-  const handleVote = async (voteType: "up" | "down") => {
-    if (!requireAuthOrShowModal()) return;
-    if (!reviewId) return;
-    setVoteLoading(true);
-    const prevVote = userVote;
-    const prevScore = voteScore;
-    // Optimistic UI
-    let newVote: "up" | "down" | null = voteType;
-    let newScore = voteScore;
-    if (userVote === voteType) {
-      newVote = null;
-      newScore += voteType === "up" ? -1 : 1;
-    } else if (userVote === "up" && voteType === "down") {
-      newScore -= 2;
-    } else if (userVote === "down" && voteType === "up") {
-      newScore += 2;
-    } else {
-      newScore += voteType === "up" ? 1 : -1;
-    }
-    setUserVote(newVote);
-    setVoteScore(newScore);
-    try {
-      await gearReviewVotesService.vote(reviewId, newVote ?? voteType);
-    } catch {
-      setUserVote(prevVote);
-      setVoteScore(prevScore);
-    } finally {
-      setVoteLoading(false);
-    }
-  };
-
   const handleReport = () => {
     if (!requireAuthOrShowModal()) return;
     if (!reviewId) return;
 
-    Alert.alert("Report Review", "Why are you reporting this review?", [
+    Alert.alert("Report review", "Why are you reporting this review?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Report",
@@ -254,16 +243,29 @@ export default function GearReviewDetailScreen() {
       />
 
       <ScrollView className="flex-1 p-5">
-        {/* Gear Name and Brand */}
-        <Text
-          className="text-2xl mb-2"
-          style={{
-            fontFamily: "JosefinSlab_700Bold",
-            color: TEXT_PRIMARY_STRONG,
-          }}
-        >
-          {review.gearName}
-        </Text>
+        {/* Gear Name and Brand with Actions */}
+        <View className="flex-row items-start justify-between mb-2">
+          <Text
+            className="text-2xl flex-1"
+            style={{
+              fontFamily: "Raleway_700Bold",
+              color: TEXT_PRIMARY_STRONG,
+            }}
+          >
+            {review.gearName}
+          </Text>
+          <ContentActionsAffordance
+            itemId={reviewId || ""}
+            itemType="review"
+            createdByUserId={review.authorId || ""}
+            currentUserId={currentUser?.id}
+            canModerate={canModerate}
+            roleLabel={roleLabel}
+            onRequestDelete={handleDeleteReview}
+            onRequestRemove={handleRemoveReview}
+            layout="cardHeader"
+          />
+        </View>
 
         {!!review.brand && (
           <Text
@@ -338,7 +340,7 @@ export default function GearReviewDetailScreen() {
                 <Text
                   className="text-lg mb-2"
                   style={{
-                    fontFamily: "JosefinSlab_700Bold",
+                    fontFamily: "Raleway_700Bold",
                     color: TEXT_PRIMARY_STRONG,
                   }}
                 >
@@ -367,7 +369,7 @@ export default function GearReviewDetailScreen() {
                 <Text
                   className="text-lg mb-2"
                   style={{
-                    fontFamily: "JosefinSlab_700Bold",
+                    fontFamily: "Raleway_700Bold",
                     color: TEXT_PRIMARY_STRONG,
                   }}
                 >
@@ -408,15 +410,16 @@ export default function GearReviewDetailScreen() {
           </View>
         )}
 
-        {/* Reddit-style Voting Control */}
-        <View className="items-center mb-6">
-          <VoteButtons
-            score={voteScore}
-            userVote={userVote}
-            onVote={handleVote}
-            layout="vertical"
-            size="large"
-            disabled={voteLoading}
+        {/* Author and Vote row */}
+        <View className="flex-row items-center justify-between py-3 border-t" style={{ borderColor: BORDER_SOFT, marginBottom: 24 }}>
+          <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+            by {review.displayName || "Anonymous"}
+          </Text>
+          <VotePill
+            collectionPath="gearReviews"
+            itemId={reviewId!}
+            initialScore={(review.upvotes || 0) - (review.downvotes || 0)}
+            onRequireAccount={() => setShowLoginModal(true)}
           />
         </View>
       </ScrollView>

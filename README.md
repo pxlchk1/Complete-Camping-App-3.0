@@ -89,7 +89,7 @@ A clean, optimized rebuild of your camping app with better architecture, perform
   - Updates dynamically without app restart
 - **About modal** created with complete app information:
   - Beautiful slide-up modal with proper styling matching app theme
-  - Josefin Slab headers (deep forest green) and Source Sans body text
+  - Raleway headers (deep forest green) and Source Sans body text
   - Links to website, YouTube, Instagram, and email
   - Special thanks section for contributors
   - All links properly open in device browser
@@ -290,7 +290,7 @@ A clean, optimized rebuild of your camping app with better architecture, perform
 - Replaced all empty states across Plan section screens with unified component
 - **Consistent design across all screens**:
   - 64px icon with EARTH_GREEN color
-  - JosefinSlab_700Bold title (20px, DEEP_FOREST)
+  - Raleway_700Bold title (20px, DEEP_FOREST)
   - SourceSans3_400Regular message (16px, EARTH_GREEN, 24px line height)
   - Optional CTA button (DEEP_FOREST background, PARCHMENT text)
   - Specific spacing: 32px above icon, 16px icon-to-title, 8px title-to-message, 24px message-to-button
@@ -344,7 +344,7 @@ A clean, optimized rebuild of your camping app with better architecture, perform
 ### Community Section Header Standardization
 - **Unified header layout** across all Community tabs (Tips, Gear Reviews, Questions, Photos, Feedback)
 - All page titles now use consistent placement: `px-5 py-3` with `mb-3` on title row
-- Title size standardized to `text-xl` with `JosefinSlab_700Bold`
+- Title size standardized to `text-xl` with `Raleway_700Bold`
 - Action button (+ icon) consistently positioned on the right at `size={32}`
 - Clean, professional look with matching spacing and alignment throughout Connect section
 
@@ -882,7 +882,7 @@ A clean, optimized rebuild of your camping app with better architecture, perform
 ### Hero Images & Navigation
 - Full-bleed hero images on all main screens (Home, Learn, Plan, Community, First Aid)
 - Universal Account icon in top-right of all hero sections
-- Consistent typography: JosefinSlab_700Bold for titles, SourceSans3_400Regular for subtitles
+- Consistent typography: Raleway_700Bold for titles, SourceSans3_400Regular for subtitles
 - Hero images extend beyond safe area for immersive feel
 - Plan/My Trips screen uses green bar pattern with "+ New Trip" button
 
@@ -1245,12 +1245,12 @@ import {
 
 The app uses the official CCC Font Stack with carefully selected typefaces:
 
-#### Display Font: Josefin Slab
+#### Display Font: Raleway
 **Weights Available:**
-- `JosefinSlab_600SemiBold` - Secondary headers, section titles
-- `JosefinSlab_700Bold` - Hero titles, main headings
+- `Raleway_600SemiBold` - Secondary headers, section titles
+- `Raleway_700Bold` - Hero titles, main headings
 
-**IMPORTANT:** Never use `JosefinSlab_400Regular`. It has been fully replaced with the SemiBold weight.
+**IMPORTANT:** Never use `Raleway_400Regular`. It has been fully replaced with the SemiBold weight.
 
 **Use For:**
 - Hero titles (Bold)
@@ -1293,8 +1293,8 @@ The app uses the official CCC Font Stack with carefully selected typefaces:
 import { Heading1, Heading2, SectionTitle, BodyText, Caption } from "../components/Typography";
 
 // Display fonts
-<Heading1>Welcome to Camping</Heading1>  // JosefinSlab_700Bold
-<SectionTitle>Getting Started</SectionTitle>  // JosefinSlab_600SemiBold
+<Heading1>Welcome to Camping</Heading1>  // Raleway_700Bold
+<SectionTitle>Getting Started</SectionTitle>  // Raleway_600SemiBold
 
 // Body fonts
 <BodyText>This is regular body text</BodyText>  // SourceSans3_400Regular
@@ -1305,7 +1305,7 @@ import { Heading1, Heading2, SectionTitle, BodyText, Caption } from "../componen
 ```typescript
 <Text style={{ fontFamily: "SourceSans3_400Regular" }}>Regular text</Text>
 <Text style={{ fontFamily: "SourceSans3_600SemiBold" }}>Semibold text</Text>
-<Text style={{ fontFamily: "JosefinSlab_700Bold" }}>Bold display text</Text>
+<Text style={{ fontFamily: "Raleway_700Bold" }}>Bold display text</Text>
 ```
 
 ### UI Components

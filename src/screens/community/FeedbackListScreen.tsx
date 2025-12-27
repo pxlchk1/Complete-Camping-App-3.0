@@ -10,10 +10,10 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { feedbackService, FeedbackPost } from "../../services/firestore/feedbackService";
 import { feedbackVoteService } from "../../services/firestore/feedbackVoteService";
-import VoteButtons from "../../components/VoteButtons";
 import { auth } from "../../config/firebase";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
-import { requireAuth } from "../../utils/gating";
+import { requireProForAction } from "../../utils/gating";
+import { shouldShowInFeed } from "../../services/moderationService";
 import { RootStackNavigationProp } from "../../navigation/types";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
 import { seedFeedbackIfEmpty } from "../../features/feedback/seedFeedback";
@@ -53,9 +53,13 @@ export default function FeedbackListScreen() {
       setLoading(true);
       setError(null);
       const allPosts = await feedbackService.getFeedback();
+      // Filter out hidden content (unless user is author)
+      const visiblePosts = allPosts.filter(post => 
+        shouldShowInFeed(post, currentUser?.uid)
+      );
       // TODO: Replace with actual comment count fetch if available
       const postsWithVotes = await Promise.all(
-        allPosts.map(async (post) => {
+        visiblePosts.map(async (post) => {
           let voteScore = post.karmaScore || 0;
           let userVote: "up" | "down" | null = null;
           try {
@@ -90,52 +94,63 @@ export default function FeedbackListScreen() {
   const handlePostPress = (postId: string) => {
     navigation.navigate("FeedbackDetail", { postId });
   };
+  
   const handleCreatePost = () => {
-    if (!currentUser) {
-      // Navigate to paywall for non-signed-in users
-      requireAuth(() => setShowLoginModal(true));
-    }
-    
-    // Firestore rules will check subscription status
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    navigation.navigate("CreateFeedback");
+    // Feedback submission requires Pro
+    requireProForAction(
+      () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        navigation.navigate("CreateFeedback");
+      },
+      {
+        openAccountModal: () => setShowLoginModal(true),
+        openPaywallModal: () => navigation.navigate("Paywall"),
+      }
+    );
   };
 
   const handleUpvote = async (postId: string) => {
-    if (!currentUser) {
-      navigation.navigate("Paywall");
-      return;
-      requireAuth(() => setShowLoginModal(true));
-    }
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await feedbackService.upvoteFeedback(postId);
-      setPosts(prev =>
-        prev.map(p => (p.id === postId ? { ...p, karmaScore: p.karmaScore + 1 } : p))
-      );
-    } catch (err) {
-      // Silently fail
-    }
+    // Voting requires Pro
+    requireProForAction(
+      async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        try {
+          await feedbackService.upvoteFeedback(postId);
+          setPosts(prev =>
+            prev.map(p => (p.id === postId ? { ...p, karmaScore: p.karmaScore + 1 } : p))
+          );
+        } catch (err) {
+          // Silently fail
+        }
+      },
+      {
+        openAccountModal: () => setShowLoginModal(true),
+        openPaywallModal: () => navigation.navigate("Paywall"),
+      }
+    );
   };
 
   const handleDownvote = async (postId: string) => {
-    if (!currentUser) {
-      navigation.navigate("Paywall");
-      return;
-      requireAuth(() => setShowLoginModal(true));
-    }
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await feedbackService.adjustKarma(postId, -1);
-      setPosts(prev =>
-        prev.map(p => (p.id === postId ? { ...p, karmaScore: p.karmaScore - 1 } : p))
-      );
-    } catch (err) {
-      // Silently fail
-    }
+    // Voting requires Pro
+    requireProForAction(
+      async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        try {
+          await feedbackService.adjustKarma(postId, -1);
+          setPosts(prev =>
+            prev.map(p => (p.id === postId ? { ...p, karmaScore: p.karmaScore - 1 } : p))
+          );
+        } catch (err) {
+          // Silently fail
+        }
+      },
+      {
+        openAccountModal: () => setShowLoginModal(true),
+        openPaywallModal: () => navigation.navigate("Paywall"),
+      }
+    );
   };
+  
   const getStatusColor = (status: string) => {
     switch (status) {
       case "open":
@@ -228,7 +243,7 @@ export default function FeedbackListScreen() {
 
         <Text
           className="text-lg mb-2"
-          style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+          style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
         >
           {item.title}
         </Text>
@@ -241,41 +256,22 @@ export default function FeedbackListScreen() {
           {item.description}
         </Text>
 
-        {/* Footer: up/down votes and comments count */}
-        <View className="flex-row items-center justify-between pt-3 border-t" style={{ borderColor: BORDER_SOFT }}>
-          <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-            {formatTimeAgo(item.createdAt)}
-          </Text>
-          <View className="flex-row items-center gap-4">
-            <VoteButtons
-              score={item.voteScore}
-              userVote={item.userVote}
-              onVote={async (voteType) => {
-                try {
-                  await feedbackVoteService.vote(item.id, voteType === "up" ? 1 : -1);
-                  setPosts((prev) =>
-                    prev.map((p) =>
-                      p.id === item.id
-                        ? {
-                            ...p,
-                            userVote: p.userVote === voteType ? null : voteType,
-                            voteScore:
-                              p.voteScore + (p.userVote === voteType ? (voteType === "up" ? -1 : 1) : voteType === "up" ? (p.userVote === "down" ? 2 : 1) : (p.userVote === "up" ? -2 : -1)),
-                          }
-                        : p
-                    )
-                  );
-                } catch {}
-              }}
-              layout="horizontal"
-              size="medium"
-            />
-            <View className="flex-row items-center ml-2">
-              <Ionicons name="chatbubble-outline" size={18} color={TEXT_MUTED} />
-              <Text className="ml-1 text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_MUTED }}>
-                {item.commentCount ?? 0}
-              </Text>
-            </View>
+        {/* Footer: author, date, and comments count */}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 12, borderTopWidth: 1, borderColor: BORDER_SOFT }}>
+          <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
+              {item.authorName || "Anonymous"}
+            </Text>
+            <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
+            <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
+              {formatTimeAgo(item.createdAt)}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Ionicons name="chatbubble-outline" size={16} color={TEXT_MUTED} />
+            <Text style={{ marginLeft: 4, fontSize: 12, fontFamily: "SourceSans3_600SemiBold", color: TEXT_MUTED }}>
+              {item.commentCount ?? 0}
+            </Text>
           </View>
         </View>
       </Pressable>
@@ -295,14 +291,6 @@ export default function FeedbackListScreen() {
       </View>
     );
   }
-    <AccountRequiredModal
-      visible={showLoginModal}
-      onCreateAccount={() => {
-        setShowLoginModal(false);
-        navigation.navigate("Auth");
-      }}
-      onMaybeLater={() => setShowLoginModal(false)}
-    />
 
   if (error) {
     return (
@@ -335,9 +323,9 @@ export default function FeedbackListScreen() {
 
   return (
     <View className="flex-1 bg-parchment">
-      {/* Header */}
+      {/* Action Bar */}
       <CommunitySectionHeader
-        title="App Feedback"
+        title="App feedback"
         onAddPress={handleCreatePost}
       />
 
@@ -389,7 +377,7 @@ export default function FeedbackListScreen() {
             </View>
             <Text
               className="text-2xl text-center mb-3"
-              style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
             >
               Share Your Feedback
             </Text>
@@ -442,11 +430,11 @@ export default function FeedbackListScreen() {
 
           <Pressable
             onPress={handleCreatePost}
-            className="px-8 py-4 rounded-xl active:opacity-90 flex-row items-center"
+            className="px-6 py-3 rounded-lg active:opacity-90 flex-row items-center"
             style={{ backgroundColor: DEEP_FOREST }}
           >
-            <Ionicons name="add-circle-outline" size={24} color={PARCHMENT} />
-            <Text className="ml-2 text-base" style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
+            <Ionicons name="add-circle-outline" size={20} color={PARCHMENT} />
+            <Text className="ml-2 text-sm" style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
               Submit Feedback
             </Text>
           </Pressable>
@@ -459,6 +447,15 @@ export default function FeedbackListScreen() {
           contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
         />
       )}
+
+      <AccountRequiredModal
+        visible={showLoginModal}
+        onCreateAccount={() => {
+          setShowLoginModal(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowLoginModal(false)}
+      />
     </View>
   );
 }

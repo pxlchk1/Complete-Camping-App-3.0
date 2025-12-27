@@ -28,19 +28,36 @@ export default function AboutModal({ visible, onClose }: AboutModalProps) {
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView className="flex-1 bg-parchment" edges={["top", "bottom"]}>
-        {/* Header */}
-        <View className="flex-row items-center justify-between px-4 py-3 border-b border-stone-300">
-          <View className="w-10" />
-          <Text
-            className="text-2xl"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
-          >
-            About
-          </Text>
-          <Pressable onPress={onClose} className="p-2 active:opacity-70">
-            <Ionicons name="close" size={28} color={DEEP_FOREST} />
-          </Pressable>
+      <SafeAreaView className="flex-1 bg-parchment" edges={["bottom"]}>
+        {/* Header - Deep Forest Green background */}
+        <View
+          style={{
+            paddingTop: 30,
+            paddingHorizontal: 20,
+            paddingBottom: 20,
+            backgroundColor: DEEP_FOREST,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text
+              style={{ fontFamily: "Raleway_700Bold", fontSize: 24, color: PARCHMENT, flex: 1, marginRight: 12 }}
+            >
+              About
+            </Text>
+            <Pressable
+              onPress={onClose}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: "rgba(255, 255, 255, 0.15)",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name="close" size={20} color={PARCHMENT} />
+            </Pressable>
+          </View>
         </View>
 
         {/* Content */}
@@ -48,7 +65,7 @@ export default function AboutModal({ visible, onClose }: AboutModalProps) {
           {/* Main Title */}
           <Text
             className="text-2xl text-center mb-6"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+            style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
           >
             About The Complete Camping App
           </Text>
@@ -58,17 +75,21 @@ export default function AboutModal({ visible, onClose }: AboutModalProps) {
             className="text-base mb-2 leading-6"
             style={{ fontFamily: "SourceSans3_400Regular", color: "#3d3d3d", lineHeight: 24 }}
           >
-            The Complete Camping App is one of the ways I try to make camping feel easier,
-            friendlier, and a little more fun. It brings together planning tools, gear ideas,
-            community advice, and simple checklists so anyone can head outside with confidence.
+            Nature has a way of steadying us. Even a simple night outside can reset your brain in the best way. I built this app to take some of the stress out of planning, packing, and getting started, so more people can experience that kind of calm.
+          </Text>
+          <Text
+            className="text-base mb-2 leading-6"
+            style={{ fontFamily: "SourceSans3_400Regular", color: "#3d3d3d", lineHeight: 24 }}
+          >
+            I hope it helps. And if it does, I&apos;d be really grateful if you&apos;d leave a review or share the app with a friend.
           </Text>
           <Text
             className="text-base mb-8"
             style={{ fontFamily: "SourceSans3_400Regular", color: "#3d3d3d", lineHeight: 24 }}
           >
             {"\n"}
-            Stay wild & wander often,{"\n"}
-            Alana
+            Stay wild and wander often!{"\n"}
+            - Alana
           </Text>
 
           {/* Divider */}
@@ -77,7 +98,7 @@ export default function AboutModal({ visible, onClose }: AboutModalProps) {
           {/* Find us online section */}
           <Text
             className="text-lg mb-4"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+            style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
           >
             Find us online
           </Text>
@@ -162,7 +183,7 @@ export default function AboutModal({ visible, onClose }: AboutModalProps) {
           {/* Special thanks section */}
           <Text
             className="text-lg mb-4"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}
+            style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
           >
             Special thanks
           </Text>

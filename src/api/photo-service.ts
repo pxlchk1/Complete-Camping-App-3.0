@@ -38,9 +38,11 @@ export async function uploadPhoto(
       title,
       description,
       imageUri: "", // Temporary, will update after upload
+      storagePath: "", // Will update after upload
       category,
       tags,
       authorId: userId,
+      ownerUid: userId, // Consistent owner field for rules
       authorHandle: userHandle,
       authorName: userName || userHandle,
       createdAt: new Date().toISOString(),
@@ -59,14 +61,14 @@ export async function uploadPhoto(
     const response = await fetch(localUri);
     const blob = await response.blob();
 
-    // Upload to Firebase Storage - matches rules: stories/{userId}/{storyId}/{fileName}
-    const filename = `stories/${userId}/${photoId}/${Date.now()}.jpg`;
-    const storageRef = ref(storage, filename);
+    // Upload to Firebase Storage - owner-scoped path: stories/{userId}/{photoId}/{timestamp}.jpg
+    const storagePath = `stories/${userId}/${photoId}/${Date.now()}.jpg`;
+    const storageRef = ref(storage, storagePath);
     await uploadBytes(storageRef, blob);
     const imageUri = await getDownloadURL(storageRef);
 
-    // Update photo document with actual image URL
-    await updateDoc(docRef, { imageUri });
+    // Update photo document with actual image URL and storage path
+    await updateDoc(docRef, { imageUri, storagePath });
 
     return photoId;
   } catch (error) {
@@ -104,8 +106,8 @@ export async function fetchPhotos(userId?: string): Promise<LibraryImage[]> {
   }
 }
 
-// Delete a photo
-export async function deletePhoto(photoId: string, userId: string): Promise<void> {
+// Delete a photo (owner OR admin)
+export async function deletePhoto(photoId: string, userId: string, isAdmin: boolean = false): Promise<void> {
   try {
     const photoRef = doc(db, PHOTOS_COLLECTION, photoId);
     const photoDoc = await getDoc(photoRef);
@@ -115,19 +117,35 @@ export async function deletePhoto(photoId: string, userId: string): Promise<void
     }
 
     const photoData = photoDoc.data();
+    const ownerId = photoData.ownerUid || photoData.authorId;
 
-    if (photoData.authorId !== userId) {
+    // Permission check: owner OR admin
+    if (ownerId !== userId && !isAdmin) {
       throw new Error("Unauthorized to delete this photo");
     }
 
-    // Delete from Storage
-    const imageUri = photoData.imageUri;
-    if (imageUri && imageUri.includes("firebase")) {
+    // Delete from Storage using stored path or construct it
+    const storagePath = photoData.storagePath;
+    if (storagePath) {
       try {
-        const storageRef = ref(storage, imageUri);
+        const storageRef = ref(storage, storagePath);
         await deleteObject(storageRef);
-      } catch (storageError) {
-        console.warn("Error deleting from storage:", storageError);
+        console.log("[deletePhoto] Deleted from Storage:", storagePath);
+      } catch (storageError: any) {
+        // Log but continue - the file might already be deleted
+        console.warn("[deletePhoto] Storage delete error (continuing):", storageError?.message || storageError);
+      }
+    } else {
+      // Fallback: try to delete using constructed path
+      const imageUri = photoData.imageUri;
+      if (imageUri && imageUri.includes("firebase")) {
+        try {
+          // Extract path from URL
+          const storageRef = ref(storage, imageUri);
+          await deleteObject(storageRef);
+        } catch (storageError: any) {
+          console.warn("[deletePhoto] Fallback storage delete error:", storageError?.message || storageError);
+        }
       }
     }
 
@@ -146,8 +164,9 @@ export async function deletePhoto(photoId: string, userId: string): Promise<void
     });
 
     await batch.commit();
-  } catch (error) {
-    console.error("Error deleting photo:", error);
+    console.log("[deletePhoto] Successfully deleted photo:", photoId);
+  } catch (error: any) {
+    console.error("[deletePhoto] Error:", error?.message || error);
     throw error;
   }
 }

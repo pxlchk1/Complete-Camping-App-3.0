@@ -11,6 +11,9 @@ import ModalHeader from "../../components/ModalHeader";
 import * as Haptics from "expo-haptics";
 import { createQuestion } from "../../services/questionsService";
 import { useCurrentUser } from "../../state/userStore";
+import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { requireAccount } from "../../utils/gating";
+import { requireEmailVerification } from "../../utils/authHelper";
 import { RootStackNavigationProp } from "../../navigation/types";
 import {
   DEEP_FOREST,
@@ -30,6 +33,7 @@ const SUGGESTED_TAGS = [
 export default function CreateQuestionScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const currentUser = useCurrentUser();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -57,6 +61,17 @@ export default function CreateQuestionScreen() {
   };
 
   const handleSubmit = async () => {
+    // Questions only require an account, not PRO (FREE users can ask questions)
+    if (!requireAccount({
+      openAccountModal: () => setShowLoginModal(true),
+    })) {
+      return;
+    }
+
+    // Require email verification for posting content
+    const isVerified = await requireEmailVerification("ask questions");
+    if (!isVerified) return;
+    
     if (!currentUser || !title.trim() || !body.trim() || submitting) return;
 
     if (title.length < 10) {
@@ -93,7 +108,7 @@ export default function CreateQuestionScreen() {
   return (
     <View className="flex-1 bg-parchment">
       <ModalHeader
-        title="Ask Question"
+        title="Ask question"
         showTitle
         rightAction={{
           icon: "checkmark",
@@ -266,6 +281,16 @@ export default function CreateQuestionScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      
+      {/* Account Required Modal */}
+      <AccountRequiredModal
+        visible={showLoginModal}
+        onCreateAccount={() => {
+          setShowLoginModal(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowLoginModal(false)}
+      />
     </View>
   );
 }

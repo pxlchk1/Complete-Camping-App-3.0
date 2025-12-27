@@ -53,23 +53,24 @@ export default function FirstAidScreen() {
           resizeMode="cover"
           accessibilityLabel="First aid and medical supplies"
         >
+          {/* Gradient Overlay - covers full image including safe area */}
+          <LinearGradient
+            colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.6)"]}
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
+            }}
+          />
           <View className="flex-1" style={{ paddingTop: insets.top, transform: [{ scaleX: -1 }] }}>
             {/* Account Button - Top Right */}
             <AccountButtonHeader color={TEXT_ON_DARK} />
 
             {/* Title at bottom left */}
             <View className="flex-1 justify-end px-6 pb-4">
-              <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.4)"]}
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: 100,
-                }}
-              />
-              <Text className="text-3xl" style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, zIndex: 1 }}>
+              <Text className="text-3xl" style={{ fontFamily: "Raleway_700Bold", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, zIndex: 1 }}>
                 First Aid
               </Text>
               <Text className="mt-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3, zIndex: 1 }}>
@@ -105,7 +106,7 @@ export default function FirstAidScreen() {
 
         {/* Table of Contents */}
         <View className="px-5 mb-8">
-          <Text className="text-2xl text-forest-800 mb-4" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-2xl text-forest-800 mb-4" style={{ fontFamily: "Raleway_700Bold" }}>
             First Aid Categories
           </Text>
           <View className="space-y-2">
@@ -134,7 +135,7 @@ export default function FirstAidScreen() {
           }}
           className="px-5 mb-8"
         >
-          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "Raleway_700Bold" }}>
             Burns and Heat Injuries
           </Text>
           <View className="h-1 w-16 bg-amber-600 rounded-full mb-6" />
@@ -278,7 +279,7 @@ export default function FirstAidScreen() {
           }}
           className="px-5 mb-8"
         >
-          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "Raleway_700Bold" }}>
             Cold Injuries
           </Text>
           <View className="h-1 w-16 bg-amber-600 rounded-full mb-6" />
@@ -357,7 +358,7 @@ export default function FirstAidScreen() {
           }}
           className="px-5 mb-8"
         >
-          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "Raleway_700Bold" }}>
             Wounds, Bites, and Trauma
           </Text>
           <View className="h-1 w-16 bg-amber-600 rounded-full mb-6" />
@@ -634,7 +635,7 @@ export default function FirstAidScreen() {
           }}
           className="px-5 mb-8"
         >
-          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "Raleway_700Bold" }}>
             Sprains, Strains, Fractures, and Joint Injuries
           </Text>
           <View className="h-1 w-16 bg-amber-600 rounded-full mb-6" />
@@ -746,7 +747,7 @@ export default function FirstAidScreen() {
           }}
           className="px-5 mb-8"
         >
-          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "Raleway_700Bold" }}>
             Medical Illnesses
           </Text>
           <View className="h-1 w-16 bg-amber-600 rounded-full mb-6" />
@@ -891,7 +892,7 @@ export default function FirstAidScreen() {
           }}
           className="px-5 mb-8"
         >
-          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "Raleway_700Bold" }}>
             Altitude Related Issues
           </Text>
           <View className="h-1 w-16 bg-amber-600 rounded-full mb-6" />
@@ -933,7 +934,7 @@ export default function FirstAidScreen() {
           }}
           className="px-5 mb-8"
         >
-          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "Raleway_700Bold" }}>
             Eye Injuries and Irritation
           </Text>
           <View className="h-1 w-16 bg-amber-600 rounded-full mb-6" />
@@ -948,7 +949,7 @@ export default function FirstAidScreen() {
           }}
           className="px-5 mb-8"
         >
-          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "Raleway_700Bold" }}>
             Dehydration and Fluid Problems
           </Text>
           <View className="h-1 w-16 bg-amber-600 rounded-full mb-6" />
@@ -963,7 +964,7 @@ export default function FirstAidScreen() {
           }}
           className="px-5 mb-8"
         >
-          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "Raleway_700Bold" }}>
             Smoke and Fire Related Injuries
           </Text>
           <View className="h-1 w-16 bg-amber-600 rounded-full mb-6" />
@@ -978,7 +979,7 @@ export default function FirstAidScreen() {
           }}
           className="px-5 mb-8"
         >
-          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-2xl text-forest-800 mb-1" style={{ fontFamily: "Raleway_700Bold" }}>
             Poisonous Plants and Skin Reactions
           </Text>
           <View className="h-1 w-16 bg-amber-600 rounded-full mb-6" />

@@ -4,49 +4,47 @@
  */
 
 import React from "react";
-import { View, Text, Pressable, ImageBackground, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { DEEP_FOREST, TEXT_ON_DARK } from "../constants/colors";
-const COMMUNITY_HEADER_BG = require("../assets/images/community.png");
 
 interface CommunitySectionHeaderProps {
   title: string;
   onAddPress: () => void;
+  showFilter?: boolean;
+  onFilterPress?: () => void;
 }
 
 export default function CommunitySectionHeader({
   title,
-  onAddPress
+  onAddPress,
+  showFilter,
+  onFilterPress,
 }: CommunitySectionHeaderProps) {
   return (
-    <ImageBackground
-      source={COMMUNITY_HEADER_BG}
-      style={styles.bg}
-      resizeMode="cover"
-      imageStyle={{ opacity: 0.85 }}
-    >
-      <View style={styles.overlay}>
-        <View style={styles.inner}>
-          <Text style={styles.title}>{title}</Text>
+    <View style={styles.container}>
+      <View style={styles.inner}>
+        <Text style={styles.title}>{title}</Text>
+        <View style={styles.actions}>
+          {showFilter && onFilterPress && (
+            <Pressable onPress={onFilterPress} style={styles.actionBtn} accessibilityLabel="Filter">
+              <Ionicons name="funnel-outline" size={24} color={TEXT_ON_DARK} />
+            </Pressable>
+          )}
           <Pressable onPress={onAddPress} style={styles.addBtn} accessibilityLabel="Add">
             <Ionicons name="add-circle" size={32} color={TEXT_ON_DARK} />
           </Pressable>
         </View>
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bg: {
-    width: '100%',
-    minHeight: 72,
-    justifyContent: 'flex-end',
-  },
-  overlay: {
-    backgroundColor: 'rgba(16,40,32,0.60)',
+  container: {
+    backgroundColor: DEEP_FOREST,
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 12,
   },
   inner: {
     flexDirection: 'row',
@@ -54,12 +52,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   title: {
-    fontFamily: 'JosefinSlab_700Bold',
+    fontFamily: 'Raleway_700Bold',
     color: TEXT_ON_DARK,
     fontSize: 22,
     letterSpacing: 0.5,
   },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  actionBtn: {
+    padding: 4,
+  },
   addBtn: {
-    marginLeft: 8,
+    marginLeft: 0,
   },
 });

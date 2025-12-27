@@ -124,7 +124,7 @@ export default function EditCamperScreen() {
   if (loading) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="Edit Camper" showTitle />
+        <ModalHeader title="Edit camper" showTitle />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={DEEP_FOREST} />
           <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
@@ -138,7 +138,7 @@ export default function EditCamperScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="Edit Camper"
+        title="Edit camper"
         showTitle
         rightAction={{
           icon: "checkmark",
@@ -254,7 +254,7 @@ export default function EditCamperScreen() {
           <Pressable
             onPress={handleSubmit}
             disabled={!displayName.trim() || submitting}
-            className="mt-4 mb-3 py-4 rounded-xl active:opacity-90"
+            className="mt-4 mb-3 py-3 rounded-lg active:opacity-90"
             style={{
               backgroundColor: displayName.trim() ? DEEP_FOREST : BORDER_SOFT,
             }}
@@ -274,7 +274,7 @@ export default function EditCamperScreen() {
           {/* Delete Button */}
           <Pressable
             onPress={handleDelete}
-            className="mb-8 py-4 rounded-xl border active:opacity-70"
+            className="mb-8 py-3 rounded-lg border active:opacity-70"
             style={{ borderColor: "#dc2626" }}
           >
             <Text

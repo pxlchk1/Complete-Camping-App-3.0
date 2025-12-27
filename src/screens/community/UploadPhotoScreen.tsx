@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import { View, Text, Pressable, TextInput, ScrollView, Image, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from "react-native";
+import { View, Text, Pressable, TextInput, ScrollView, Image, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Keyboard, TouchableWithoutFeedback } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import ModalHeader from "../../components/ModalHeader";
@@ -14,6 +14,8 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getFirestore, collection, addDoc, updateDoc, serverTimestamp, doc } from "firebase/firestore";
 import { useCurrentUser } from "../../state/userStore";
 import { RootStackNavigationProp } from "../../navigation/types";
+import { requireEmailVerification } from "../../utils/authHelper";
+import { recordPhotoUpload, canUploadPhotoToday } from "../../services/photoLimitService";
 import {
   DEEP_FOREST,
   PARCHMENT,
@@ -95,10 +97,23 @@ export default function UploadPhotoScreen() {
 
   const handleSubmit = async () => {
     if (!currentUser || !imageUri || !caption.trim() || uploading) return;
+
+    // Require email verification for posting content
+    const isVerified = await requireEmailVerification("upload photos");
+    if (!isVerified) return;
+
     if (caption.length < 10) {
       setError("Caption must be at least 10 characters");
       return;
     }
+
+    // Double-check photo limit before upload (belt and suspenders)
+    const limitCheck = await canUploadPhotoToday();
+    if (!limitCheck.canUpload) {
+      setError(limitCheck.message || "You've reached your daily photo limit.");
+      return;
+    }
+
     try {
       setUploading(true);
       setError(null);
@@ -114,6 +129,11 @@ export default function UploadPhotoScreen() {
         displayName: currentUser.displayName || "Anonymous User",
         locationName: locationLabel.trim() || null,
         createdAt: serverTimestamp(),
+        // Moderation fields
+        upvotes: 0,
+        downvotes: 0,
+        isHidden: false,
+        needsReview: false,
       });
       const photoId = docRef.id;
       // Upload image to Firebase Storage
@@ -123,6 +143,10 @@ export default function UploadPhotoScreen() {
         imageUrl: downloadURL,
         storagePath,
       });
+
+      // Record the photo upload for daily limit tracking
+      await recordPhotoUpload();
+
       // Navigate to the photo detail
       navigation.replace("PhotoDetail", { photoId });
     } catch (err: any) {
@@ -136,7 +160,7 @@ export default function UploadPhotoScreen() {
   return (
     <View className="flex-1 bg-parchment">
       <ModalHeader
-        title="Upload Photo"
+        title="Upload photo"
         showTitle
         rightAction={{
           icon: "checkmark",
@@ -149,7 +173,8 @@ export default function UploadPhotoScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={90}
       >
-        <ScrollView className="flex-1" contentContainerStyle={{ padding: 20 }}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <ScrollView className="flex-1" contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
           {error && (
             <View className="rounded-xl p-4 mb-4 flex-row items-center bg-red-100 border border-red-300">
               <Ionicons name="alert-circle" size={20} color="#dc2626" />
@@ -207,6 +232,9 @@ export default function UploadPhotoScreen() {
               multiline
               numberOfLines={4}
               textAlignVertical="top"
+              returnKeyType="done"
+              blurOnSubmit={true}
+              onSubmitEditing={Keyboard.dismiss}
               className="rounded-xl border px-4 py-3"
               style={{
                 backgroundColor: "white",
@@ -232,6 +260,8 @@ export default function UploadPhotoScreen() {
               onChangeText={setLocationLabel}
               placeholder="Where was this photo taken?"
               placeholderTextColor={TEXT_MUTED}
+              returnKeyType="done"
+              blurOnSubmit={true}
               className="rounded-xl border px-4 py-3"
               style={{
                 backgroundColor: "white",
@@ -323,8 +353,7 @@ export default function UploadPhotoScreen() {
               ))}
             </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </ScrollView>        </TouchableWithoutFeedback>      </KeyboardAvoidingView>
     </View>
   );
 }

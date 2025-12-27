@@ -5,7 +5,21 @@
 
 import { Timestamp } from "firebase/firestore";
 
-export type GearCategory = "shelter" | "sleep" | "kitchen" | "clothing" | "bags" | "lighting" | "misc";
+export type GearCategory = 
+  | "shelter" 
+  | "sleep" 
+  | "kitchen" 
+  | "water"
+  | "lighting"
+  | "tools"
+  | "safety"
+  | "clothing" 
+  | "camp_comfort"
+  | "electronics"
+  | "hygiene"
+  | "documents_essentials"
+  | "optional_extras"
+  | "seating";
 
 export interface GearItem {
   id: string;
@@ -48,8 +62,15 @@ export const GEAR_CATEGORIES: { value: GearCategory; label: string }[] = [
   { value: "shelter", label: "Shelter" },
   { value: "sleep", label: "Sleep" },
   { value: "kitchen", label: "Kitchen" },
-  { value: "clothing", label: "Clothing" },
-  { value: "bags", label: "Bags" },
+  { value: "water", label: "Water" },
   { value: "lighting", label: "Lighting" },
-  { value: "misc", label: "Misc" },
+  { value: "tools", label: "Tools" },
+  { value: "safety", label: "Safety" },
+  { value: "clothing", label: "Clothing" },
+  { value: "camp_comfort", label: "Camp Comfort" },
+  { value: "electronics", label: "Electronics" },
+  { value: "hygiene", label: "Hygiene" },
+  { value: "documents_essentials", label: "Documents & Essentials" },
+  { value: "optional_extras", label: "Optional Extras" },
+  { value: "seating", label: "Seating" },
 ];

@@ -5,7 +5,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
 import { useTripsStore } from "../state/tripsStore";
 import { CampingStyle } from "../types/camping";
-import { DEEP_FOREST } from "../constants/colors";
+import { DEEP_FOREST, PARCHMENT } from "../constants/colors";
 
 interface EditTripModalProps {
   visible: boolean;
@@ -35,7 +35,7 @@ export default function EditTripModal({ visible, onClose, tripId }: EditTripModa
   const [endDate, setEndDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-  const [destination, setDestination] = useState("");
+  // NOTE: Destination removed - users edit destination via Plan > Parks
   const [partySize, setPartySize] = useState("4");
   const [campingStyle, setCampingStyle] = useState<CampingStyle | undefined>(undefined);
 
@@ -45,7 +45,7 @@ export default function EditTripModal({ visible, onClose, tripId }: EditTripModa
       setTripName(trip.name);
       setStartDate(new Date(trip.startDate));
       setEndDate(new Date(trip.endDate));
-      setDestination(trip.destination?.name || "");
+      // NOTE: Destination is not editable here - use Plan > Parks
       setPartySize(trip.partySize?.toString() || "4");
       setCampingStyle(trip.campingStyle);
     }
@@ -74,18 +74,13 @@ export default function EditTripModal({ visible, onClose, tripId }: EditTripModa
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+      // NOTE: Destination is not updated here - use Plan > Parks to change destination
       updateTrip(tripId, {
         name: tripName.trim(),
         startDate: startDate.toISOString().split("T")[0],
         endDate: endDate.toISOString().split("T")[0],
         campingStyle,
         partySize: size,
-        destination: destination.trim() ? {
-          id: trip?.destination?.id || `dest_${Date.now()}`,
-          name: destination.trim(),
-          city: trip?.destination?.city,
-          state: trip?.destination?.state,
-        } : undefined,
       });
 
       onClose();
@@ -123,15 +118,33 @@ export default function EditTripModal({ visible, onClose, tripId }: EditTripModa
         className="flex-1 bg-black/40 justify-end"
       >
         <View className="bg-parchment rounded-t-3xl max-h-[90%]">
-          {/* Header */}
-          <View className="flex-row items-center justify-between px-5 pt-5 pb-3 border-b border-parchmentDark">
-            <Text className="text-xl font-bold text-forest" style={{ fontFamily: "JosefinSlab_700Bold" }}>Edit Trip Details</Text>
-            <Pressable
-              onPress={onClose}
-              className="w-9 h-9 rounded-full bg-[#f0f9f4] items-center justify-center active:bg-[#dcf3e5]"
-            >
-              <Ionicons name="close" size={20} color={DEEP_FOREST} />
-            </Pressable>
+          {/* Header - Deep Forest Green background */}
+          <View
+            style={{
+              paddingTop: 30,
+              paddingHorizontal: 20,
+              paddingBottom: 20,
+              backgroundColor: DEEP_FOREST,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={{ fontFamily: "Raleway_700Bold", fontSize: 24, color: PARCHMENT, flex: 1, marginRight: 12 }}>Edit trip details</Text>
+              <Pressable
+                onPress={onClose}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: "rgba(255, 255, 255, 0.15)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="close" size={20} color={PARCHMENT} />
+              </Pressable>
+            </View>
           </View>
 
           <ScrollView className="px-5 pt-4" showsVerticalScrollIndicator={false}>
@@ -162,7 +175,7 @@ export default function EditTripModal({ visible, onClose, tripId }: EditTripModa
                           : "bg-parchment border-parchmentDark"
                       }`}
                     >
-                      <Text className="text-2xl mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>{style.emoji}</Text>
+                      <Text className="text-2xl mb-1" style={{ fontFamily: "Raleway_700Bold" }}>{style.emoji}</Text>
                       <Text
                         className={`text-sm font-medium ${
                           campingStyle === style.value ? "text-parchment" : "text-forest"
@@ -210,17 +223,7 @@ export default function EditTripModal({ visible, onClose, tripId }: EditTripModa
               </Text>
             </View>
 
-            {/* Destination */}
-            <View className="mb-4">
-              <Text className="text-forest text-sm font-semibold mb-2" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Destination</Text>
-              <TextInput
-                value={destination}
-                onChangeText={setDestination}
-                placeholder="e.g., Yosemite Valley, CA"
-                placeholderTextColor="#999"
-                className="bg-parchment border border-parchmentDark rounded-xl px-4 py-3 text-base text-forest"
-              />
-            </View>
+            {/* NOTE: Destination field removed - users edit destination via Plan > Parks */}
 
             {/* Party Size */}
             <View className="mb-4">
@@ -242,7 +245,7 @@ export default function EditTripModal({ visible, onClose, tripId }: EditTripModa
               onPress={handleSaveTrip}
               className="bg-[#AC9A6D] rounded-2xl px-4 py-4 items-center justify-center active:bg-[#9a8860]"
             >
-              <Text className="text-parchment font-semibold text-base" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Save Changes</Text>
+              <Text className="text-parchment font-semibold text-base" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Save changes</Text>
             </Pressable>
           </View>
         </View>
@@ -259,7 +262,7 @@ export default function EditTripModal({ visible, onClose, tripId }: EditTripModa
                 onPress={(e) => e.stopPropagation()}
               >
                 <View className="flex-row items-center justify-between mb-4">
-                  <Text className="text-xl font-bold text-forest" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+                  <Text className="text-xl font-bold text-forest" style={{ fontFamily: "Raleway_700Bold" }}>
                     Select Start Date
                   </Text>
                   <Pressable
@@ -294,7 +297,7 @@ export default function EditTripModal({ visible, onClose, tripId }: EditTripModa
                 onPress={(e) => e.stopPropagation()}
               >
                 <View className="flex-row items-center justify-between mb-4">
-                  <Text className="text-xl font-bold text-forest" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+                  <Text className="text-xl font-bold text-forest" style={{ fontFamily: "Raleway_700Bold" }}>
                     Select End Date
                   </Text>
                   <Pressable

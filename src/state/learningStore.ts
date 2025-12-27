@@ -127,107 +127,15 @@ interface LearningState {
   completeStep: (moduleId: string, stepId: string) => void;
 }
 
+// Import expanded LNT module content
+import { getLNTExpandedModule } from "../data/lntModuleContent";
+
+// Get the expanded LNT module
+const LNT_EXPANDED_MODULE = getLNTExpandedModule();
+
 const DEFAULT_MODULES: LearningModule[] = [
-  {
-    id: "leave-no-trace",
-    title: "Leave No Trace: The 7 Principles",
-    description: "Learn how to protect the places we love with these seven simple ideas",
-    icon: "leaf",
-    difficulty: "Beginner",
-    duration: "20 min",
-    category: "ethics",
-    trackId: "novice",
-    xpReward: 50,
-    badge: {
-      id: "lnt-badge",
-      name: "LNT Champion",
-      description: "Completed Leave No Trace training",
-      icon: "medal",
-    },
-    steps: [
-      {
-        id: "lnt-1",
-        title: "Introduction",
-        type: "article",
-        content: "Leave No Trace is a simple way to protect the places we love. These seven ideas help you enjoy the outdoors without harming it. They work anywhere. Big parks, tiny campsites, rivers, deserts, forests. Once you learn them, they become second nature.",
-        duration: 2,
-      },
-      {
-        id: "lnt-2",
-        title: "Plan Ahead and Prepare",
-        type: "article",
-        content: "Good planning prevents most problems. Check the weather. Know local rules. Choose the right gear. Pack enough food and water. Let someone know where you will be.",
-        duration: 2,
-      },
-      {
-        id: "lnt-3",
-        title: "Travel and Camp on Durable Surfaces",
-        type: "article",
-        content: "Stick to marked trails. Walk on rock, gravel, or dry grass when you can. Set your tent on established pads. Avoid fragile areas like wildflower meadows.",
-        duration: 2,
-      },
-      {
-        id: "lnt-4",
-        title: "Dispose of Waste Properly",
-        type: "article",
-        content: "Pack out all trash. Even tiny things. Food scraps attract animals and change their habits. If you need to go to the bathroom outdoors, follow local rules. Many places require wag bags.",
-        duration: 2,
-      },
-      {
-        id: "lnt-5",
-        title: "Leave What You Find",
-        type: "article",
-        content: "Rocks, shells, sticks, bones, and feathers belong to the land. Take a photo instead. Do not build furniture or forts using natural materials.",
-        duration: 2,
-      },
-      {
-        id: "lnt-6",
-        title: "Minimize Campfire Impact",
-        type: "article",
-        content: "Use a stove whenever possible. If fires are allowed, keep them small and in established rings. Burn only clean wood. Fully drown it before you leave.",
-        duration: 2,
-      },
-      {
-        id: "lnt-7",
-        title: "Respect Wildlife",
-        type: "article",
-        content: "Give animals space. Never feed them. Store your food safely. Keep pets controlled so they do not chase or disturb animals.",
-        duration: 2,
-      },
-      {
-        id: "lnt-8",
-        title: "Be Considerate of Others",
-        type: "article",
-        content: "Share the space kindly. Keep noise low. Step aside on trails. Let nature be the soundtrack.",
-        duration: 2,
-      },
-      {
-        id: "lnt-quiz",
-        title: "Quiz",
-        type: "quiz",
-        content: JSON.stringify({
-          questions: [
-            {
-              question: "Why do we stay on durable surfaces?",
-              options: ["To avoid damaging fragile land", "To walk faster", "To make new trails"],
-              correctAnswer: 0,
-            },
-            {
-              question: "Should you burn trash in a fire?",
-              options: ["Yes", "No"],
-              correctAnswer: 1,
-            },
-            {
-              question: "What should you do if you find a cool rock or feather?",
-              options: ["Take it home", "Leave it where it is"],
-              correctAnswer: 1,
-            },
-          ],
-        }),
-        duration: 3,
-      },
-    ],
-  },
+  // Use expanded LNT module
+  LNT_EXPANDED_MODULE as LearningModule,
   {
     id: "first-trip",
     title: "How to Plan Your First Camping Trip",

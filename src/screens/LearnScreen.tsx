@@ -1,18 +1,35 @@
-import React, { useState } from "react";
-import { View, Text, ScrollView, Pressable, ImageBackground } from "react-native";
+/**
+ * LearnScreen (Redesigned)
+ * 
+ * Firebase-backed learning content with:
+ * - Badge display section
+ * - Track selection
+ * - Module cards with progress
+ */
+
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, ScrollView, Pressable, ImageBackground, RefreshControl, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Components
-import { SectionTitle, Heading3, Heading2 } from "../components/Typography";
 import AccountButtonHeader from "../components/AccountButtonHeader";
-import { XPBar } from "../components/XPBar";
 
-// State
-import { useLearningStore, SkillLevel } from "../state/learningStore";
+// Services
+import {
+  getTracksWithProgress,
+  getUserLearningProgress,
+} from "../services/learningService";
+
+// Types
+import {
+  TrackWithModules,
+  UserLearningProgress,
+  LEARNING_BADGES,
+} from "../types/learning";
 
 // Constants
 import {
@@ -22,7 +39,6 @@ import {
   PARCHMENT,
   PARCHMENT_BACKGROUND,
   CARD_BACKGROUND_LIGHT,
-  PARCHMENT_BORDER,
   BORDER_SOFT,
   TEXT_PRIMARY_STRONG,
   TEXT_SECONDARY,
@@ -34,55 +50,78 @@ import { RootStackParamList } from "../navigation/types";
 
 type LearnScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "Learn">;
 
-const LODGE_FOREST = DEEP_FOREST;
-const LODGE_AMBER = GRANITE_GOLD;
-
 export default function LearnScreen() {
   const navigation = useNavigation<LearnScreenNavigationProp>();
+  const insets = useSafeAreaInsets();
+  const bottomSpacer = 50 + Math.max(insets.bottom, 18) + 12;
 
-  const {
-    tracks,
-    calculateModuleProgress,
-    calculateTrackProgress,
-    getModulesByTrack,
-    isTrackUnlocked,
-    getTotalXP,
-    getCurrentLevel,
-    getCompletedModules,
-  } = useLearningStore();
+  // State
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [tracks, setTracks] = useState<TrackWithModules[]>([]);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [userProgress, setUserProgress] = useState<UserLearningProgress | null>(null);
 
-  const [selectedTrack, setSelectedTrack] = useState<SkillLevel>("novice");
+  // Load data
+  const loadData = useCallback(async (showRefresh = false) => {
+    try {
+      if (showRefresh) setRefreshing(true);
+      else setLoading(true);
 
-  const totalXP = getTotalXP();
-  const currentLevel = getCurrentLevel();
-  const completedModules = getCompletedModules();
+      const [tracksData, progress] = await Promise.all([
+        getTracksWithProgress(),
+        getUserLearningProgress(),
+      ]);
 
-  const currentTrackModules = getModulesByTrack(selectedTrack);
-  const currentTrackProgress = calculateTrackProgress(selectedTrack);
+      setTracks(tracksData);
+      setUserProgress(progress);
+
+      // Select first track by default
+      if (tracksData.length > 0 && !selectedTrackId) {
+        setSelectedTrackId(tracksData[0].id);
+      }
+    } catch (error) {
+      console.error("[LearnScreen] Error loading data:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [selectedTrackId]);
+
+  // Load on mount and focus
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData(true);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
 
   const handleModulePress = (moduleId: string) => {
     navigation.navigate("ModuleDetail", { moduleId });
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "Beginner":
-        return "bg-[#f0f9f4] text-forest";
-      case "Intermediate":
-        return "bg-[#fef3c7] text-[#92400e]";
-      case "Advanced":
-        return "bg-[#fee2e2] text-[#991b1b]";
-      default:
-        return "bg-[#f5f5f4] text-earthGreen";
-    }
-  };
+  const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
 
-  const insets = useSafeAreaInsets();
-  const bottomSpacer = 50 + Math.max(insets.bottom, 18) + 12;
+  // Loading state
+  if (loading && tracks.length === 0) {
+    return (
+      <View style={{ flex: 1, backgroundColor: PARCHMENT_BACKGROUND, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={DEEP_FOREST} />
+        <Text style={{ marginTop: 16, fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+          Loading learning content...
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <View className="flex-1" style={{ backgroundColor: PARCHMENT_BACKGROUND }}>
-      {/* Hero Image - full bleed */}
+    <View style={{ flex: 1, backgroundColor: PARCHMENT_BACKGROUND }}>
+      {/* Hero Image */}
       <View style={{ height: 200 + insets.top }}>
         <ImageBackground
           source={HERO_IMAGES.LEARNING}
@@ -90,240 +129,350 @@ export default function LearnScreen() {
           resizeMode="cover"
           accessibilityLabel="Learning and education scene"
         >
-          <View className="flex-1" style={{ paddingTop: insets.top }}>
-            {/* Account Button - Top Right */}
+          <LinearGradient
+            colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.6)"]}
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
+            }}
+          />
+          <View style={{ flex: 1, paddingTop: insets.top }}>
             <AccountButtonHeader color={TEXT_ON_DARK} />
 
-            {/* Title at bottom left */}
-            <View className="flex-1 justify-end px-6 pb-4">
-              <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.4)"]}
+            <View style={{ flex: 1, justifyContent: "flex-end", paddingHorizontal: 24, paddingBottom: 16 }}>
+              <Text
                 style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: 100,
+                  fontFamily: "Raleway_700Bold",
+                  fontSize: 30,
+                  color: TEXT_ON_DARK,
+                  textShadowColor: "rgba(0, 0, 0, 0.5)",
+                  textShadowOffset: { width: 0, height: 1 },
+                  textShadowRadius: 4,
                 }}
-              />
-              <Text className="text-3xl" style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4, zIndex: 1 }}>
+              >
                 Learn
               </Text>
-              <Text className="mt-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_ON_DARK, textShadowColor: "rgba(0, 0, 0, 0.5)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3, zIndex: 1 }}>
-                Master camping skills from novice to expert
+              <Text
+                style={{
+                  fontFamily: "SourceSans3_400Regular",
+                  fontSize: 15,
+                  color: TEXT_ON_DARK,
+                  marginTop: 8,
+                  textShadowColor: "rgba(0, 0, 0, 0.5)",
+                  textShadowOffset: { width: 0, height: 1 },
+                  textShadowRadius: 3,
+                }}
+              >
+                Master camping skills and earn badges
               </Text>
             </View>
           </View>
         </ImageBackground>
       </View>
 
-        <ScrollView
-          className="flex-1 px-4 pt-4"
-          contentInsetAdjustmentBehavior="never"
-          contentContainerStyle={{ paddingBottom: bottomSpacer }}
-        >
-          {/* XP Bar */}
-          <XPBar
-            currentXP={totalXP}
-            level={currentLevel}
-            nextLevelXP={tracks.find((t) => !isTrackUnlocked(t.level))?.xpRequired}
-          />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: bottomSpacer }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />
+        }
+      >
+        {/* Your Progress Section */}
+        {tracks.length > 0 && (
+          <View style={{ marginBottom: 24 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+              <Ionicons name="ribbon" size={20} color={GRANITE_GOLD} />
+              <Text
+                style={{
+                  fontFamily: "SourceSans3_600SemiBold",
+                  fontSize: 18,
+                  color: TEXT_PRIMARY_STRONG,
+                  marginLeft: 8,
+                }}
+              >
+                Your Progress
+              </Text>
+            </View>
 
-          {/* Track Tabs */}
-          <View className="flex-row mb-4 bg-parchment rounded-xl p-1 border border-parchmentDark">
-            {tracks.map((track) => {
-              const unlocked = isTrackUnlocked(track.level);
-              const isSelected = selectedTrack === track.level;
+            {/* Track Badge Grid */}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}>
+              {tracks.map((track) => {
+                const isSelected = selectedTrackId === track.id;
+                const isCompleted = track.hasBadge;
+                // Find the badge for this track
+                const badgeEntry = Object.values(LEARNING_BADGES).find(b => b.trackId === track.id);
+                const badgeColor = badgeEntry?.color || GRANITE_GOLD;
 
-              return (
-                <Pressable
-                  key={track.id}
-                  onPress={() => unlocked && setSelectedTrack(track.level)}
-                  className={`flex-1 py-3 px-2 rounded-lg items-center justify-end ${
-                    isSelected ? "" : unlocked ? "bg-parchment" : "bg-sierraSky/10"
-                  }`}
-                  style={[
-                    { minHeight: 64 },
-                    isSelected && { backgroundColor: EARTH_GREEN },
-                  ]}
-                  disabled={!unlocked}
-                >
-                  {isSelected && unlocked && (
-                    <Text className="text-center text-2xl mb-1" style={{ fontFamily: "JosefinSlab_700Bold" }}>🧭</Text>
-                  )}
-                  {!unlocked && <Text className="text-center text-lg mb-1" style={{ fontFamily: "SourceSans3_400Regular" }}>🔒</Text>}
-                  {unlocked && !isSelected && <View style={{ height: 24 }} />}
-                  <Text
-                    className={`text-center font-semibold text-sm leading-tight ${
-                      isSelected
-                        ? "text-parchment"
-                        : unlocked
-                        ? "text-forest"
-                        : "text-earthGreen"
-                    }`}
-                    style={{ lineHeight: 16 }}
+                return (
+                  <Pressable
+                    key={track.id}
+                    onPress={() => setSelectedTrackId(track.id)}
+                    style={{
+                      width: "25%",
+                      paddingHorizontal: 6,
+                      marginBottom: 16,
+                      alignItems: "center",
+                    }}
                   >
-                    {track.title === "Trail Leader" ? "Trail\nLeader" : track.title}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* Track Overview Card */}
-          {tracks.map((track) => {
-            if (track.level !== selectedTrack) return null;
-            return (
-              <View key={track.id} className="mb-6">
-                <View
-                  className="rounded-xl p-4 mb-4 border"
-                  style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
-                >
-                  <View className="flex-row items-center justify-between mb-3">
-                    <SectionTitle color={TEXT_PRIMARY_STRONG}>Track Progress</SectionTitle>
-                    <View className="bg-sierraSky/20 rounded-full px-3 py-1 border border-sierraSky">
-                      <Text className="text-riverRock font-medium" style={{ fontFamily: "SourceSans3_600SemiBold" }}>
-                        {currentTrackProgress.completed}/{currentTrackProgress.total} Complete
-                      </Text>
-                    </View>
-                  </View>
-                  <View className="bg-parchmentDark/20 rounded-full h-3 mb-2">
                     <View
-                      className="bg-granite h-3 rounded-full"
                       style={{
-                        width: `${currentTrackProgress.percentage}%`,
-                        backgroundColor: GRANITE_GOLD,
+                        width: 56,
+                        height: 56,
+                        borderRadius: 28,
+                        backgroundColor: isCompleted ? badgeColor : CARD_BACKGROUND_LIGHT,
+                        borderWidth: isCompleted ? 0 : isSelected ? 2 : 2,
+                        borderColor: isSelected ? DEEP_FOREST : BORDER_SOFT,
+                        borderStyle: isCompleted ? "solid" : "dashed",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        opacity: isCompleted ? 1 : 0.5,
                       }}
-                    />
-                  </View>
-                  <Text className="text-sm text-center" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                    {currentTrackProgress.xpEarned}/{currentTrackProgress.xpTotal} XP earned in
-                    this track
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-
-          {/* Modules */}
-          <View className="space-y-4">
-            {currentTrackModules.map((module) => {
-              const isCompleted = completedModules.includes(module.id);
-              const progress = calculateModuleProgress(module.id);
-
-              return (
-                <Pressable
-                  key={module.id}
-                  onPress={() => handleModulePress(module.id)}
-                  className="rounded-xl p-4 border active:opacity-80"
-                  style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
-                >
-                  <View className="flex-row items-start">
-                    <View
-                      className={`rounded-full p-3 mr-4 ${
-                        isCompleted ? "bg-forest" : "bg-sierraSky/20"
-                      }`}
                     >
                       <Ionicons
-                        name={module.icon as keyof typeof Ionicons.glyphMap}
-                        size={24}
-                        color={isCompleted ? "white" : LODGE_FOREST}
+                        name={track.icon as any}
+                        size={26}
+                        color={isCompleted ? PARCHMENT : TEXT_MUTED}
                       />
                     </View>
-
-                    <View className="flex-1">
-                      <View className="flex-row items-center justify-between mb-2">
-                        <Heading3 color={TEXT_PRIMARY_STRONG} className="flex-1" numberOfLines={2}>
-                          {module.title}
-                        </Heading3>
-                        {isCompleted && (
-                          <Ionicons
-                            name="checkmark-circle"
-                            size={20}
-                            color={LODGE_FOREST}
-                            style={{ marginLeft: 8 }}
-                          />
-                        )}
-                      </View>
-
-                      <Text className="mb-3" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }} numberOfLines={3}>
-                        {module.description}
-                      </Text>
-
-                      <View className="flex-row items-center flex-wrap">
-                        <View className={`rounded-full px-2 py-1 ${getDifficultyColor(module.difficulty)}`}>
-                          <Text className="text-xs font-medium" style={{ fontFamily: "SourceSans3_600SemiBold" }}>{module.difficulty}</Text>
-                        </View>
-                        <Text className="text-sm ml-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                          {progress.completed}/{progress.total} complete
-                        </Text>
-                      </View>
-
-                      <View className="flex-row items-center mt-2 space-x-3">
-                        <View className="flex-row items-center">
-                          <Ionicons name="time-outline" size={14} color={EARTH_GREEN} />
-                          <Text className="text-sm ml-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>{module.duration}</Text>
-                        </View>
-                        {module.xpReward && (
-                          <View className="flex-row items-center">
-                            <Ionicons name="star" size={14} color={GRANITE_GOLD} />
-                            <Text className="text-sm font-semibold ml-1" style={{ fontFamily: "SourceSans3_600SemiBold", color: GRANITE_GOLD }}>
-                              +{module.xpReward} XP
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Lessons Preview */}
-                      <View className="mt-3 pt-3 border-t" style={{ borderColor: BORDER_SOFT }}>
-                        <Text className="text-sm font-medium mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: GRANITE_GOLD }}>
-                          What you&apos;ll learn:
-                        </Text>
-                        <View className="space-y-1">
-                          {module.steps.slice(0, 2).map((step, index) => (
-                            <View key={index} className="flex-row items-center">
-                              <View
-                                className="w-1.5 h-1.5 bg-granite rounded-full mr-2"
-                                style={{ marginTop: 6 }}
-                              />
-                              <Text
-                                className="text-sm"
-                                style={{ flex: 1, flexShrink: 1, fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-                              >
-                                {step.title}
-                              </Text>
-                            </View>
-                          ))}
-                          {module.steps.length > 2 && (
-                            <Text className="text-sm ml-3.5" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                              +{module.steps.length - 2} more topics
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-
-                      {/* Badge Preview */}
-                      {module.badge && (
-                        <View
-                          className="mt-3 pt-3 border-t flex-row items-center"
-                          style={{ borderColor: BORDER_SOFT }}
-                        >
-                          <Ionicons name={module.badge.icon as any} size={20} color={GRANITE_GOLD} />
-                          <Text
-                            className="text-sm font-medium ml-2"
-                            style={{ flex: 1, flexShrink: 1, fontFamily: "SourceSans3_600SemiBold", color: GRANITE_GOLD }}
-                          >
-                            Earn Badge: {module.badge.name}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </Pressable>
-              );
-            })}
+                    <Text
+                      style={{
+                        fontFamily: isSelected ? "SourceSans3_600SemiBold" : "SourceSans3_400Regular",
+                        fontSize: 11,
+                        color: isCompleted ? TEXT_PRIMARY_STRONG : TEXT_MUTED,
+                        marginTop: 6,
+                        textAlign: "center",
+                      }}
+                      numberOfLines={2}
+                    >
+                      {track.title}
+                    </Text>
+                    {isSelected && (
+                      <View
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: 3,
+                          backgroundColor: DEEP_FOREST,
+                          marginTop: 4,
+                        }}
+                      />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        </ScrollView>
+        )}
+
+        {/* Track Progress Card */}
+        {selectedTrack && (
+          <View
+            style={{
+              backgroundColor: CARD_BACKGROUND_LIGHT,
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 20,
+              borderWidth: 1,
+              borderColor: BORDER_SOFT,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 16, color: TEXT_PRIMARY_STRONG }}>
+                {selectedTrack.title}
+              </Text>
+              <View
+                style={{
+                  backgroundColor: selectedTrack.hasBadge ? "rgba(34, 197, 94, 0.15)" : "rgba(0,0,0,0.05)",
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    fontSize: 12,
+                    color: selectedTrack.hasBadge ? EARTH_GREEN : TEXT_SECONDARY,
+                  }}
+                >
+                  {selectedTrack.userProgress}% Complete
+                </Text>
+              </View>
+            </View>
+
+            {/* Progress Bar */}
+            <View style={{ backgroundColor: "rgba(0,0,0,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
+              <View
+                style={{
+                  width: `${selectedTrack.userProgress}%`,
+                  height: "100%",
+                  backgroundColor: selectedTrack.hasBadge ? EARTH_GREEN : GRANITE_GOLD,
+                  borderRadius: 6,
+                }}
+              />
+            </View>
+
+            <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 13, color: TEXT_SECONDARY, marginTop: 10, textAlign: "center" }}>
+              {selectedTrack.modules.filter((m) => 
+                userProgress?.moduleProgress[m.id]?.passed
+              ).length} of {selectedTrack.modules.length} modules completed
+            </Text>
+          </View>
+        )}
+
+        {/* Modules List */}
+        {selectedTrack?.modules.map((module) => {
+          const moduleProgress = userProgress?.moduleProgress[module.id];
+          const isCompleted = moduleProgress?.passed || false;
+          const hasStarted = moduleProgress?.hasRead || false;
+
+          return (
+            <Pressable
+              key={module.id}
+              onPress={() => handleModulePress(module.id)}
+              style={{
+                backgroundColor: CARD_BACKGROUND_LIGHT,
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 12,
+                borderWidth: 1,
+                borderColor: isCompleted ? EARTH_GREEN : BORDER_SOFT,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                {/* Icon */}
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    backgroundColor: isCompleted ? EARTH_GREEN : "rgba(42, 83, 55, 0.1)",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginRight: 14,
+                  }}
+                >
+                  <Ionicons
+                    name={module.icon as any}
+                    size={24}
+                    color={isCompleted ? PARCHMENT : DEEP_FOREST}
+                  />
+                </View>
+
+                {/* Content */}
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text
+                      style={{
+                        fontFamily: "SourceSans3_600SemiBold",
+                        fontSize: 16,
+                        color: TEXT_PRIMARY_STRONG,
+                        flex: 1,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {module.title}
+                    </Text>
+                    {isCompleted && (
+                      <Ionicons name="checkmark-circle" size={20} color={EARTH_GREEN} style={{ marginLeft: 8 }} />
+                    )}
+                  </View>
+
+                  <Text
+                    style={{
+                      fontFamily: "SourceSans3_400Regular",
+                      fontSize: 14,
+                      color: TEXT_SECONDARY,
+                      marginTop: 4,
+                    }}
+                    numberOfLines={2}
+                  >
+                    {module.description}
+                  </Text>
+
+                  {/* Meta */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}>
+                    <Ionicons name="time-outline" size={14} color={TEXT_MUTED} />
+                    <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 13, color: TEXT_MUTED, marginLeft: 4 }}>
+                      {module.estimatedMinutes} min read
+                    </Text>
+                    
+                    <View style={{ width: 1, height: 12, backgroundColor: BORDER_SOFT, marginHorizontal: 10 }} />
+                    
+                    <Ionicons name="help-circle-outline" size={14} color={TEXT_MUTED} />
+                    <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 13, color: TEXT_MUTED, marginLeft: 4 }}>
+                      {module.quiz.length} quiz questions
+                    </Text>
+                  </View>
+
+                  {/* Status Badge */}
+                  <View style={{ marginTop: 10 }}>
+                    {isCompleted ? (
+                      <View
+                        style={{
+                          alignSelf: "flex-start",
+                          backgroundColor: "rgba(34, 197, 94, 0.15)",
+                          paddingHorizontal: 10,
+                          paddingVertical: 4,
+                          borderRadius: 10,
+                        }}
+                      >
+                        <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: EARTH_GREEN }}>
+                          ✓ Completed
+                        </Text>
+                      </View>
+                    ) : hasStarted ? (
+                      <View
+                        style={{
+                          alignSelf: "flex-start",
+                          backgroundColor: "rgba(212, 175, 55, 0.15)",
+                          paddingHorizontal: 10,
+                          paddingVertical: 4,
+                          borderRadius: 10,
+                        }}
+                      >
+                        <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: GRANITE_GOLD }}>
+                          In Progress
+                        </Text>
+                      </View>
+                    ) : (
+                      <View
+                        style={{
+                          alignSelf: "flex-start",
+                          backgroundColor: "rgba(0,0,0,0.05)",
+                          paddingHorizontal: 10,
+                          paddingVertical: 4,
+                          borderRadius: 10,
+                        }}
+                      >
+                        <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_SECONDARY }}>
+                          Not Started
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </View>
+            </Pressable>
+          );
+        })}
+
+        {/* Empty State */}
+        {tracks.length === 0 && !loading && (
+          <View style={{ alignItems: "center", paddingVertical: 40 }}>
+            <Ionicons name="book-outline" size={48} color={TEXT_MUTED} />
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 18, color: TEXT_PRIMARY_STRONG, marginTop: 16 }}>
+              No Learning Content
+            </Text>
+            <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 14, color: TEXT_SECONDARY, marginTop: 8, textAlign: "center" }}>
+              Learning tracks are being prepared.{"\n"}Check back soon!
+            </Text>
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }

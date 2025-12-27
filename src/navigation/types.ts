@@ -11,7 +11,7 @@ export type RootStackParamList = {
   FirstAid: undefined;
   MyTrips: undefined;
   CreateTrip: undefined;
-  TripDetail: { tripId: string };
+  TripDetail: { tripId: string; showItineraryPrompt?: boolean };
   Parks: undefined;
   ParksBrowse: undefined;
   ParkDetail: { parkId: string };
@@ -19,6 +19,7 @@ export type RootStackParamList = {
   GearListDetail: { listId: string };
   CreateGearList: { tripId?: string };
   Account: undefined;
+  MyCampsite: undefined;
   MyCampground: undefined;
   AddCamper: undefined;
   EditCamper: { contactId: string };
@@ -41,7 +42,12 @@ export type RootStackParamList = {
 
   // Plan section with trip context
   PackingList: { tripId: string };
+  PackingListGenerate: { tripId: string };
   MealPlan: { tripId: string };
+
+  // New Packing List screens (local-first)
+  PackingListCreate: undefined;
+  PackingListEditor: { listId: string };
   MealPlanning: { tripId: string };
   ShoppingList: { tripId: string };
   AddMeal: { tripId: string; category?: "breakfast" | "lunch" | "dinner" | "snack" };
@@ -73,6 +79,7 @@ export type RootStackParamList = {
   // Photos/Stories
   PhotoDetail: { storyId: string };
   UploadPhoto: undefined;
+  PhotoComposer: { postType?: string };
   PhotosListScreen: undefined;
 
   // Feedback
@@ -91,6 +98,7 @@ export type RootStackParamList = {
 
   // Invitation
   AcceptInvitation: { invitationToken: string };
+  AcceptInvite: { token: string };
 
   // Main tabs
   MainTabs: { screen: string; params?: any };

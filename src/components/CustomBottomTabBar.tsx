@@ -135,7 +135,7 @@ export default function CustomBottomTabBar({ state, descriptors, navigation }: B
       {/* Copyright Footer */}
       <View
         className="bg-parchment border-t border-parchmentDark items-center justify-center"
-        style={{ paddingBottom: insets.bottom || 12, paddingTop: 8 }}
+        style={{ paddingBottom: Math.max((insets.bottom || 12) / 2, 6), paddingTop: 8 }}
       >
         <View className="flex-row items-center">
           <Text className="text-earthGreen text-xs" style={{ fontFamily: "SourceSans3_400Regular" }}>

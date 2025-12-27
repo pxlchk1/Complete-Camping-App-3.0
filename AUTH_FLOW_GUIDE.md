@@ -34,11 +34,13 @@ The Complete Camping App implements a **two-gate authentication and authorizatio
 - ❌ Use templates
 - ❌ Adjust advanced filters
 - ❌ View their account page
-- ❌ Upload photos
-- ❌ Post tips or reviews
-- ❌ Comment on community posts
+- ❌ Upload photos → AccountRequiredModal
+- ❌ Post tips or reviews → AccountRequiredModal
+- ❌ Ask questions → AccountRequiredModal
+- ❌ Vote on community content → AccountRequiredModal
+- ❌ Comment on community posts → AccountRequiredModal
 
-**Trigger:** Any action button redirects to `Auth` screen with `navigation.navigate("Auth")`
+**Trigger:** Any action button shows AccountRequiredModal or redirects to `Auth` screen
 
 ### Free Users (Logged In, Not Subscribed)
 **What they can do:**
@@ -48,10 +50,16 @@ The Complete Camping App implements a **two-gate authentication and authorizatio
 - ✅ Save basic preferences
 - ✅ Upload profile photo
 - ✅ View their account
+- ✅ Vote on community content (upvote/downvote)
+- ✅ Create tips
+- ✅ Ask questions
+- ✅ Upload photos (1 per calendar day)
 
 **Paywall Triggers:**
 - Creating a 3rd trip → Navigate to `Paywall`
-- Posting tips/reviews in Community → Navigate to `Paywall`
+- Creating feedback posts → Navigate to `Paywall`
+- Creating gear reviews → Navigate to `Paywall`
+- Uploading more than 1 photo per day → Show limit message
 - Using advanced filters (future) → Navigate to `Paywall`
 - Saving parks/favorites (future) → Navigate to `Paywall`
 - Offline mode (future) → Navigate to `Paywall`
@@ -61,7 +69,10 @@ The Complete Camping App implements a **two-gate authentication and authorizatio
 - ✅ **Everything** - Full, unlimited access to all features
 - ✅ Unlimited trips
 - ✅ Saved parks and favorites
-- ✅ Post tips and reviews
+- ✅ Create tips and ask questions
+- ✅ Create feedback posts
+- ✅ Create gear reviews
+- ✅ Unlimited photo uploads
 - ✅ Advanced filters
 - ✅ Offline mode
 - ✅ Priority support
@@ -144,6 +155,54 @@ export default function MyScreen() {
 - **Login Gate:** Submit tip/review (checks guest first)
 - **Pro Gate:** Posting content (free users can browse only)
 
+## Connect (Community) Permissions
+
+### Overview
+The Connect section uses a "Middle-Road" approach to user access, allowing Free users to contribute meaningfully while reserving advanced features for Pro subscribers.
+
+### Permission Matrix
+
+| Action | NO_ACCOUNT | FREE | PRO |
+|--------|------------|------|-----|
+| Browse all content | ✅ | ✅ | ✅ |
+| Vote (upvote/downvote) | ❌ (prompt) | ✅ | ✅ |
+| Profile (edit) | ❌ (redirect) | ✅ | ✅ |
+| Questions (create) | ❌ (prompt) | ✅ | ✅ |
+| Tips (create) | ❌ (prompt) | ✅ | ✅ |
+| Photos (upload) | ❌ (prompt) | ✅ (1/day) | ✅ (unlimited) |
+| Feedback (create) | ❌ (prompt) | ❌ (paywall) | ✅ |
+| Gear Reviews (create) | ❌ (prompt) | ❌ (paywall) | ✅ |
+
+### Photo Daily Limit
+- **FREE users:** Limited to 1 photo upload per calendar day (based on America/Chicago timezone)
+- **PRO users:** Unlimited photo uploads
+- **Implementation:** `src/services/photoLimitService.ts`
+
+### Auto-Hide Moderation
+When community content receives **3 or more downvotes**, it is automatically:
+1. Hidden from public feeds (`isHidden: true`)
+2. Added to moderator review queue (`needsReview: true`, `reviewQueueStatus: "pending"`)
+3. Marked with reason (`hiddenReason: "downvotes"`)
+
+**Important:** Once hidden, content stays hidden until a moderator manually approves or rejects it. There is no automatic un-hiding.
+
+### Implementation Files
+- **Gating Hooks:** `src/hooks/useGating.ts`
+- **Access Functions:** `src/utils/gating.ts`
+- **Photo Limits:** `src/services/photoLimitService.ts`
+- **Moderation:** `src/services/moderationService.ts`
+- **Vote Services:** `src/services/firestore/*VotesService.ts`
+
+### Connect Screens & Their Gating
+
+| Screen | Create Gating | Vote Gating | Notes |
+|--------|---------------|-------------|-------|
+| TipsListScreen | requireAccount | requireAccount | FREE can create |
+| QuestionsListScreen | requireAccount | requireAccount | FREE can create |
+| PhotosListScreen | requireAccount + checkPhotoLimit | requireAccount | FREE limited to 1/day |
+| FeedbackListScreen | requirePro | requireAccount | PRO only to create |
+| GearReviewsListScreen | requirePro | requireAccount | PRO only to create |
+
 ## Navigation Routes
 
 - **Login/Signup:** `navigation.navigate("Auth")`
@@ -165,22 +224,42 @@ Potential additional auth gates:
 - [ ] Duplicate trip → Login required
 - [ ] Export packing list → Pro required
 - [ ] Offline mode → Pro required
-- [ ] Photo uploads to Community → Login required
-- [ ] Commenting on posts → Login required
+- [x] Photo uploads to Community → Login required (implemented with 1/day limit for FREE)
+- [x] Commenting on posts → Login required (implemented)
+- [x] Voting on content → Login required (implemented)
+- [x] Create Feedback → Pro required (implemented)
+- [x] Create Gear Reviews → Pro required (implemented)
 
 ## Testing Checklist
 
+### General Auth Gates
 - [ ] Guest user cannot create trips (redirects to Auth)
 - [ ] Guest user cannot add gear (redirects to Auth)
 - [ ] Guest user cannot save parks (redirects to Auth)
 - [ ] Free user can create 2 trips
 - [ ] Free user's 3rd trip attempt shows Paywall
-- [ ] Free user cannot post Community content (shows Paywall)
 - [ ] Pro user has unlimited access
 - [ ] Empty states display correct messaging for guests
 - [ ] All navigation redirects work correctly
 
+### Connect Access (Updated)
+- [ ] NO_ACCOUNT user sees AccountRequiredModal when voting
+- [ ] NO_ACCOUNT user sees AccountRequiredModal when creating tips
+- [ ] NO_ACCOUNT user sees AccountRequiredModal when creating questions
+- [ ] NO_ACCOUNT user sees AccountRequiredModal when uploading photos
+- [ ] FREE user can create tips
+- [ ] FREE user can create questions  
+- [ ] FREE user can upload 1 photo per day
+- [ ] FREE user sees limit message after first daily photo
+- [ ] FREE user sees Paywall when trying to create feedback
+- [ ] FREE user sees Paywall when trying to create gear review
+- [ ] PRO user can upload unlimited photos
+- [ ] PRO user can create feedback
+- [ ] PRO user can create gear reviews
+- [ ] Content with 3+ downvotes is auto-hidden from feeds
+- [ ] Hidden content shows in moderator review queue
+
 ---
 
-**Last Updated:** December 9, 2025  
-**Version:** 1.1.1 (Build 120)
+**Last Updated:** December 12, 2025  
+**Version:** 1.1.2 (Middle-Road Connect Access)

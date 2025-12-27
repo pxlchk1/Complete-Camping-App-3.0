@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Park } from "../types/camping";
-import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, PARCHMENT, PARCHMENT_BORDER } from "../constants/colors";
+import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, TEXT_SECONDARY, PARCHMENT, PARCHMENT_BORDER } from "../constants/colors";
 
 interface ParkCardProps {
   park: Park;
@@ -44,9 +44,9 @@ export default function ParkCard({ park, onPress }: ParkCardProps) {
       {/* Header */}
       <View className="flex-row items-start justify-between mb-3">
         <View className="flex-1 mr-3">
-          <Text className="text-lg font-semibold text-forest mb-1" style={{ fontFamily: "JosefinSlab_600SemiBold" }}>{park.name}</Text>
+          <Text className="text-lg font-semibold text-forest mb-1" style={{ fontFamily: "Raleway_600SemiBold" }}>{park.name}</Text>
           <View className="flex-row items-center">
-            <Ionicons name={getTypeIcon(park.filter)} size={16} color={RIVER_ROCK} />
+            <Ionicons name={getTypeIcon(park.filter)} size={16} color={TEXT_SECONDARY} />
             <Text className="text-riverRock text-sm font-medium ml-1" style={{ fontFamily: "SourceSans3_600SemiBold" }}>
               {getTypeLabel(park.filter)}
             </Text>

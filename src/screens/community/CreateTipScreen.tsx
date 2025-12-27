@@ -20,7 +20,8 @@ import ModalHeader from "../../components/ModalHeader";
 import * as Haptics from "expo-haptics";
 import { tipsService } from "../../services/firestore/tipsService";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
-import { requireAuth } from "../../utils/gating";
+import { requireAccount } from "../../utils/gating";
+import { requireEmailVerification } from "../../utils/authHelper";
 import { RootStackNavigationProp } from "../../navigation/types";
 import {
   DEEP_FOREST,
@@ -52,9 +53,17 @@ export default function CreateTipScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!requireAuth(() => setShowLoginModal(true))) {
+    // Tips only require an account, not PRO (FREE users can submit tips)
+    if (!requireAccount({
+      openAccountModal: () => setShowLoginModal(true),
+    })) {
       return;
     }
+
+    // Require email verification for posting content
+    const isVerified = await requireEmailVerification("share tips");
+    if (!isVerified) return;
+
     if (!title.trim()) {
       Alert.alert("Missing Title", "Please enter a title for your tip");
       return;
@@ -81,7 +90,7 @@ export default function CreateTipScreen() {
   return (
     <View className="flex-1 bg-parchment">
       <ModalHeader
-        title="New Tip"
+        title="New tip"
         showTitle
         rightAction={{
           icon: "checkmark",
@@ -189,7 +198,7 @@ export default function CreateTipScreen() {
           <Pressable
             onPress={handleSubmit}
             disabled={submitting || !title.trim() || !content.trim()}
-            className="py-4 rounded-xl items-center mt-6 active:opacity-90"
+            className="py-3 rounded-lg items-center mt-6 active:opacity-90"
             style={{
               backgroundColor: title.trim() && content.trim() ? DEEP_FOREST : BORDER_SOFT,
             }}

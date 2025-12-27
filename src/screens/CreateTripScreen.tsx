@@ -12,7 +12,12 @@ import Button from "../components/Button";
 import AccountButton from "../components/AccountButton";
 import { RootStackParamList } from "../navigation/types";
 import { CampingStyle } from "../types/camping";
+import { requirePro } from "../utils/gating";
+import AccountRequiredModal from "../components/AccountRequiredModal";
 import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER } from "../constants/colors";
+import { trackTripCreated } from "../services/analyticsService";
+import { trackCoreAction } from "../services/userActionTrackerService";
+import { useAuth } from "../context/AuthContext";
 
 type CreateTripScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -35,6 +40,7 @@ const CAMPING_STYLES: { value: CampingStyle; label: string }[] = [
 export default function CreateTripScreen() {
   const navigation = useNavigation<CreateTripScreenNavigationProp>();
   const addTrip = useTripsStore((s) => s.addTrip);
+  const { user } = useAuth();
 
   const [tripName, setTripName] = useState("");
   const [startDate, setStartDate] = useState(new Date());
@@ -44,13 +50,24 @@ export default function CreateTripScreen() {
   const [campingStyle, setCampingStyle] = useState<CampingStyle | undefined>();
   const [partySize, setPartySize] = useState("");
 
-  const handleCreate = () => {
+  // Gating modal state
+  const [showAccountModal, setShowAccountModal] = useState(false);
+
+  const handleCreate = async () => {
     if (!tripName.trim()) {
       alert("Please enter a trip name");
       return;
     }
 
-    addTrip({
+    // Gate: PRO required to create trips
+    if (!requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: () => navigation.navigate("Paywall"),
+    })) {
+      return;
+    }
+
+    const tripId = addTrip({
       name: tripName.trim(),
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
@@ -58,7 +75,14 @@ export default function CreateTripScreen() {
       partySize: partySize ? parseInt(partySize) : undefined,
     });
 
-    navigation.goBack();
+    // Track analytics and core action
+    trackTripCreated(tripId);
+    if (user?.uid) {
+      trackCoreAction(user.uid, "trip_created");
+    }
+
+    // Navigate to trip detail
+    navigation.replace("TripDetail", { tripId });
   };
 
   return (
@@ -70,7 +94,7 @@ export default function CreateTripScreen() {
         {/* Header */}
         <View className="px-5 pt-4 pb-3 border-b border-parchmentDark">
           <View className="flex-row items-center justify-between">
-            <Heading2>Plan New Trip</Heading2>
+            <Heading2>Plan new trip</Heading2>
             <View className="flex-row items-center gap-2">
               <Pressable
                 onPress={() => navigation.goBack()}
@@ -191,7 +215,7 @@ export default function CreateTripScreen() {
             onPress={(e) => e.stopPropagation()}
           >
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-xl" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
+              <Text className="text-xl" style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}>
                 Select Start Date
               </Text>
               <Pressable
@@ -235,7 +259,7 @@ export default function CreateTripScreen() {
             onPress={(e) => e.stopPropagation()}
           >
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-xl" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
+              <Text className="text-xl" style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}>
                 Select End Date
               </Text>
               <Pressable
@@ -263,6 +287,16 @@ export default function CreateTripScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Gating Modals */}
+      <AccountRequiredModal
+        visible={showAccountModal}
+        onCreateAccount={() => {
+          setShowAccountModal(false);
+          navigation.navigate("Auth" as any);
+        }}
+        onMaybeLater={() => setShowAccountModal(false)}
+      />
     </SafeAreaView>
   );
 }

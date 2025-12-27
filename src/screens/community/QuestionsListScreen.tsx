@@ -1,6 +1,8 @@
 /**
  * Questions List Screen (Ask a Camper)
  * Uses questionsService for Firestore queries
+ * 
+ * Connect-only actions: Edit/Delete for owners, Remove for admins/mods
  */
 
 import React, { useState, useEffect } from "react";
@@ -11,6 +13,12 @@ import * as Haptics from "expo-haptics";
 import { getQuestions } from "../../services/questionsService";
 import { Question } from "../../types/community";
 import { useCurrentUser } from "../../state/userStore";
+import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { requireAccount } from "../../utils/gating";
+import { shouldShowInFeed } from "../../services/moderationService";
+import { isAdmin, isModerator, canModerateContent } from "../../services/userService";
+import { User } from "../../types/user";
+import { ContentActionsAffordance } from "../../components/contentActions";
 import { RootStackNavigationProp } from "../../navigation/types";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
 import {
@@ -31,6 +39,17 @@ type FilterOption = "all" | "unanswered" | "answered" | "popular";
 export default function QuestionsListScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const currentUser = useCurrentUser();
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Connect-only actions: Permission checks for content actions
+  const canModerate = currentUser ? canModerateContent(currentUser as User) : false;
+  const roleLabel = currentUser 
+    ? isAdmin(currentUser as User) 
+      ? "ADMIN" as const
+      : isModerator(currentUser as User) 
+        ? "MOD" as const 
+        : null 
+    : null;
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,10 +78,15 @@ export default function QuestionsListScreen() {
         refresh ? undefined : lastDoc || undefined
       );
 
+      // Filter out hidden content (unless user is author)
+      const visibleQuestions = result.questions.filter(q => 
+        shouldShowInFeed(q, currentUser?.id)
+      );
+
       if (refresh) {
-        setQuestions(result.questions);
+        setQuestions(visibleQuestions);
       } else {
-        setQuestions(prev => [...prev, ...result.questions]);
+        setQuestions(prev => [...prev, ...visibleQuestions]);
       }
 
       setLastDoc(result.lastDoc);
@@ -97,10 +121,13 @@ export default function QuestionsListScreen() {
   };
 
   const handleAskQuestion = () => {
-    if (!currentUser) {
-      // TODO: Show auth dialog
-      return;
-    }
+    // Questions only require an account, not PRO
+    const canProceed = requireAccount({
+      openAccountModal: () => setShowLoginModal(true),
+    });
+    
+    if (!canProceed) return;
+    
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     navigation.navigate("CreateQuestion");
   };
@@ -135,18 +162,41 @@ export default function QuestionsListScreen() {
       className="rounded-xl p-4 mb-3 border active:opacity-90"
       style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
     >
+      {/* Connect-only actions: Card header with title and actions */}
       <View className="flex-row items-start justify-between mb-2">
-        <Text
-          className="text-lg flex-1 mr-2"
-          style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
-        >
-          {item.title}
-        </Text>
-        {item.hasAcceptedAnswer && (
-          <View className="bg-green-100 rounded-full px-2 py-1">
-            <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
-          </View>
-        )}
+        <View className="flex-row items-start flex-1 mr-2">
+          <Text
+            className="text-lg flex-1 mr-2"
+            style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
+          >
+            {item.title}
+          </Text>
+          {item.hasAcceptedAnswer && (
+            <View className="bg-green-100 rounded-full px-2 py-1">
+              <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
+            </View>
+          )}
+        </View>
+        <ContentActionsAffordance
+          itemId={item.id}
+          itemType="question"
+          createdByUserId={item.authorId}
+          currentUserId={currentUser?.id}
+          canModerate={canModerate}
+          roleLabel={roleLabel}
+          onRequestEdit={() => {
+            // Navigate to edit screen (if implemented)
+            navigation.navigate("QuestionDetail", { questionId: item.id });
+          }}
+          onRequestDelete={async () => {
+            setQuestions(prev => prev.filter(q => q.id !== item.id));
+          }}
+          onRequestRemove={async () => {
+            setQuestions(prev => prev.filter(q => q.id !== item.id));
+          }}
+          layout="cardHeader"
+          iconSize={18}
+        />
       </View>
 
       <Text
@@ -172,23 +222,21 @@ export default function QuestionsListScreen() {
         </View>
       )}
 
-      <View className="flex-row items-center justify-between">
-        <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-          by @{item.authorHandle} • {formatTimeAgo(item.createdAt)}
-        </Text>
-        <View className="flex-row items-center gap-3">
-          <View className="flex-row items-center">
-            <Ionicons name="arrow-up-circle-outline" size={16} color={TEXT_MUTED} />
-            <Text className="text-xs ml-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-              {item.upvotes}
-            </Text>
-          </View>
-          <View className="flex-row items-center">
-            <Ionicons name="chatbubble-outline" size={16} color={TEXT_MUTED} />
-            <Text className="text-xs ml-1" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-              {item.answerCount}
-            </Text>
-          </View>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
+          <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
+            @{item.authorHandle}
+          </Text>
+          <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
+          <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
+            {formatTimeAgo(item.createdAt)}
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Ionicons name="chatbubble-outline" size={16} color={TEXT_MUTED} />
+          <Text style={{ marginLeft: 4, fontSize: 12, fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+            {item.answerCount} {item.answerCount === 1 ? "answer" : "answers"}
+          </Text>
         </View>
       </View>
     </Pressable>
@@ -212,7 +260,7 @@ export default function QuestionsListScreen() {
     return (
       <View className="flex-1 bg-parchment">
         <CommunitySectionHeader
-          title="Ask a Camper"
+          title="Ask a camper"
           onAddPress={handleAskQuestion}
         />
         <View className="flex-1 items-center justify-center px-5">
@@ -245,9 +293,9 @@ export default function QuestionsListScreen() {
 
   return (
     <View className="flex-1 bg-parchment">
-      {/* Header */}
+      {/* Action Bar */}
       <CommunitySectionHeader
-        title="Ask a Camper"
+        title="Ask a camper"
         onAddPress={handleAskQuestion}
       />
 
@@ -310,7 +358,7 @@ export default function QuestionsListScreen() {
           <Ionicons name="help-circle-outline" size={64} color={GRANITE_GOLD} />
           <Text
             className="mt-4 text-xl text-center"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+            style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
           >
             No questions yet
           </Text>
@@ -355,6 +403,15 @@ export default function QuestionsListScreen() {
           }
         />
       )}
+
+      <AccountRequiredModal
+        visible={showLoginModal}
+        onCreateAccount={() => {
+          setShowLoginModal(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowLoginModal(false)}
+      />
     </View>
   );
 }

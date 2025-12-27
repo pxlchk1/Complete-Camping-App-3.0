@@ -6,10 +6,8 @@ import type { RootStackNavigationProp } from "../../navigation/types";
 import { getQuestions, type Question } from "../../api/qa-service";
 import { useAuthStore } from "../../state/authStore";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
-import { requireAuth } from "../../utils/gating";
+import { requireAccount } from "../../utils/gating";
 import { useToast } from "../../components/ToastManager";
-import VoteButtons from "../../components/VoteButtons";
-import * as Haptics from "expo-haptics";
 import { DEEP_FOREST, PARCHMENT, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY, TEXT_MUTED } from "../../constants/colors";
 
 export default function ConnectAskScreen() {
@@ -60,20 +58,12 @@ export default function ConnectAskScreen() {
       )
     : questions).filter((q) => (q.score || 0) > -5); // Hide items with score less than -5
 
-  const handleQuestionVote = async (questionId: string, voteType: "up" | "down") => {
-    if (!requireAuth(() => setShowLoginModal(true))) {
-      return;
-    }
-    // TODO: Implement question voting in Firebase
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
-
   return (
     <View className="flex-1">
       {/* Top Navigation Bar */}
       <View className="bg-forest" style={{ paddingVertical: 12 }}>
         <View className="flex-row items-center" style={{ paddingHorizontal: 16, minHeight: 44 }}>
-          <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "Raleway_700Bold" }}>
             Ask a Camper
           </Text>
           <View className="flex-1 ml-3 mr-3">
@@ -96,9 +86,12 @@ export default function ConnectAskScreen() {
           </View>
           <Pressable
             onPress={() => {
-              if (!requireAuth(() => setShowLoginModal(true))) {
-                return;
-              }
+              // Questions only require an account, not PRO
+              const canProceed = requireAccount({
+                openAccountModal: () => setShowLoginModal(true),
+              });
+              if (!canProceed) return;
+              
               navigation.navigate("CreateQuestion");
             }}
             className="active:opacity-70"
@@ -137,40 +130,25 @@ export default function ConnectAskScreen() {
                 className="rounded-xl p-4 border mb-3 active:opacity-70"
                 style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
               >
-                <View className="flex-row items-start">
-                  <View className="mr-3">
-                    <VoteButtons
-                      score={item.score || (item.upvotes || 0)}
-                      userVote={item.userVote}
-                      onVote={(voteType) => handleQuestionVote(item.id, voteType)}
-                      size="small"
-                      layout="vertical"
-                    />
-                  </View>
-                  <View className="flex-1">
-                    {/* Question */}
-                    <Text className="text-base mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                      {item.question}
-                    </Text>
+                {/* Question */}
+                <Text className="text-base mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
+                  {item.question}
+                </Text>
 
-                    {/* Details Preview */}
-                    <Text className="text-sm mb-3" numberOfLines={2} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-                      {item.details}
-                    </Text>
+                {/* Details Preview */}
+                <Text className="text-sm mb-3" numberOfLines={2} style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
+                  {item.details}
+                </Text>
 
-                    {/* Footer */}
-                    <View className="flex-row items-center justify-between pt-3 border-t" style={{ borderColor: BORDER_SOFT }}>
-                      <View className="flex-row items-center">
-                        <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                          by {item.userId}
-                        </Text>
-                        <Text className="mx-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>•</Text>
-                        <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                          {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : ""}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
+                {/* Footer: author, date */}
+                <View style={{ flexDirection: "row", alignItems: "center", paddingTop: 12, borderTopWidth: 1, borderColor: BORDER_SOFT }}>
+                  <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
+                    {item.userId}
+                  </Text>
+                  <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
+                  <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
+                    {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : ""}
+                  </Text>
                 </View>
               </Pressable>
             )}

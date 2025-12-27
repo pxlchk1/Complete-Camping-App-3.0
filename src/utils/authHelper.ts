@@ -8,6 +8,8 @@ import { useSubscriptionStore } from "../state/subscriptionStore";
 import { NavigationProp } from "@react-navigation/native";
 import { RootStackParamList } from "../navigation/types";
 import { auth } from "../config/firebase";
+import { sendEmailVerification } from "firebase/auth";
+import { Alert } from "react-native";
 
 /**
  * Get current authenticated user ID
@@ -43,13 +45,97 @@ export const useIsPro = (): boolean => {
 export const useUserStatus = () => {
   const isLoggedIn = useIsLoggedIn();
   const isPro = useIsPro();
+  const isEmailVerified = auth.currentUser?.emailVerified ?? false;
+  
+  // Apple Sign-In users don't need email verification (Apple handles it)
+  const isAppleUser = auth.currentUser?.providerData?.some(
+    (provider) => provider.providerId === "apple.com"
+  ) ?? false;
   
   return {
     isLoggedIn,
     isPro,
     isFree: isLoggedIn && !isPro,
     isGuest: !isLoggedIn,
+    isEmailVerified: isEmailVerified || isAppleUser, // Apple users are considered verified
+    needsEmailVerification: isLoggedIn && !isEmailVerified && !isAppleUser,
   };
+};
+
+/**
+ * Check if email is verified (or user signed in with Apple)
+ */
+export const isEmailVerified = (): boolean => {
+  const user = auth.currentUser;
+  if (!user) return false;
+  
+  // Apple users are considered verified (Apple handles email verification)
+  const isAppleUser = user.providerData?.some(
+    (provider) => provider.providerId === "apple.com"
+  );
+  
+  return user.emailVerified || isAppleUser;
+};
+
+/**
+ * Require email verification for an action
+ * Shows an alert if not verified and offers to resend verification email
+ * Returns true if verified, false if not
+ */
+export const requireEmailVerification = async (
+  action?: string
+): Promise<boolean> => {
+  const user = auth.currentUser;
+  
+  if (!user) {
+    console.log("[EmailVerification] No user logged in");
+    return false;
+  }
+  
+  // Apple users are considered verified
+  const isAppleUser = user.providerData?.some(
+    (provider) => provider.providerId === "apple.com"
+  );
+  
+  if (user.emailVerified || isAppleUser) {
+    return true;
+  }
+  
+  // User not verified - show alert with option to resend
+  console.log(`[EmailVerification] Email not verified for: ${action || 'action'}`);
+  
+  return new Promise((resolve) => {
+    Alert.alert(
+      "Email Verification Required",
+      `Please verify your email address to ${action || "use this feature"}. Check your inbox for the verification link.`,
+      [
+        {
+          text: "Resend Email",
+          onPress: async () => {
+            try {
+              await sendEmailVerification(user);
+              Alert.alert(
+                "Verification Email Sent",
+                "Please check your inbox and click the verification link."
+              );
+            } catch (error) {
+              console.error("[EmailVerification] Failed to resend:", error);
+              Alert.alert(
+                "Error",
+                "Failed to send verification email. Please try again later."
+              );
+            }
+            resolve(false);
+          },
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => resolve(false),
+        },
+      ]
+    );
+  });
 };
 
 /**

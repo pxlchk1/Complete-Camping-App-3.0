@@ -1,6 +1,8 @@
 /**
  * Tips List Screen
  * Uses tipsService for Firestore queries
+ * 
+ * Connect-only actions: Edit/Delete for owners, Remove for admins/mods
  */
 
 import React, { useState, useEffect } from "react";
@@ -10,8 +12,14 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { tipsService, TipPost } from "../../services/firestore/tipsService";
 import { tipVotesService } from "../../services/firestore/tipVotesService";
-import VoteButtons from "../../components/VoteButtons";
 import { auth } from "../../config/firebase";
+import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { requireAccount } from "../../utils/gating";
+import { shouldShowInFeed } from "../../services/moderationService";
+import { isAdmin, isModerator, canModerateContent } from "../../services/userService";
+import { useCurrentUser } from "../../state/userStore";
+import { User } from "../../types/user";
+import { ContentActionsAffordance } from "../../components/contentActions";
 import { RootStackNavigationProp } from "../../navigation/types";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
 import {
@@ -36,7 +44,19 @@ interface TipWithVotes extends TipPost {
 
 export default function TipsListScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
-  const currentUser = auth.currentUser;
+  const currentAuthUser = auth.currentUser;
+  const currentUser = useCurrentUser();
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Connect-only actions: Permission checks for content actions
+  const canModerate = currentUser ? canModerateContent(currentUser as User) : false;
+  const roleLabel = currentUser 
+    ? isAdmin(currentUser as User) 
+      ? "ADMIN" as const
+      : isModerator(currentUser as User) 
+        ? "MOD" as const 
+        : null 
+    : null;
 
   const [tips, setTips] = useState<TipWithVotes[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,23 +71,26 @@ export default function TipsListScreen() {
 
       let allTips: TipPost[];
 
-      if (sortBy === "my" && currentUser) {
+      if (sortBy === "my" && currentAuthUser) {
         // Filter tips by current user
         const allTipsData = await tipsService.getTips();
-        allTips = allTipsData.filter(tip => tip.userId === currentUser.uid);
+        allTips = allTipsData.filter(tip => tip.userId === currentAuthUser.uid);
       } else {
         allTips = await tipsService.getTips();
       }
 
       // Fetch votes for each tip
       const tipsWithVotes: TipWithVotes[] = await Promise.all(
-        allTips.map(async (tip) => {
+        allTips
+          // Filter out hidden content (unless user is author)
+          .filter(tip => shouldShowInFeed(tip, currentAuthUser?.uid))
+          .map(async (tip) => {
           let voteScore = 0;
           let userVote: "up" | "down" | null = null;
           try {
             const summary = await tipVotesService.getVoteSummary(tip.id);
             voteScore = summary.score;
-            if (currentUser) {
+            if (currentAuthUser) {
               const vote = await tipVotesService.getUserVote(tip.id);
               userVote = vote?.voteType || null;
             }
@@ -101,10 +124,13 @@ export default function TipsListScreen() {
   };
 
   const handleCreateTip = () => {
-    if (!currentUser) {
-      // TODO: Show auth dialog
-      return;
-    }
+    // Tips only require an account, not PRO
+    const canProceed = requireAccount({
+      openAccountModal: () => setShowLoginModal(true),
+    });
+    
+    if (!canProceed) return;
+    
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     navigation.navigate("CreateTip");
   };
@@ -134,6 +160,13 @@ export default function TipsListScreen() {
     : tips;
 
   const handleVote = async (tipId: string, voteType: "up" | "down") => {
+    // Voting requires an account (but NOT Pro)
+    if (!requireAccount({
+      openAccountModal: () => setShowLoginModal(true),
+    })) {
+      return;
+    }
+    
     try {
       await tipVotesService.vote(tipId, voteType);
       // Refresh just this tip's votes
@@ -157,12 +190,35 @@ export default function TipsListScreen() {
       className="rounded-xl p-4 mb-3 border active:opacity-90"
       style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
     >
-      <Text
-        className="text-lg mb-2"
-        style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
-      >
-        {item.title}
-      </Text>
+      {/* Connect-only actions: Card header with title and actions */}
+      <View className="flex-row items-start justify-between mb-2">
+        <Text
+          className="text-lg flex-1 mr-2"
+          style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
+        >
+          {item.title}
+        </Text>
+        <ContentActionsAffordance
+          itemId={item.id}
+          itemType="tip"
+          createdByUserId={item.userId || item.authorId || ""}
+          currentUserId={currentUser?.id}
+          canModerate={canModerate}
+          roleLabel={roleLabel}
+          onRequestEdit={() => {
+            // Navigate to edit screen (if implemented)
+            navigation.navigate("TipDetail", { tipId: item.id });
+          }}
+          onRequestDelete={async () => {
+            setTips(prev => prev.filter(t => t.id !== item.id));
+          }}
+          onRequestRemove={async () => {
+            setTips(prev => prev.filter(t => t.id !== item.id));
+          }}
+          layout="cardHeader"
+          iconSize={18}
+        />
+      </View>
       <Text
         className="mb-3"
         numberOfLines={2}
@@ -171,16 +227,14 @@ export default function TipsListScreen() {
         {item.content}
       </Text>
 
-      <View className="flex-row items-center justify-between mt-2">
-        <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-          by {item.userName} • {formatTimeAgo(item.createdAt)}
+      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
+        <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
+          {item.userName}
         </Text>
-        <VoteButtons
-          score={item.voteScore}
-          userVote={item.userVote}
-          onVote={(voteType) => handleVote(item.id, voteType)}
-          layout="vertical"
-        />
+        <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
+        <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
+          {formatTimeAgo(item.createdAt)}
+        </Text>
       </View>
     </Pressable>
   );
@@ -230,9 +284,9 @@ export default function TipsListScreen() {
 
   return (
     <View className="flex-1 bg-parchment">
-      {/* Header */}
+      {/* Action Bar */}
       <CommunitySectionHeader
-        title="Camping Tips"
+        title="Camping tips"
         onAddPress={handleCreateTip}
       />
 
@@ -293,7 +347,7 @@ export default function TipsListScreen() {
           <Ionicons name="bulb-outline" size={64} color={GRANITE_GOLD} />
           <Text
             className="mt-4 text-xl text-center"
-            style={{ fontFamily: "JosefinSlab_700Bold", color: TEXT_PRIMARY_STRONG }}
+            style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
           >
             No tips yet
           </Text>
@@ -321,6 +375,15 @@ export default function TipsListScreen() {
           contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
         />
       )}
+
+      <AccountRequiredModal
+        visible={showLoginModal}
+        onCreateAccount={() => {
+          setShowLoginModal(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowLoginModal(false)}
+      />
     </View>
   );
 }

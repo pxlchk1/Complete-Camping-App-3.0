@@ -17,6 +17,7 @@ interface TripsState {
   updateTripMeals: (id: string, meals: Trip["meals"]) => void;
   updateTripNotes: (id: string, notes: string) => void;
   updateTripWeather: (id: string, weather: Trip["weather"]) => void;
+  clearTrips: () => void;
 }
 
 const getTripStatus = (startDate: string, endDate: string): TripStatus => {
@@ -119,6 +120,10 @@ export const useTripsStore = create<TripsState>()(
               : trip
           ),
         }));
+      },
+
+      clearTrips: () => {
+        set({ trips: [] });
       },
     }),
     {

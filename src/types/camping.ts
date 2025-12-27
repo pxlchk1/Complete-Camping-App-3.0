@@ -28,6 +28,29 @@ export interface Coordinates {
   longitude: number;
 }
 
+/**
+ * TripDestination - Structured destination object for trips
+ * Used by Weather and other location-aware features
+ * 
+ * sourceType: "parks" = from Parks database, "custom" = user-added campground
+ */
+export interface TripDestination {
+  sourceType: "parks" | "custom";
+  placeId: string | null;          // Parks database ID or custom place ID
+  name: string;                    // Display name
+  addressLine1: string | null;     // Street address
+  city: string | null;
+  state: string | null;
+  lat: number | null;              // Latitude for Weather
+  lng: number | null;              // Longitude for Weather
+  formattedAddress: string | null; // Full formatted address for display
+  parkType: "State Park" | "National Park" | "National Forest" | "Other" | null;
+  updatedAt?: string;              // ISO timestamp when destination was set
+}
+
+/**
+ * @deprecated Use TripDestination instead. Kept for legacy data migration.
+ */
 export interface Destination {
   id: string;
   name: string;
@@ -37,12 +60,27 @@ export interface Destination {
   state?: string;
 }
 
+export interface WeatherDestination {
+  source: "manual" | "park" | "trip";
+  label: string;
+  lat: number;
+  lon: number;
+  placeId?: string;
+  updatedAt: string;
+}
+
 export interface Trip {
   id: string;
   name: string;
   startDate: string; // ISO string
   endDate: string; // ISO string
+  
+  // New structured destination (preferred - for Weather and location features)
+  tripDestination?: TripDestination;
+  
+  /** @deprecated Use tripDestination instead. Kept for legacy data migration. */
   destination?: Destination;
+  
   campingStyle?: CampingStyle;
   partySize?: number;
   notes?: string;
@@ -51,9 +89,14 @@ export interface Trip {
   createdBy?: string;
   userId: string; // User ID for Firebase scoping (required)
   parkId?: string; // Reference to selected park
+  
+  /** @deprecated Use tripDestination.name instead */
   locationName?: string; // Custom location name
+  /** @deprecated Use tripDestination.sourceType instead */
   locationType?: "park" | "custom";
+  /** @deprecated Use tripDestination.lat/lng instead */
   coordinates?: Coordinates;
+  
   createdAt: string;
   updatedAt: string;
   parks?: string[];
@@ -68,6 +111,7 @@ export interface Trip {
     forecast: WeatherForecast[];
     lastUpdated: string;
   };
+  weatherDestination?: WeatherDestination;
 }
 
 export interface Park {

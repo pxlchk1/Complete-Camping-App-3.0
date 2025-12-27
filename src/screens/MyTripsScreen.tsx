@@ -1,16 +1,16 @@
 import React, { useMemo, useState } from "react";
-import { View, Text, Pressable, FlatList, Modal, Share, ImageBackground } from "react-native";
+import { View, Text, Pressable, FlatList, Modal, ImageBackground } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { useTrips, Trip, useCreateTrip, useDeleteTrip, useUpdateTrip } from "../state/tripsStore";
 import { useUserStore } from "../state/userStore";
-import PaywallModal from "../components/PaywallModal";
 import { useTripsListStore, TripSegment, TripSort } from "../state/tripsListStore";
 import { usePlanTabStore } from "../state/planTabStore";
 import { useSubscriptionStore } from "../state/subscriptionStore";
 import { useUserStatus } from "../utils/authHelper";
+import { requirePro } from "../utils/gating";
 import { useAuthStore } from "../state/authStore";
 import TripCard from "../components/TripCard";
 import AccountButtonHeader from "../components/AccountButtonHeader";
@@ -49,11 +49,6 @@ function parseStateFromDestination(name?: string): string | null {
   return m ? m[1] : null;
 }
 
-function formatShare(trip: Trip) {
-  const loc = trip.destination?.name ? ` at ${trip.destination.name}` : "";
-  return `${trip.name}${loc}\n${trip.startDate} → ${trip.endDate}`;
-}
-
 export default function MyTripsScreen() {
   const nav = useNavigation<MyTripsScreenNavigationProp>();
   const allTrips = useTrips();
@@ -87,7 +82,6 @@ export default function MyTripsScreen() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
-  const [showProModal, setShowProModal] = useState(false);
   const hasUsedFreeTrip = useUserStore((s) => s.hasUsedFreeTrip);
   const setHasUsedFreeTrip = useUserStore((s) => s.setHasUsedFreeTrip);
   const [menuTrip, setMenuTrip] = useState<Trip | null>(null);
@@ -154,38 +148,35 @@ export default function MyTripsScreen() {
   const onMenu = (trip: Trip) => setMenuTrip(trip);
 
   const handleCreateTrip = () => {
-    // Gate 1: Login required - show AccountRequiredModal
-    if (isGuest) {
-      setShowAccountModal(true);
-      return;
-    }
-
-    // Gate 2: Free users get one lifetime trip
-    if (isFree) {
-      if (hasUsedFreeTrip) {
-        setShowProModal(true);
-        return;
-      }
-      if (trips.length >= 1) {
-        setShowProModal(true);
-        return;
-      }
-    }
-
+    // Trip creation requires PRO subscription
+    const canProceed = requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: () => nav.navigate("Paywall"),
+    });
+    
+    if (!canProceed) return;
+    
     setShowCreate(true);
   };
 
-  const empty = (
+  const handleGuestLogin = () => {
+    nav.navigate("Auth");
+  };
+
+  // Only show empty state if there are no trips at all (including trip in progress)
+  const showEmptyState = !tripInProgress && filtered.length === 0;
+
+  const empty = showEmptyState ? (
     <View style={{ flex: 1, backgroundColor: '#F4EBD0' }}>
       <EmptyState
         iconName="compass"
-        title={isGuest ? "Log in to start planning" : "No active trips"}
-        message={isGuest ? "Create an account to plan trips, save parks, and organize your camping adventures." : "Start planning and we will keep your trips here."}
-        ctaLabel={isGuest ? "Log In" : "Plan a Trip"}
-        onPress={handleCreateTrip}
+        title={isGuest ? "Log in to start planning" : "No active trips."}
+        message={isGuest ? "Create an account to plan trips, save parks, and organize your camping adventures." : "Your sleeping bag is bored."}
+        ctaLabel={isGuest ? "Log in" : "Plan a new trip"}
+        onPress={isGuest ? handleGuestLogin : handleCreateTrip}
       />
     </View>
-  );
+  ) : null;
 
   const bottomSpacer = 50 + Math.max(insets.bottom, 18) + 12;
 
@@ -231,7 +222,7 @@ export default function MyTripsScreen() {
         {/* Trip in Progress Module */}
         {tripInProgress && (
           <View className="px-4 pt-4 pb-2">
-            <Text className="text-lg font-bold mb-2" style={{ fontFamily: 'JosefinSlab_700Bold', color: DEEP_FOREST }}>Trip in Progress</Text>
+            <Text className="text-lg font-bold mb-2" style={{ fontFamily: 'Raleway_700Bold', color: DEEP_FOREST }}>Trip in progress</Text>
             <TripCard
               trip={tripInProgress}
               onResume={() => onResume(tripInProgress)}
@@ -243,43 +234,41 @@ export default function MyTripsScreen() {
           </View>
         )}
 
-        {/* Plan a New Trip CTA */}
-        <View className="px-4 pb-4">
+        {/* Segments + New Trip Button */}
+        <View className="px-4 pt-4 pb-2 flex-row items-center justify-between">
+          <View className="flex-row gap-2">
+            {(["active", "completed", "all"] as TripSegment[]).map((seg) => (
+              <Pressable
+                key={seg}
+                onPress={() => {
+                  setSegment(seg);
+                  resetPaging(seg);
+                }}
+                className={`px-3 py-2 rounded-xl border ${
+                  segment === seg
+                    ? "bg-forest border-[#3a453f]"
+                    : "bg-parchment border-parchmentDark"
+                }`}
+                accessibilityLabel={`View ${seg === "active" ? "active" : seg === "completed" ? "completed" : "all"} trips`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: segment === seg }}
+              >
+                <Text
+                  className={`${segment === seg ? "text-parchment" : "text-forest"} font-semibold text-sm`}
+                >
+                  {seg === "active" ? "Active" : seg === "completed" ? "Completed" : "All"}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
           <Pressable
             onPress={handleCreateTrip}
-            className="w-full py-4 rounded-xl bg-forest items-center justify-center mb-2 active:opacity-90"
+            className="px-3 py-2 rounded-lg bg-forest items-center justify-center active:opacity-90"
             accessibilityLabel="Plan a new trip"
             accessibilityRole="button"
           >
-            <Text className="text-parchment text-lg font-semibold" style={{ fontFamily: 'SourceSans3_600SemiBold' }}>Plan a new trip</Text>
+            <Text className="text-parchment text-sm font-semibold" style={{ fontFamily: 'SourceSans3_600SemiBold' }}>+ New trip</Text>
           </Pressable>
-        </View>
-
-        {/* Segments */}
-        <View className="px-4 pt-2 pb-2 flex-row gap-2">
-          {(["active", "completed", "all"] as TripSegment[]).map((seg) => (
-            <Pressable
-              key={seg}
-              onPress={() => {
-                setSegment(seg);
-                resetPaging(seg);
-              }}
-              className={`px-3 py-2 rounded-xl border ${
-                segment === seg
-                  ? "bg-forest border-[#3a453f]"
-                  : "bg-parchment border-parchmentDark"
-              }`}
-              accessibilityLabel={`View ${seg === "active" ? "active" : seg === "completed" ? "completed" : "all"} trips`}
-              accessibilityRole="button"
-              accessibilityState={{ selected: segment === seg }}
-            >
-              <Text
-                className={`${segment === seg ? "text-parchment" : "text-forest"} font-semibold text-sm`}
-              >
-                {seg === "active" ? "Active" : seg === "completed" ? "Completed" : "All"}
-              </Text>
-            </Pressable>
-          ))}
         </View>
 
         {/* Sort / Filters */}
@@ -289,7 +278,7 @@ export default function MyTripsScreen() {
               value={sortBy}
               onValueChange={(v) => setSortBy(v as TripSort)}
               options={[
-                { value: "startSoonest", label: "Start Date (soonest)" },
+                { value: "startSoonest", label: "Start date (soonest)" },
                 { value: "updatedRecent", label: "Recently Updated" },
                 { value: "az", label: "A–Z" },
               ]}
@@ -298,7 +287,7 @@ export default function MyTripsScreen() {
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="startSoonest">Start Date (soonest)</SelectItem>
+                <SelectItem value="startSoonest">Start date (soonest)</SelectItem>
                 <SelectItem value="updatedRecent">Recently Updated</SelectItem>
                 <SelectItem value="az">A–Z</SelectItem>
               </SelectContent>
@@ -337,7 +326,7 @@ export default function MyTripsScreen() {
                 onPress={() => incrementPage(segment)}
                 className="py-3 items-center active:opacity-70"
               >
-                <Text className="text-earthGreen font-semibold" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Load More</Text>
+                <Text className="text-earthGreen font-semibold" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Load more</Text>
               </Pressable>
             ) : null
           }
@@ -351,10 +340,6 @@ export default function MyTripsScreen() {
             if (isFree) setHasUsedFreeTrip(true);
             setShowCreate(false);
           }}
-        />
-        <PaywallModal
-          visible={showProModal}
-          onClose={() => setShowProModal(false)}
         />
 
         {/* Account Required Modal */}
@@ -382,20 +367,9 @@ export default function MyTripsScreen() {
               className="bg-parchment rounded-t-2xl p-6"
               onPress={(e) => e.stopPropagation()}
             >
-              <Text className="text-xl font-bold mb-4" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
+              <Text className="text-xl font-bold mb-4" style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}>
                 {menuTrip?.name}
               </Text>
-              <Pressable
-                onPress={async () => {
-                  if (menuTrip) {
-                    await Share.share({ message: formatShare(menuTrip) });
-                    setMenuTrip(null);
-                  }
-                }}
-                className="py-3 border-b border-parchmentDark active:opacity-70"
-              >
-                <Text className="text-base" style={{ fontFamily: "SourceSans3_400Regular", color: DEEP_FOREST }}>Share Trip</Text>
-              </Pressable>
               <Pressable
                 onPress={() => {
                   setPendingDelete(menuTrip);
@@ -403,7 +377,7 @@ export default function MyTripsScreen() {
                 }}
                 className="py-3 active:opacity-70"
               >
-                <Text className="text-base text-red-600" style={{ fontFamily: "SourceSans3_400Regular" }}>Delete Trip</Text>
+                <Text className="text-base text-red-600" style={{ fontFamily: "SourceSans3_400Regular" }}>Delete trip</Text>
               </Pressable>
             </Pressable>
           </Pressable>
@@ -412,7 +386,7 @@ export default function MyTripsScreen() {
         {/* Delete Confirmation */}
         <ConfirmationModal
           visible={!!pendingDelete}
-          title="Delete Trip?"
+          title="Delete trip?"
           message={`Are you sure you want to delete "${pendingDelete?.name}"? This cannot be undone.`}
           primary={{
             label: "Delete",
@@ -443,7 +417,7 @@ export default function MyTripsScreen() {
               className="bg-parchment rounded-t-2xl p-6"
               onPress={(e) => e.stopPropagation()}
             >
-              <Text className="text-xl font-bold mb-4" style={{ fontFamily: "JosefinSlab_700Bold", color: DEEP_FOREST }}>
+              <Text className="text-xl font-bold mb-4" style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}>
                 Filters
               </Text>
               <Text className="mb-4" style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}>

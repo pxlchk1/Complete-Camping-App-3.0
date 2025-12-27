@@ -8,6 +8,11 @@ import { useToast } from "../../components/ToastManager";
 import * as ImagePicker from "expo-image-picker";
 import type { ImageCategory } from "../../types/community";
 import { DEEP_FOREST, PARCHMENT, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY, TEXT_MUTED } from "../../constants/colors";
+import { requireAccount } from "../../utils/gating";
+import AccountRequiredModal from "../../components/AccountRequiredModal";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../navigation/types";
 
 // Component to handle individual photo rendering with error state
 function PhotoCard({ item, onVote }: { item: any; onVote: (id: string, type: "up" | "down") => void }) {
@@ -71,9 +76,11 @@ function PhotoCard({ item, onVote }: { item: any; onVote: (id: string, type: "up
 }
 
 export default function PhotosTabContent() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuthStore();
   const { showError, showSuccess } = useToast();
   const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   // Use individual selectors to prevent re-render loops
   const images = useImageLibraryStore((state) => state.images);
@@ -143,8 +150,10 @@ export default function PhotosTabContent() {
   }, [user]);
 
   const handleUploadPhoto = async () => {
-    if (!user) {
-      showError("Please sign in to upload photos");
+    // Uploading photos requires an account
+    if (!requireAccount({
+      openAccountModal: () => setShowAccountModal(true),
+    })) {
       return;
     }
 
@@ -175,8 +184,10 @@ export default function PhotosTabContent() {
   };
 
   const handleVote = async (imageId: string, voteType: "up" | "down") => {
-    if (!user) {
-      showError("Please sign in to vote");
+    // Voting requires an account
+    if (!requireAccount({
+      openAccountModal: () => setShowAccountModal(true),
+    })) {
       return;
     }
 
@@ -202,7 +213,7 @@ export default function PhotosTabContent() {
       {/* Top Navigation Bar */}
       <View className="bg-forest" style={{ paddingVertical: 12 }}>
         <View className="flex-row items-center mb-3" style={{ paddingHorizontal: 16, minHeight: 44 }}>
-          <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "JosefinSlab_700Bold" }}>
+          <Text className="text-xl font-bold text-parchment" style={{ fontFamily: "Raleway_700Bold" }}>
             Photo Library
           </Text>
           <View className="flex-1 ml-3 mr-3">
@@ -277,7 +288,7 @@ export default function PhotosTabContent() {
             onPress={() => {}}
             className="bg-forest-800 rounded-xl px-6 py-3 mt-6 active:opacity-70"
           >
-            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>Sign In</Text>
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>Sign in</Text>
           </Pressable>
         </View>
       ) : isLoading ? (
@@ -311,6 +322,16 @@ export default function PhotosTabContent() {
           )}
         />
       )}
+
+      {/* Gating Modal */}
+      <AccountRequiredModal
+        visible={showAccountModal}
+        onCreateAccount={() => {
+          setShowAccountModal(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowAccountModal(false)}
+      />
     </View>
   );
 }

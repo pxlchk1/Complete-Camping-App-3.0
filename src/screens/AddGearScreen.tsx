@@ -25,6 +25,8 @@ import { createGearItem, uploadGearImage } from "../services/gearClosetService";
 import { GearCategory, GEAR_CATEGORIES } from "../types/gear";
 import { RootStackNavigationProp } from "../navigation/types";
 import ModalHeader from "../components/ModalHeader";
+import { trackGearItemAdded } from "../services/analyticsService";
+import { trackCoreAction } from "../services/userActionTrackerService";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -139,6 +141,10 @@ export default function AddGearScreen() {
         }
       }
 
+      // Track analytics and core action
+      trackGearItemAdded();
+      trackCoreAction(user.uid, "gear_item_added");
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.goBack();
     } catch (error: any) {
@@ -152,7 +158,7 @@ export default function AddGearScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="Add Gear"
+        title="Add gear"
         showTitle
         rightAction={{
           icon: "checkmark",
@@ -374,7 +380,7 @@ export default function AddGearScreen() {
           <Pressable
             onPress={handleSubmit}
             disabled={!name.trim() || submitting}
-            className="mt-4 mb-8 py-4 rounded-xl active:opacity-90"
+            className="mt-4 mb-8 py-3 rounded-lg active:opacity-90"
             style={{
               backgroundColor: name.trim() ? DEEP_FOREST : BORDER_SOFT,
             }}
