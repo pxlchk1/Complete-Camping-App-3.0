@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
 
@@ -40,13 +40,19 @@ import {
 import { RootStackParamList } from "../navigation/types";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type RouteProps = RouteProp<RootStackParamList, "PackingListCreate">;
 
 export default function PackingListCreateScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
   const { createPackingList } = usePackingStore();
+  
+  // Get tripId and tripName from route params (if navigating from a trip)
+  const tripId = route.params?.tripId;
+  const tripName = route.params?.tripName;
 
-  // Form state
-  const [listName, setListName] = useState("");
+  // Form state - pre-fill with trip name if available
+  const [listName, setListName] = useState(tripName ? `${tripName} Packing List` : "");
   const [tripType, setTripType] = useState<TripType>("weekend");
   const [season, setSeason] = useState<Season>("summer");
   const [isTemplate, setIsTemplate] = useState(false);
@@ -76,13 +82,13 @@ export default function PackingListCreateScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     const templateKeys = Array.from(selectedTemplates);
-    const listId = createPackingList(listName.trim(), tripType, season, templateKeys, undefined, isTemplate);
+    const listId = createPackingList(listName.trim(), tripType, season, templateKeys, tripId, isTemplate);
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     // Navigate to the editor
     navigation.replace("PackingListEditor" as any, { listId });
-  }, [listName, tripType, season, selectedTemplates, isTemplate, createPackingList, navigation]);
+  }, [listName, tripType, season, selectedTemplates, tripId, isTemplate, createPackingList, navigation]);
 
   const canCreate = listName.trim().length > 0;
 

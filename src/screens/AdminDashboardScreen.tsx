@@ -176,31 +176,65 @@ export default function AdminDashboardScreen() {
             
             try {
               let totalDeleted = 0;
+              let errors: string[] = [];
+              
+              console.log("[AdminDashboard] Starting photo cleanup...");
               
               // Delete from 'photos' collection
               const photosSnapshot = await getDocs(collection(db, "photos"));
+              console.log(`[AdminDashboard] Found ${photosSnapshot.size} photos to delete`);
               for (const docSnap of photosSnapshot.docs) {
-                await deleteDoc(docSnap.ref);
-                totalDeleted++;
+                try {
+                  await deleteDoc(doc(db, "photos", docSnap.id));
+                  totalDeleted++;
+                  console.log(`[AdminDashboard] Deleted photo: ${docSnap.id}`);
+                } catch (e) {
+                  console.error(`[AdminDashboard] Failed to delete photo ${docSnap.id}:`, e);
+                  errors.push(`photos/${docSnap.id}`);
+                }
               }
               
               // Delete from 'stories' collection
               const storiesSnapshot = await getDocs(collection(db, "stories"));
+              console.log(`[AdminDashboard] Found ${storiesSnapshot.size} stories to delete`);
               for (const docSnap of storiesSnapshot.docs) {
-                await deleteDoc(docSnap.ref);
-                totalDeleted++;
+                try {
+                  await deleteDoc(doc(db, "stories", docSnap.id));
+                  totalDeleted++;
+                  console.log(`[AdminDashboard] Deleted story: ${docSnap.id}`);
+                } catch (e) {
+                  console.error(`[AdminDashboard] Failed to delete story ${docSnap.id}:`, e);
+                  errors.push(`stories/${docSnap.id}`);
+                }
               }
               
               // Delete from 'photoPosts' collection
               const photoPostsSnapshot = await getDocs(collection(db, "photoPosts"));
+              console.log(`[AdminDashboard] Found ${photoPostsSnapshot.size} photoPosts to delete`);
               for (const docSnap of photoPostsSnapshot.docs) {
-                await deleteDoc(docSnap.ref);
-                totalDeleted++;
+                try {
+                  await deleteDoc(doc(db, "photoPosts", docSnap.id));
+                  totalDeleted++;
+                  console.log(`[AdminDashboard] Deleted photoPost: ${docSnap.id}`);
+                } catch (e) {
+                  console.error(`[AdminDashboard] Failed to delete photoPost ${docSnap.id}:`, e);
+                  errors.push(`photoPosts/${docSnap.id}`);
+                }
               }
               
+              console.log(`[AdminDashboard] Cleanup complete. Deleted: ${totalDeleted}, Errors: ${errors.length}`);
+              
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert("Success", `Deleted ${totalDeleted} photos from all collections.`);
+              if (errors.length > 0) {
+                Alert.alert(
+                  "Partially Complete", 
+                  `Deleted ${totalDeleted} items.\n\nFailed to delete ${errors.length} items (check console for details).`
+                );
+              } else {
+                Alert.alert("Success", `Deleted ${totalDeleted} photos from all collections.`);
+              }
             } catch (error) {
+              console.error("[AdminDashboard] Clear photos error:", error);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               Alert.alert("Error", error instanceof Error ? error.message : "Failed to clear photos");
             } finally {

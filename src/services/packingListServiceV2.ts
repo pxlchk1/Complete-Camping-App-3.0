@@ -1,11 +1,20 @@
 /**
- * Packing List Service V2
- * Handles trip packing list initialization, suggestions, and management
+ * 🚫 LOCKED UX: PACKING LIST SERVICE (DO NOT REFACTOR BEHAVIOR)
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * This service handles packing list operations for trips.
  * 
- * This service implements the new packing system with:
- * - Global library-based items with proper categoryId
- * - Weather/season-based suggestions
- * - Suggestion tracking (add/dismiss)
+ * PROHIBITED CHANGES:
+ * - Do not call initializeTripPackingList on screen mount
+ * - Do not auto-seed items without explicit user action
+ * - Do not create empty category shells
+ * - Do not change the Firestore path structure
+ * 
+ * REQUIRED BEHAVIOR:
+ * - Builder is the ONLY path to create starter items
+ * - Items must use categoryKey from canonical enum
+ * - hasTripPackingItems is the source of truth for "has built a list"
+ * 
+ * Firestore path: /users/{userId}/trips/{tripId}/packingList/{itemId}
  */
 
 import {
@@ -79,6 +88,25 @@ export function getLibraryItems(): PackingLibraryItem[] {
 // ============================================================================
 // TRIP PACKING LIST INITIALIZATION
 // ============================================================================
+
+/**
+ * Check if a trip has any packing list items
+ * This is the source of truth for "has built a packing list"
+ * @returns true if the trip has at least 1 packing item
+ */
+export async function hasTripPackingItems(
+  userId: string,
+  tripId: string
+): Promise<boolean> {
+  try {
+    const packingRef = collection(db, "users", userId, "trips", tripId, "packingList");
+    const snapshot = await getDocs(packingRef);
+    return !snapshot.empty;
+  } catch (error) {
+    console.error("Error checking packing items:", error);
+    return false;
+  }
+}
 
 /**
  * Check if trip packing list needs initialization

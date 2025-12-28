@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { View, Text, Pressable, FlatList, Modal, ImageBackground } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { useTrips, Trip, useCreateTrip, useDeleteTrip, useUpdateTrip } from "../state/tripsStore";
 import { useUserStore } from "../state/userStore";
 import { useTripsListStore, TripSegment, TripSort } from "../state/tripsListStore";
@@ -32,6 +32,7 @@ import MealsScreen from "./MealsScreen";
 import PackingTabScreen from "./PackingTabScreen";
 
 type MyTripsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type MyTripsScreenRouteProp = RouteProp<{ MyTrips: { initialTab?: PlanTab; selectedParkId?: string } }, "MyTrips">;
 type PlanTab = "trips" | "parks" | "weather" | "packing" | "meals";
 
 function getStatus(startISO: string, endISO: string): "In Progress" | "Upcoming" | "Completed" {
@@ -51,10 +52,24 @@ function parseStateFromDestination(name?: string): string | null {
 
 export default function MyTripsScreen() {
   const nav = useNavigation<MyTripsScreenNavigationProp>();
+  const route = useRoute<MyTripsScreenRouteProp>();
   const allTrips = useTrips();
   const currentUser = useAuthStore((s) => s.user);
   const { isLoggedIn, isPro, isFree, isGuest } = useUserStatus();
   const insets = useSafeAreaInsets();
+
+  // Track selectedParkId from route params
+  const [selectedParkId, setSelectedParkId] = useState<string | undefined>(undefined);
+
+  // Handle route params for initialTab and selectedParkId
+  useEffect(() => {
+    if (route.params?.initialTab) {
+      setActivePlanTab(route.params.initialTab);
+    }
+    if (route.params?.selectedParkId) {
+      setSelectedParkId(route.params.selectedParkId);
+    }
+  }, [route.params?.initialTab, route.params?.selectedParkId]);
 
   // Filter trips to only show those for the current logged-in user
   // Guest users see no trips
@@ -184,7 +199,11 @@ export default function MyTripsScreen() {
   if (activePlanTab === "parks") {
     return (
       <View style={{ flex: 1 }}>
-        <ParksBrowseScreen onTabChange={setActivePlanTab} />
+        <ParksBrowseScreen 
+          onTabChange={setActivePlanTab} 
+          selectedParkId={selectedParkId}
+          onParkDetailClosed={() => setSelectedParkId(undefined)}
+        />
       </View>
     );
   }

@@ -41,7 +41,8 @@ import { createItineraryLink } from "../services/itineraryLinksService";
 import * as WebBrowser from "expo-web-browser";
 import { v4 as uuidv4 } from "uuid";
 import { updateDoc, doc, serverTimestamp } from "firebase/firestore";
-import { db } from "../config/firebase";
+import { db, auth } from "../config/firebase";
+import * as PackingV2 from "../services/packingListServiceV2";
 import { RootStackParamList } from "../navigation/types";
 import { format } from "date-fns";
 import { requirePro } from "../utils/gating";
@@ -81,8 +82,9 @@ export default function TripDetailScreen() {
   const [showItineraryPromptPanel, setShowItineraryPromptPanel] = useState(showItineraryPrompt || false);
   const [showAddItineraryModal, setShowAddItineraryModal] = useState(false);
 
-  // Mock packing and meal stats (swap with real data later)
-  const [packingStats] = useState({ packed: 0, total: 0 });
+  // Packing list state
+  const [hasPackingList, setHasPackingList] = useState(false);
+  const [checkingPackingList, setCheckingPackingList] = useState(true);
   const [mealStats] = useState({ planned: 0, total: 0 });
 
   const [participants, setParticipants] = useState<
@@ -146,6 +148,32 @@ export default function TripDetailScreen() {
     }, [loadParticipants])
   );
 
+  // Check if packing list exists for this trip
+  useFocusEffect(
+    useCallback(() => {
+      const checkPackingList = async () => {
+        const userId = auth.currentUser?.uid;
+        if (!userId || !tripId) {
+          setCheckingPackingList(false);
+          return;
+        }
+        
+        try {
+          // Check if this trip has any packing items
+          const hasItems = await PackingV2.hasTripPackingItems(userId, tripId);
+          setHasPackingList(hasItems);
+        } catch (err) {
+          console.error("Error checking packing list:", err);
+          setHasPackingList(false);
+        } finally {
+          setCheckingPackingList(false);
+        }
+      };
+      
+      checkPackingList();
+    }, [tripId])
+  );
+
   useEffect(() => {
     if (!trip) return;
     setDetailsNotes(trip.detailsNotes || "");
@@ -158,8 +186,17 @@ export default function TripDetailScreen() {
     } catch {
       // ignore
     }
-    if (trip) navigation.navigate("PackingList", { tripId: trip.id });
-  }, [navigation, trip]);
+    
+    if (!trip) return;
+    
+    if (hasPackingList) {
+      // Has items - go to view/manage existing packing list
+      navigation.navigate("PackingList", { tripId: trip.id, intent: "view" });
+    } else {
+      // No items - go to the full builder experience (same as Pack tab)
+      navigation.navigate("PackingListCreate", { tripId: trip.id, tripName: trip.name });
+    }
+  }, [navigation, trip, hasPackingList]);
 
   const handleOpenMeals = useCallback(async () => {
     try {
@@ -605,14 +642,26 @@ export default function TripDetailScreen() {
                     Packing List
                   </Text>
 
-                  <Text
-                    className="text-sm"
-                    style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
-                  >
-                    {packingStats.total === 0
-                      ? "Start packing for your trip"
-                      : `${packingStats.packed} of ${packingStats.total} items packed`}
-                  </Text>
+                  {checkingPackingList ? (
+                    <View className="flex-row items-center">
+                      <ActivityIndicator size="small" color={EARTH_GREEN} />
+                      <Text
+                        className="text-sm ml-2"
+                        style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
+                      >
+                        Loading...
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text
+                      className="text-sm"
+                      style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
+                    >
+                      {hasPackingList
+                        ? "Get packed for your trip"
+                        : "Build your packing list (We'll even help!)"}
+                    </Text>
+                  )}
                 </View>
               </View>
 

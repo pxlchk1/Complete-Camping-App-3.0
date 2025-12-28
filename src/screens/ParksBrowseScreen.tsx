@@ -67,16 +67,38 @@ type ParksBrowseScreenNavigationProp = NativeStackNavigationProp<RootStackParamL
 
 interface ParksBrowseScreenProps {
   onTabChange?: (tab: "trips" | "parks" | "weather" | "packing" | "meals") => void;
+  selectedParkId?: string;
+  onParkDetailClosed?: () => void;
 }
 
 type LatLng = { latitude: number; longitude: number };
 
-export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProps) {
+export default function ParksBrowseScreen({ onTabChange, selectedParkId, onParkDetailClosed }: ParksBrowseScreenProps) {
   console.log("[PLAN_TRACE] Enter ParksBrowseScreen");
 
   useEffect(() => {
     console.log("[PLAN_TRACE] ParksBrowseScreen mounted");
   }, []);
+
+  // Handle selectedParkId prop - fetch and open park detail
+  useEffect(() => {
+    if (selectedParkId) {
+      fetchParkById(selectedParkId);
+    }
+  }, [selectedParkId]);
+
+  const fetchParkById = async (parkId: string) => {
+    try {
+      const parkDoc = await getDocs(query(collection(db, "parks"), firestoreLimit(3000)));
+      const park = parkDoc.docs.find(d => d.id === parkId);
+      if (park) {
+        const parkData = { id: park.id, ...park.data() } as Park;
+        setSelectedPark(parkData);
+      }
+    } catch (error) {
+      console.error("[ParksBrowse] Error fetching park by ID:", error);
+    }
+  };
 
   const navigation = useNavigation<ParksBrowseScreenNavigationProp>();
 
@@ -660,7 +682,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
         onRequestClose={handleCloseAddCampground}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.parchment }]}>
+          <View style={[styles.modalCard, { backgroundColor: "#F4EBD0" }]}>
             {/* Header */}
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.md }}>
               <Text style={{ fontFamily: fonts.displayBold, fontSize: 20, color: DEEP_FOREST }}>
@@ -802,7 +824,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
       </Modal>
 
       {/* Main Content */}
-      <View style={{ flex: 1, backgroundColor: colors.parchment }}>
+      <View style={{ flex: 1, backgroundColor: "#F4EBD0" }}>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{
@@ -996,7 +1018,10 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
         <ParkDetailModal
           visible={!!selectedPark}
           park={selectedPark}
-          onClose={() => setSelectedPark(null)}
+          onClose={() => {
+            setSelectedPark(null);
+            onParkDetailClosed?.();
+          }}
           onAddToTrip={(park, tripId) => {
             if (tripId) {
               // Add park as structured tripDestination to existing trip
@@ -1008,6 +1033,7 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
               });
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               setSelectedPark(null);
+              onParkDetailClosed?.();
             } else {
               // Create new trip flow - user will set destination after trip creation
               console.log("[ParksBrowse] Create new trip for park:", park.name);
@@ -1017,16 +1043,19 @@ export default function ParksBrowseScreen({ onTabChange }: ParksBrowseScreenProp
               });
               if (!canProceed) {
                 setSelectedPark(null);
+                onParkDetailClosed?.();
                 return;
               }
               // TODO: Pass park info to CreateTrip so it can be set as destination after creation
               setSelectedPark(null);
+              onParkDetailClosed?.();
               navigation.navigate("CreateTrip" as never);
             }
           }}
           onCheckWeather={(park) => {
             console.log("Check weather for park:", park.name);
             setSelectedPark(null);
+            onParkDetailClosed?.();
             if (onTabChange) onTabChange("weather");
           }}
         />
@@ -1056,7 +1085,7 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     position: "relative",
-    backgroundColor: colors.parchment,
+    backgroundColor: "#F4EBD0",
   },
   loaderOverlay: {
     position: "absolute",

@@ -163,18 +163,29 @@ export default function SuggestionPickerSheet({
       onRequestClose={onClose}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View className="flex-1 justify-end">
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
           {/* Backdrop */}
           <Pressable
-            className="absolute inset-0"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            style={{ 
+              position: "absolute", 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              bottom: 0, 
+              backgroundColor: "rgba(0,0,0,0.5)" 
+            }}
             onPress={onClose}
           />
 
           {/* Sheet Content */}
           <View
-            className="rounded-t-3xl overflow-hidden flex-1"
-            style={{ backgroundColor: PARCHMENT, maxHeight: "85%" }}
+            style={{ 
+              backgroundColor: PARCHMENT, 
+              maxHeight: "85%",
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              overflow: "hidden",
+            }}
           >
             <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
               {/* Header */}
@@ -294,7 +305,9 @@ export default function SuggestionPickerSheet({
               {/* Suggestions List */}
               <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={{ paddingBottom: 40, paddingTop: 8 }}
+                contentContainerStyle={{ paddingBottom: 40, paddingTop: 8, flexGrow: 1 }}
+                showsVerticalScrollIndicator={true}
+                bounces={true}
               >
                 {loading ? (
                   <View className="py-12 items-center">

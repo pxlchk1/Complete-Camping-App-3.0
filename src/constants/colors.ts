@@ -26,6 +26,10 @@ export const CARD_BACKGROUND_LIGHT = PARCHMENT_SOFT;
 export const DISABLED_BG = "#E6E1D6";
 export const DISABLED_TEXT = "#8A8076";
 
+// List row alternating background (10% darker than PARCHMENT)
+export const LIST_ROW_DEFAULT = "#F4EBD0"; // matches tailwind parchment
+export const LIST_ROW_ALT = "#E8DFC5"; // 10% darker for alternating rows
+
 // Additional exports for backward compatibility with existing screens
 export const TEXT_PRIMARY_STRONG = INK;
 export const TEXT_MUTED = "#7A8A82";

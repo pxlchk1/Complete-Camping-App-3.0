@@ -1140,7 +1140,17 @@ export default function MyCampsiteScreen({ navigation }: any) {
                   key={fav.parkId}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    navigation.navigate("ParksBrowse", { selectedParkId: fav.parkId });
+                    // Navigate to Plan tab with Parks selected and park ID
+                    navigation.navigate("MainTabs", {
+                      screen: "Plan",
+                      params: {
+                        screen: "MyTrips",
+                        params: {
+                          initialTab: "parks",
+                          selectedParkId: fav.parkId,
+                        },
+                      },
+                    });
                   }}
                   className="p-4 rounded-xl border mb-3 active:opacity-90"
                   style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}

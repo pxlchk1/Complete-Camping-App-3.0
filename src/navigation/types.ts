@@ -13,7 +13,7 @@ export type RootStackParamList = {
   CreateTrip: undefined;
   TripDetail: { tripId: string; showItineraryPrompt?: boolean };
   Parks: undefined;
-  ParksBrowse: undefined;
+  ParksBrowse: { selectedParkId?: string } | undefined;
   ParkDetail: { parkId: string };
   GearLists: undefined;
   GearListDetail: { listId: string };
@@ -41,12 +41,12 @@ export type RootStackParamList = {
   ModuleDetail: { moduleId: string };
 
   // Plan section with trip context
-  PackingList: { tripId: string };
+  PackingList: { tripId: string; intent?: "build" | "view" };
   PackingListGenerate: { tripId: string };
   MealPlan: { tripId: string };
 
   // New Packing List screens (local-first)
-  PackingListCreate: undefined;
+  PackingListCreate: { tripId?: string; tripName?: string } | undefined;
   PackingListEditor: { listId: string };
   MealPlanning: { tripId: string };
   ShoppingList: { tripId: string };

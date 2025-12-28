@@ -11,6 +11,8 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  ActionSheetIOS,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -103,6 +105,40 @@ export default function PackingTabScreenNew({ onTabChange }: PackingTabScreenPro
       ]
     );
   }, [deletePackingList]);
+
+  const handleShowListMenu = useCallback((listId: string, listName: string, isTemplate: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ["Cancel", "Delete"],
+          destructiveButtonIndex: 1,
+          cancelButtonIndex: 0,
+          title: listName,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            handleDeleteList(listId, listName, isTemplate);
+          }
+        }
+      );
+    } else {
+      // Android fallback - use Alert
+      Alert.alert(
+        listName,
+        "What would you like to do?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => handleDeleteList(listId, listName, isTemplate),
+          },
+        ]
+      );
+    }
+  }, [handleDeleteList]);
 
   const handleUseTemplate = useCallback((templateId: string, templateName: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -248,7 +284,6 @@ export default function PackingTabScreenNew({ onTabChange }: PackingTabScreenPro
                   <Pressable
                     key={list.id}
                     onPress={() => handleOpenList(list.id)}
-                    onLongPress={() => handleDeleteList(list.id, list.name, false)}
                     className="bg-white rounded-xl mb-3 p-4"
                     style={{
                       borderWidth: 1,
@@ -280,19 +315,28 @@ export default function PackingTabScreenNew({ onTabChange }: PackingTabScreenPro
                         </View>
                       </View>
 
-                      <View className="items-end">
-                        <Text
-                          className="text-lg"
-                          style={{
-                            fontFamily: "Raleway_700Bold",
-                            color: progress.percentage === 100 ? DEEP_FOREST : GRANITE_GOLD,
-                          }}
+                      <View className="flex-row items-center">
+                        <View className="items-end mr-2">
+                          <Text
+                            className="text-lg"
+                            style={{
+                              fontFamily: "Raleway_700Bold",
+                              color: progress.percentage === 100 ? DEEP_FOREST : GRANITE_GOLD,
+                            }}
+                          >
+                            {progress.percentage}%
+                          </Text>
+                          {progress.percentage === 100 && (
+                            <Ionicons name="checkmark-circle" size={16} color={DEEP_FOREST} />
+                          )}
+                        </View>
+                        <Pressable
+                          onPress={() => handleShowListMenu(list.id, list.name, false)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          className="p-1"
                         >
-                          {progress.percentage}%
-                        </Text>
-                        {progress.percentage === 100 && (
-                          <Ionicons name="checkmark-circle" size={16} color={DEEP_FOREST} />
-                        )}
+                          <Ionicons name="ellipsis-vertical" size={18} color={EARTH_GREEN} />
+                        </Pressable>
                       </View>
                     </View>
 
@@ -342,7 +386,6 @@ export default function PackingTabScreenNew({ onTabChange }: PackingTabScreenPro
                   <Pressable
                     key={template.id}
                     onPress={() => handleOpenList(template.id)}
-                    onLongPress={() => handleDeleteList(template.id, template.name, true)}
                     className="bg-white rounded-xl mb-3 p-4"
                     style={{
                       borderWidth: 1,
@@ -370,18 +413,27 @@ export default function PackingTabScreenNew({ onTabChange }: PackingTabScreenPro
                         </Text>
                       </View>
 
-                      <Pressable
-                        onPress={() => handleUseTemplate(template.id, template.name)}
-                        className="px-3 py-2 rounded-lg"
-                        style={{ backgroundColor: DEEP_FOREST }}
-                      >
-                        <Text
-                          className="text-xs"
-                          style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                      <View className="flex-row items-center">
+                        <Pressable
+                          onPress={() => handleUseTemplate(template.id, template.name)}
+                          className="px-3 py-2 rounded-lg mr-2"
+                          style={{ backgroundColor: DEEP_FOREST }}
                         >
-                          Use
-                        </Text>
-                      </Pressable>
+                          <Text
+                            className="text-xs"
+                            style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                          >
+                            Use
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => handleShowListMenu(template.id, template.name, true)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          className="p-1"
+                        >
+                          <Ionicons name="ellipsis-vertical" size={18} color={EARTH_GREEN} />
+                        </Pressable>
+                      </View>
                     </View>
                   </Pressable>
                 );
@@ -389,21 +441,6 @@ export default function PackingTabScreenNew({ onTabChange }: PackingTabScreenPro
             </View>
           )}
 
-          {/* Tip */}
-          <View className="px-4 mt-2">
-            <View
-              className="flex-row items-center p-3 rounded-xl"
-              style={{ backgroundColor: "#F4F2EC" }}
-            >
-              <Ionicons name="information-circle" size={20} color={EARTH_GREEN} />
-              <Text
-                className="ml-2 flex-1 text-xs"
-                style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
-              >
-                Long press a list to delete it
-              </Text>
-            </View>
-          </View>
         </ScrollView>
       )}
 

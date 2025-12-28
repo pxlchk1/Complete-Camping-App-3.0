@@ -24,6 +24,7 @@ import FireflyLoader from "../components/common/FireflyLoader";
 import EmptyState from "../components/EmptyState";
 import { DEEP_FOREST, EARTH_GREEN, PARCHMENT } from "../constants/colors";
 import { useTrips } from "../state/tripsStore";
+import { useAuthStore } from "../state/authStore";
 import { RootStackParamList } from "../navigation/types";
 import { MealCategory, PrepType, MealLibraryItem } from "../types/meal";
 import * as Haptics from "expo-haptics";
@@ -64,7 +65,14 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
 
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<MealsScreenNavigationProp>();
-  const trips = useTrips();
+  const allTrips = useTrips();
+  const currentUser = useAuthStore((s) => s.user);
+
+  // Filter trips to only show those for the current logged-in user
+  const trips = currentUser ? allTrips.filter((t) => t.userId === currentUser.id) : [];
+
+  // Debug: Log trips from store
+  console.log(`[MealsScreen] Total trips in store: ${allTrips.length}, User trips: ${trips.length}`, trips.map(t => ({ id: t.id, name: t.name, start: t.startDate, end: t.endDate })));
 
   // Toggle state
   const [activeView, setActiveView] = useState<MealsView>("planner");
@@ -92,11 +100,18 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
   // Gating modal state
   const [showAccountModal, setShowAccountModal] = useState(false);
 
-  // Filter to active trips only
+  // Filter to active trips only (upcoming or in progress - not completed)
   const activeTrips = trips.filter((trip) => {
-    const today = new Date();
+    const now = new Date();
+    const start = new Date(trip.startDate);
     const end = new Date(trip.endDate);
-    return today <= end;
+    // Set end to end of day to include trips ending today
+    end.setHours(23, 59, 59, 999);
+    
+    // Debug logging
+    console.log(`[MealsScreen] Trip "${trip.name}": start=${start.toISOString()}, end=${end.toISOString()}, now=${now.toISOString()}, isActive=${now <= end}`);
+    
+    return now <= end;
   });
 
   // Load recipes from Firebase
@@ -407,7 +422,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
             <EmptyState
               iconName="calendar"
               title="No active trips."
-              message="Your sleeping bag is bored."
+              message="Your camp stove is so cold."
               ctaLabel="Plan a new trip"
               onPress={() => {
                 const canProceed = requirePro({

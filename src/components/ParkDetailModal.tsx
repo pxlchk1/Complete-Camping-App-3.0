@@ -448,7 +448,7 @@ export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, o
                     backgroundColor: isFavorited ? RUST : PARCHMENT,
                     borderRadius: 16,
                     paddingVertical: 9,
-                    paddingHorizontal: 12,
+                    paddingHorizontal: 20,
                     borderWidth: 1,
                     borderColor: isFavorited ? RUST : BORDER_SOFT,
                     flexDirection: "row",
@@ -468,13 +468,13 @@ export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, o
                       <Text
                         style={{
                           fontFamily: "SourceSans3_600SemiBold",
-                          fontSize: 12,
+                          fontSize: 16,
                           color: isFavorited ? PARCHMENT : DEEP_FOREST,
-                          marginLeft: 6,
+                          marginLeft: 8,
                         }}
                         numberOfLines={1}
                       >
-                        {isFavorited ? "Added to favorites" : "Favorite"}
+                        {isFavorited ? "Favorited" : "Favorite"}
                       </Text>
                     </>
                   )}

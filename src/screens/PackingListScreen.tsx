@@ -1,9 +1,22 @@
 /**
- * Packing List Screen
- * Shows packing items for a selected trip with Firebase integration
- * Structure: /users/{userId}/trips/{tripId}/packingList/{itemId}
+ * 🚫 LOCKED UX: PACKING LIST (DO NOT REFACTOR BEHAVIOR)
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * This screen displays the packing list for a specific trip.
  * 
- * V2: Now uses packingListServiceV2 for weather-based suggestions
+ * PROHIBITED CHANGES:
+ * - Do not auto-seed items on screen mount
+ * - Do not create empty category shells
+ * - Do not change the intent-based routing behavior
+ * - Do not modify the canonical category key system
+ * 
+ * REQUIRED BEHAVIOR:
+ * - intent="build": Show builder UI (no auto-seed)
+ * - intent="view": Load existing items only
+ * - Only show categories that have items (no 0/0)
+ * - Use categoryKey from canonical enum
+ * - Derive labels using getCategoryLabel()
+ * 
+ * Firestore path: /users/{userId}/trips/{tripId}/packingList/{itemId}
  */
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
@@ -40,8 +53,14 @@ import {
 } from "../api/packing-service";
 import * as LocalPackingService from "../services/localPackingService";
 import * as PackingV2 from "../services/packingListServiceV2";
-import { getCategoryLabel } from "../data/packingLibrarySeed";
-import { normalizeCategoryId } from "../utils/packingUtils";
+import { auth } from "../config/firebase";
+import { 
+  getCategoryLabel as getCanonicalCategoryLabel, 
+  normalizeCategoryKey,
+  getCategoryIcon,
+  getCategoryOrder,
+  PACK_CATEGORIES,
+} from "../constants/packingCategories";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -55,16 +74,16 @@ type PackingListScreenNavigationProp = NativeStackNavigationProp<
   "PackingList"
 >;
 
-const DEFAULT_CATEGORIES = [
-  "Shelter",
-  "Sleep System",
-  "Kitchen",
-  "Clothing",
-  "Tools",
-  "Safety and First Aid",
-  "Personal Items",
-  "Food and Kitchen",
-  "Trip Specific",
+// Default expanded categories (using canonical keys)
+const DEFAULT_EXPANDED_CATEGORIES = [
+  "shelter",
+  "sleep",
+  "kitchen",
+  "clothing",
+  "tools",
+  "safety",
+  "personal",
+  "tripSpecific",
 ];
 
 /**
@@ -128,11 +147,11 @@ function determineWeatherConditions(
 export default function PackingListScreen() {
   const navigation = useNavigation<PackingListScreenNavigationProp>();
   const route = useRoute<PackingListScreenRouteProp>();
-  const { tripId } = route.params;
+  const { tripId, intent = "view" } = route.params;
   const { isGuest } = useUserStatus();
 
   const trip = useTripsStore((s) => s.getTripById(tripId));
-  const userId = "demo_user_1"; // TODO: Get from auth
+  const userId = auth.currentUser?.uid || "demo_user_1"; // Fallback for guests
 
   const [packingItems, setPackingItems] = useState<PackingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,12 +160,13 @@ export default function PackingListScreen() {
   
   // V2: Suggestions state
   const [suggestions, setSuggestions] = useState<PackingSuggestion[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(true);
+  // Show suggestions by default in build mode, collapsed in view mode
+  const [showSuggestions, setShowSuggestions] = useState(intent === "build");
   const [isInitializing, setIsInitializing] = useState(false);
 
   const [showAddItem, setShowAddItem] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(DEFAULT_CATEGORIES)
+    new Set(DEFAULT_EXPANDED_CATEGORIES)
   );
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [filterUnpackedOnly, setFilterUnpackedOnly] = useState(false);
@@ -156,7 +176,7 @@ export default function PackingListScreen() {
   const [showAccountModal, setShowAccountModal] = useState(false);
 
   // Add item form state
-  const [newItemCategory, setNewItemCategory] = useState(DEFAULT_CATEGORIES[0]);
+  const [newItemCategory, setNewItemCategory] = useState(PACK_CATEGORIES[0].key);
   const [newItemLabel, setNewItemLabel] = useState("");
   const [newItemQuantity, setNewItemQuantity] = useState("1");
   const [newItemNotes, setNewItemNotes] = useState("");
@@ -164,14 +184,15 @@ export default function PackingListScreen() {
   // Add category form state
   const [newCategoryName, setNewCategoryName] = useState("");
 
-  // V2: Build categories from items using categoryId
+  // V2: Build categories from items using categoryKey (normalized)
+  // Only categories with items are included - NO empty categories
   const categoryGroups = useMemo(() => {
     if (!packingItems.length) return [];
     return PackingV2.groupItemsByCategory(
       packingItems.map(item => ({
         id: item.id,
         name: item.label,
-        categoryId: normalizeCategoryId(item.category),
+        categoryId: normalizeCategoryKey(item.category),
         qty: item.quantity || 1,
         isPacked: item.isPacked,
         source: (item as any).source || "base",
@@ -181,21 +202,27 @@ export default function PackingListScreen() {
     );
   }, [packingItems]);
 
-  // Legacy category support for UI
-  const allCategories = useMemo(() => {
-    const fromItems = packingItems.map((i) => i.category).filter(Boolean);
-    const merged = Array.from(new Set([...DEFAULT_CATEGORIES, ...fromItems]));
-    return merged;
+  // Derive categories ONLY from items that exist - NO empty categories
+  const categories = useMemo(() => {
+    // Get unique normalized category keys from items
+    const categoryKeys = new Set<string>();
+    packingItems.forEach(item => {
+      const key = normalizeCategoryKey(item.category);
+      categoryKeys.add(key);
+    });
+    
+    // Sort by canonical order
+    return Array.from(categoryKeys).sort((a, b) => {
+      return getCategoryOrder(a) - getCategoryOrder(b);
+    });
   }, [packingItems]);
 
-  const categories = useMemo(() => {
-    // Show categories even if empty, so defaults are visible
-    return allCategories;
-  }, [allCategories]);
-
+  // Group items by normalized categoryKey
   const itemsByCategory = useMemo(() => {
-    return categories.reduce((acc, cat) => {
-      acc[cat] = packingItems.filter((i) => i.category === cat);
+    return categories.reduce((acc, catKey) => {
+      acc[catKey] = packingItems.filter(i => 
+        normalizeCategoryKey(i.category) === catKey
+      );
       return acc;
     }, {} as Record<string, PackingItem[]>);
   }, [categories, packingItems]);
@@ -278,7 +305,8 @@ export default function PackingListScreen() {
     }
   }, [userId, tripId, suggestions]);
 
-  // Load packing list with V2 initialization
+  // Load packing list - NO AUTO-SEEDING
+  // Builder is the only path to create starter items
   const loadPackingList = useCallback(async () => {
     if (!trip) return;
 
@@ -288,35 +316,20 @@ export default function PackingListScreen() {
     try {
       if (!useLocalStorage) {
         try {
-          // V2: Check if needs initialization
-          const needsInit = await PackingV2.needsInitialization(userId, tripId);
-          
-          if (needsInit) {
-            console.log("[PackingV2] Initializing packing list for trip:", tripId);
-            setIsInitializing(true);
-            const initResult = await PackingV2.initializeTripPackingList(userId, tripId, trip);
-            setIsInitializing(false);
-            
-            if (!initResult.success) {
-              console.warn("[PackingV2] Init failed, falling back to legacy:", initResult.error);
-              // Fall back to legacy initialization
-              if (trip.campingStyle) {
-                const conditions = determineWeatherConditions(trip.startDate, trip.campingStyle);
-                await generatePackingListFromTemplate(userId, tripId, trip.campingStyle, conditions);
-              }
-            }
-          }
-          
+          // Just load existing items - DO NOT auto-initialize
           const items = await getPackingList(userId, tripId);
           setPackingItems(items);
           
-          // V2: Load suggestions
+          // Load suggestions for user to optionally add
           await loadSuggestions();
 
-          // Expand any categories we just learned about
+          // Expand categories that have items
           setExpandedCategories((prev) => {
             const next = new Set(prev);
-            items.forEach((i) => next.add(i.category));
+            items.forEach((i) => {
+              const key = normalizeCategoryKey(i.category);
+              next.add(key);
+            });
             return next;
           });
 
@@ -327,22 +340,16 @@ export default function PackingListScreen() {
         }
       }
 
+      // Local storage fallback - also NO auto-seeding
       const items = await LocalPackingService.getPackingList(tripId);
-
-      if (items.length === 0 && trip.campingStyle) {
-        await LocalPackingService.generatePackingListFromTemplate(
-          tripId,
-          trip.campingStyle
-        );
-        const newItems = await LocalPackingService.getPackingList(tripId);
-        setPackingItems(newItems);
-      } else {
-        setPackingItems(items);
-      }
+      setPackingItems(items);
 
       setExpandedCategories((prev) => {
         const next = new Set(prev);
-        items.forEach((i) => next.add(i.category));
+        items.forEach((i) => {
+          const key = normalizeCategoryKey(i.category);
+          next.add(key);
+        });
         return next;
       });
     } catch (err: any) {
@@ -527,8 +534,9 @@ export default function PackingListScreen() {
                     fontFamily: "Raleway_700Bold",
                     color: PARCHMENT,
                   }}
+                  numberOfLines={1}
                 >
-                  Packing List
+                  {packingItems.length === 0 ? trip.name : "Packing List"}
                 </Text>
               </View>
 
@@ -564,7 +572,9 @@ export default function PackingListScreen() {
               className="text-sm"
               style={{ fontFamily: "SourceSans3_400Regular", color: PARCHMENT }}
             >
-              For: {trip.name}
+              {packingItems.length === 0 
+                ? "Build your packing list" 
+                : `For: ${trip.name}`}
             </Text>
 
             {/* Progress bar */}
@@ -788,41 +798,102 @@ export default function PackingListScreen() {
               <View className="flex-1 items-center justify-center py-12">
                 <Ionicons name="bag-outline" size={48} color={EARTH_GREEN} />
                 <Text
-                  className="mt-3 mb-1 text-center"
+                  className="mt-3 mb-1 text-center text-lg"
                   style={{
-                    fontFamily: "SourceSans3_600SemiBold",
+                    fontFamily: "Raleway_700Bold",
                     color: DEEP_FOREST,
                   }}
                 >
-                  No items yet
+                  {intent === "build" ? "Build Your Packing List" : "No items yet"}
                 </Text>
                 <Text
-                  className="text-center"
+                  className="text-center px-8 mb-4"
                   style={{
                     fontFamily: "SourceSans3_400Regular",
                     color: EARTH_GREEN,
                   }}
                 >
-                  Add items to start packing
+                  {intent === "build" 
+                    ? "Add items using the + button or choose from our suggestions below."
+                    : "Add items to start packing"}
                 </Text>
+                
+                {/* Show prominent suggestions in build mode */}
+                {intent === "build" && suggestions.length > 0 && (
+                  <View className="w-full mt-4 bg-amber-50 rounded-xl p-4 border border-amber-200">
+                    <Text
+                      className="text-base font-bold mb-3"
+                      style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
+                    >
+                      Suggested starter items
+                    </Text>
+                    {suggestions.slice(0, 8).map((suggestion) => (
+                      <View
+                        key={suggestion.id}
+                        className="flex-row items-center justify-between py-2 border-b border-amber-100"
+                      >
+                        <View className="flex-1 mr-2">
+                          <Text
+                            className="text-sm"
+                            style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+                          >
+                            {suggestion.name}
+                          </Text>
+                        </View>
+                        <Pressable
+                          onPress={() => handleAddSuggestion(suggestion)}
+                          className="bg-forest rounded-lg px-3 py-1.5 active:opacity-90"
+                        >
+                          <Text
+                            className="text-xs"
+                            style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                          >
+                            Add
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                    {suggestions.length > 1 && (
+                      <Pressable
+                        onPress={handleAddAllSuggestions}
+                        className="mt-3 bg-forest rounded-lg py-2 items-center active:opacity-90"
+                      >
+                        <Text
+                          className="text-sm"
+                          style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                        >
+                          Add All Suggested Items ({suggestions.length})
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                )}
               </View>
             ) : (
-              categories.map((category) => {
-                const items = itemsByCategory[category] || [];
+              <>
+                {categories.map((categoryKey) => {
+                const items = itemsByCategory[categoryKey] || [];
+                
+                // Never show empty categories
+                if (items.length === 0) return null;
+                
                 const visibleItems = filterUnpackedOnly
                   ? items.filter((i) => !i.isPacked)
                   : items;
 
+                // If filtering and no visible items, skip this category
                 if (visibleItems.length === 0 && filterUnpackedOnly) return null;
 
-                const isExpanded = expandedCategories.has(category);
+                const isExpanded = expandedCategories.has(categoryKey);
                 const categoryPacked = items.filter((i) => i.isPacked).length;
+                const categoryLabel = getCanonicalCategoryLabel(categoryKey);
+                const categoryIcon = getCategoryIcon(categoryKey);
 
                 return (
-                  <View key={category} className="mt-4">
+                  <View key={categoryKey} className="mt-4">
                     {/* Category Header */}
                     <Pressable
-                      onPress={() => toggleCategory(category)}
+                      onPress={() => toggleCategory(categoryKey)}
                       className="flex-row items-center justify-between py-2 active:opacity-70"
                     >
                       <View className="flex-row items-center flex-1">
@@ -831,6 +902,12 @@ export default function PackingListScreen() {
                           size={20}
                           color={DEEP_FOREST}
                         />
+                        <Ionicons
+                          name={categoryIcon as any}
+                          size={18}
+                          color={EARTH_GREEN}
+                          style={{ marginLeft: 8 }}
+                        />
                         <Text
                           className="ml-2 text-base font-bold"
                           style={{
@@ -838,7 +915,7 @@ export default function PackingListScreen() {
                             color: DEEP_FOREST,
                           }}
                         >
-                          {category}
+                          {categoryLabel}
                         </Text>
                         <Text
                           className="ml-2 text-sm"
@@ -862,7 +939,7 @@ export default function PackingListScreen() {
                             } catch {
                               // ignore
                             }
-                            setNewItemCategory(category);
+                            setNewItemCategory(categoryKey);
                             setShowAddItem(true);
                           }}
                           className="ml-2 bg-forest rounded-full p-1 active:opacity-90"
@@ -967,7 +1044,8 @@ export default function PackingListScreen() {
                       ))}
                   </View>
                 );
-              })
+              })}
+              </>
             )}
           </ScrollView>
         )}
@@ -1118,12 +1196,12 @@ export default function PackingListScreen() {
                       showsHorizontalScrollIndicator={false}
                       contentContainerStyle={{ gap: 8 }}
                     >
-                      {allCategories.map((cat) => (
+                      {PACK_CATEGORIES.map((cat) => (
                         <Pressable
-                          key={cat}
-                          onPress={() => setNewItemCategory(cat)}
+                          key={cat.key}
+                          onPress={() => setNewItemCategory(cat.key)}
                           className={`px-3 py-2 rounded-xl border ${
-                            newItemCategory === cat
+                            newItemCategory === cat.key
                               ? "bg-forest border-forest"
                               : "bg-white border-stone-300"
                           }`}
@@ -1133,12 +1211,12 @@ export default function PackingListScreen() {
                             style={{
                               fontFamily: "SourceSans3_600SemiBold",
                               color:
-                                newItemCategory === cat
+                                newItemCategory === cat.key
                                   ? PARCHMENT
                                   : DEEP_FOREST,
                             }}
                           >
-                            {cat}
+                            {cat.label}
                           </Text>
                         </Pressable>
                       ))}

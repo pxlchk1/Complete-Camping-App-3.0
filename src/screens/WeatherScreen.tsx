@@ -350,7 +350,7 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
   }, [searchQuery, setSelectedLocation]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.parchment }}>
+    <View style={{ flex: 1, backgroundColor: "#F4EBD0" }}>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{

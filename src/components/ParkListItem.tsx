@@ -1,9 +1,9 @@
 import React from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Park } from "../types/camping";
-import { colors, textStyles, spacing, radius, fonts, fontSizes, shadows } from "../theme/theme";
-import { DEEP_FOREST, EARTH_GREEN, CARD_BACKGROUND_LIGHT, CARD_BACKGROUND_ALT, BORDER_SOFT, TEXT_SECONDARY, PARCHMENT } from "../constants/colors";
+import { fonts, fontSizes, spacing } from "../theme/theme";
+import { DEEP_FOREST, LIST_ROW_DEFAULT, LIST_ROW_ALT } from "../constants/colors";
 
 interface ParkListItemProps {
   park: Park;
@@ -24,31 +24,26 @@ const getParkTypeLabel = (filter: string): string => {
   }
 };
 
-// Alternating background colors for visual separation
-// PARCHMENT is #F5F1E8, lighter variant is 5% lighter
-const PARCHMENT_BASE = "#F5F1E8";
-const PARCHMENT_LIGHT = "#FAF8F3"; // 5% lighter
-
 export default function ParkListItem({ park, onPress, index = 0 }: ParkListItemProps) {
-  // Alternate background color based on index
-  const isEvenRow = index % 2 === 0;
-  const backgroundColor = isEvenRow ? PARCHMENT_BASE : PARCHMENT_LIGHT;
+  // Alternate background: even rows get default, odd rows get 10% darker
+  const isOddRow = index % 2 === 1;
+  const backgroundColor = isOddRow ? LIST_ROW_ALT : LIST_ROW_DEFAULT;
 
   return (
     <Pressable
       onPress={() => onPress?.(park)}
       style={({ pressed }) => ({
         backgroundColor: backgroundColor,
-        paddingVertical: 18,
-        paddingHorizontal: 16,
-        marginHorizontal: -16, // Full width - extend to edges
+        paddingVertical: 10,
+        paddingHorizontal: 14,
         opacity: pressed ? 0.7 : 1,
+        // Separator line inside the item container at bottom
         borderBottomWidth: 1,
-        borderBottomColor: "#E5E0D5",
+        borderBottomColor: "#DDD6C4",
       })}
     >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        {/* Content */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        {/* Content block - tightly grouped */}
         <View style={{ flex: 1, marginRight: spacing.sm }}>
           {/* Park Name */}
           <Text
@@ -56,29 +51,29 @@ export default function ParkListItem({ park, onPress, index = 0 }: ParkListItemP
               fontFamily: fonts.displaySemibold,
               fontSize: fontSizes.md,
               color: DEEP_FOREST,
-              marginBottom: 8,
-              lineHeight: fontSizes.md * 1.2,
+              lineHeight: fontSizes.md * 1.25,
             }}
+            numberOfLines={2}
           >
             {park.name}
           </Text>
 
-          {/* Type and State */}
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+          {/* Meta row: State pill + Park type - small gap from name */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
             {park.state && (
               <View
                 style={{
                   backgroundColor: "#E8F4E8",
                   borderRadius: 999,
-                  paddingHorizontal: 8,
-                  paddingVertical: 2,
+                  paddingHorizontal: 7,
+                  paddingVertical: 1,
                   marginRight: 6,
                 }}
               >
                 <Text
                   style={{
                     fontFamily: fonts.bodyRegular,
-                    fontSize: fontSizes.xs,
+                    fontSize: 11,
                     color: "#5A7856",
                   }}
                 >
@@ -89,7 +84,7 @@ export default function ParkListItem({ park, onPress, index = 0 }: ParkListItemP
             <Text
               style={{
                 fontFamily: fonts.bodyRegular,
-                fontSize: fontSizes.xs,
+                fontSize: 11,
                 color: "#5A7856",
               }}
             >
@@ -97,36 +92,44 @@ export default function ParkListItem({ park, onPress, index = 0 }: ParkListItemP
             </Text>
           </View>
 
-          {/* Address */}
-          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
-            <Ionicons name="location-outline" size={12} color="#8A9580" />
-            <Text
-              style={{
-                fontFamily: fonts.bodyRegular,
-                fontSize: 11,
-                color: "#8A9580",
-                marginLeft: 4,
-              }}
-              numberOfLines={1}
-            >
-              {park.address}
-            </Text>
-          </View>
+          {/* Address row - very tight to meta row */}
+          {park.address ? (
+            <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 3 }}>
+              <Ionicons 
+                name="location-outline" 
+                size={11} 
+                color="#8A9580" 
+                style={{ marginTop: 1 }} 
+              />
+              <Text
+                style={{
+                  fontFamily: fonts.bodyRegular,
+                  fontSize: 11,
+                  color: "#8A9580",
+                  marginLeft: 3,
+                  lineHeight: 14,
+                  flex: 1,
+                }}
+                numberOfLines={2}
+              >
+                {park.address}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
-        {/* Icon */}
+        {/* Action icon - vertically centered to the grouped block */}
         <View
           style={{
-            width: 36,
-            height: 36,
+            width: 32,
+            height: 32,
             borderRadius: 999,
             backgroundColor: "#EBE7DC",
             alignItems: "center",
             justifyContent: "center",
-            padding: 7,
           }}
         >
-          <Ionicons name="compass-outline" size={20} color={DEEP_FOREST} />
+          <Ionicons name="compass-outline" size={18} color={DEEP_FOREST} />
         </View>
       </View>
     </Pressable>

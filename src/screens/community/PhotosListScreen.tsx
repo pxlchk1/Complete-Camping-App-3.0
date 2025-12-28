@@ -1,27 +1,22 @@
 /**
- * Photos List Screen
- * Enhanced photo feed with post types, Quick Post tiles, and structured tags
+ * Photos List Screen (Redesigned)
+ * Content-first photo gallery with compact filter bar
  */
 
-import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, Pressable, FlatList, Image, ActivityIndicator, Dimensions, Modal, ScrollView, Alert } from "react-native";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { View, Text, Pressable, FlatList, Image, ActivityIndicator, Dimensions, ScrollView, Alert, LayoutAnimation, Platform, UIManager } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { getPhotoPosts, getHelpfulStatuses, toggleHelpful, getPostTypeLabel } from "../../services/photoPostsService";
+import { getPhotoPosts, getHelpfulStatuses, toggleHelpful } from "../../services/photoPostsService";
 import { getStories } from "../../services/storiesService";
 import { Story } from "../../types/community";
 import {
   PhotoPost,
   PhotoPostType,
   TripStyle,
-  DetailTag,
-  PRIMARY_PHOTO_TILES,
-  QUICK_POST_TILES,
   POST_TYPE_LABELS,
   POST_TYPE_COLORS,
-  TRIP_STYLE_LABELS,
-  DETAIL_TAG_LABELS,
   mapLegacyPostType,
 } from "../../types/photoPost";
 import { useCurrentUser } from "../../state/userStore";
@@ -43,64 +38,56 @@ import {
 } from "../../constants/colors";
 import { DocumentSnapshot } from "firebase/firestore";
 
-const { width } = Dimensions.get("window");
-const ITEM_WIDTH = (width - 60) / 2; // 2 columns with padding
-const QUICK_TILE_WIDTH = 100;
+// Enable LayoutAnimation on Android
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
-// Feed filter chips (no Tips - that's a separate section)
-const FILTER_CHIPS: { key: PhotoPostType | "all" | "nearby"; label: string }[] = [
+const { width } = Dimensions.get("window");
+const GRID_GAP = 8;
+const GRID_PADDING = 12;
+const ITEM_WIDTH = (width - GRID_PADDING * 2 - GRID_GAP) / 2;
+
+// Category chips - compact, text only
+const CATEGORY_CHIPS: { key: PhotoPostType | "all"; label: string }[] = [
   { key: "all", label: "All" },
   { key: "campsite-spotlight", label: "Campsites" },
   { key: "conditions-report", label: "Conditions" },
   { key: "setup-ideas", label: "Setups" },
   { key: "gear-in-real-life", label: "Gear" },
+];
+
+// Tag chips - collapsible row
+const TAG_CHIPS: { key: string; label: string }[] = [
   { key: "camp-cooking", label: "Cooking" },
   { key: "wildlife-nature", label: "Wildlife" },
   { key: "accessibility", label: "Accessible" },
+  { key: "car-camping", label: "Car Camping" },
+  { key: "backpacking", label: "Backpacking" },
+  { key: "winter-camping", label: "Winter" },
+  { key: "family-camping", label: "Family" },
 ];
-
-// Legacy filter tags (for backwards compatibility with old data)
-const FILTER_TAGS = ["all", "camping", "nature", "gear", "trails", "wildlife", "sunset"];
-
-// Trip style options for filter modal
-const TRIP_STYLE_OPTIONS: TripStyle[] = [
-  "car-camping",
-  "tent-camping",
-  "backpacking",
-  "rv-trailer",
-  "group-camping",
-  "solo-camping",
-  "family-camping",
-  "winter-camping",
-];
-
-// Sort options
-const SORT_OPTIONS = [
-  { key: "newest", label: "Newest" },
-  { key: "most-helpful", label: "Most Helpful" },
-] as const;
 
 export default function PhotosListScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const currentUser = useCurrentUser();
 
-  // New photo posts from enhanced system
+  // Photo data
   const [photoPosts, setPhotoPosts] = useState<PhotoPost[]>([]);
-  // Legacy stories for backwards compatibility
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Filter state
-  const [selectedPostType, setSelectedPostType] = useState<PhotoPostType | "all">("all");
-  const [selectedTripStyle, setSelectedTripStyle] = useState<TripStyle | null>(null);
-  const [sortBy, setSortBy] = useState<"newest" | "most-helpful">("newest");
-  const [selectedTag, setSelectedTag] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<PhotoPostType | "all">("all");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [sortBy] = useState<"newest" | "most-helpful">("newest");
+  const [tagsExpanded, setTagsExpanded] = useState(false);
   
+  // Pagination
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [showFilterModal, setShowFilterModal] = useState(false);
 
   // Helpful status tracking
   const [helpfulStatuses, setHelpfulStatuses] = useState<Record<string, boolean>>({});
@@ -108,7 +95,10 @@ export default function PhotosListScreen() {
   // Gating modal state
   const [showAccountModal, setShowAccountModal] = useState(false);
 
-  const loadPhotoPosts = async (refresh = false) => {
+  // Check if any filter is active
+  const hasActiveFilters = selectedCategory !== "all" || selectedTag !== null;
+
+  const loadPhotoPosts = useCallback(async (refresh = false) => {
     try {
       if (refresh) {
         setLoading(true);
@@ -119,15 +109,27 @@ export default function PhotosListScreen() {
 
       setError(null);
 
-      // Load from new photoPosts collection
-      const filters = {
-        postType: selectedPostType === "all" ? undefined : selectedPostType,
-        tripStyle: selectedTripStyle || undefined,
-        sortBy,
-      };
+      // Build filter for query
+      let postType: PhotoPostType | undefined;
+      let tripStyle: TripStyle | undefined;
+
+      if (selectedCategory !== "all") {
+        postType = selectedCategory;
+      }
+
+      // Check if selected tag is a trip style or post type
+      if (selectedTag) {
+        const tripStyles: TripStyle[] = ["car-camping", "backpacking", "winter-camping", "family-camping", "tent-camping", "rv-trailer", "group-camping", "solo-camping"];
+        if (tripStyles.includes(selectedTag as TripStyle)) {
+          tripStyle = selectedTag as TripStyle;
+        } else {
+          // It's a post type (like camp-cooking, wildlife-nature)
+          postType = selectedTag as PhotoPostType;
+        }
+      }
 
       const result = await getPhotoPosts(
-        filters,
+        { postType, tripStyle, sortBy },
         30,
         refresh ? undefined : lastDoc || undefined
       );
@@ -146,7 +148,7 @@ export default function PhotosListScreen() {
       setLastDoc(result.lastDoc);
       setHasMore(result.posts.length === 30);
 
-      // Load helpful statuses for current user
+      // Load helpful statuses
       if (currentUser?.id && visiblePosts.length > 0) {
         const statuses = await getHelpfulStatuses(
           visiblePosts.map(p => p.id),
@@ -156,28 +158,19 @@ export default function PhotosListScreen() {
       }
     } catch (err: any) {
       console.error("Error loading photo posts:", err);
-      // Fall back to legacy stories
       await loadLegacyStories(refresh);
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, selectedTag, sortBy, currentUser?.id]);
 
-  // Legacy fallback for old data
+  // Legacy fallback
   const loadLegacyStories = async (refresh = false) => {
     try {
-      const filterTag = selectedTag === "all" ? undefined : selectedTag;
-      const result = await getStories(
-        filterTag,
-        undefined,
-        30,
-        refresh ? undefined : lastDoc || undefined
-      );
-
-      const visibleStories = result.stories.filter(story => 
-        shouldShowInFeed(story, currentUser?.id)
-      );
+      const result = await getStories(undefined, undefined, 30, refresh ? undefined : lastDoc || undefined);
+      const visibleStories = result.stories.filter(story => shouldShowInFeed(story, currentUser?.id));
 
       if (refresh) {
         setStories(visibleStories);
@@ -192,14 +185,17 @@ export default function PhotosListScreen() {
     }
   };
 
+  // Initial load
   useEffect(() => {
     loadPhotoPosts(true);
-  }, [selectedPostType, selectedTripStyle, sortBy]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, selectedTag, sortBy]);
 
   useFocusEffect(
     useCallback(() => {
       loadPhotoPosts(true);
-    }, [selectedPostType, selectedTripStyle, sortBy])
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedCategory, selectedTag, sortBy])
   );
 
   const handleLoadMore = () => {
@@ -209,55 +205,19 @@ export default function PhotosListScreen() {
     }
   };
 
-  const handlePhotoPostPress = (postId: string) => {
+  const handlePhotoPress = (postId: string) => {
     navigation.navigate("PhotoDetail", { storyId: postId });
   };
 
-  const handleQuickPostPress = async (postType: PhotoPostType) => {
-    // First check if user has account
-    if (!requireAccount({
-      openAccountModal: () => setShowAccountModal(true),
-    })) {
-      return;
-    }
-
-    // Check daily photo limit
-    const limitCheck = await canUploadPhotoToday();
-    if (!limitCheck.canUpload) {
-      Alert.alert(
-        "Daily Limit Reached",
-        limitCheck.message || "You've hit today's photo limit. Try again tomorrow, or upgrade for unlimited photo posts.",
-        [
-          { text: "Maybe Later", style: "cancel" },
-          { text: "Upgrade", onPress: () => navigation.navigate("Paywall") },
-        ]
-      );
-      return;
-    }
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    navigation.navigate("PhotoComposer", { postType });
-  };
-
   const handleUploadPhoto = async () => {
-    // First check if user has account
-    if (!requireAccount({
-      openAccountModal: () => setShowAccountModal(true),
-    })) {
-      return;
-    }
+    if (!requireAccount({ openAccountModal: () => setShowAccountModal(true) })) return;
 
-    // Check daily photo limit for FREE users
     const limitCheck = await canUploadPhotoToday();
     if (!limitCheck.canUpload) {
-      Alert.alert(
-        "Daily Limit Reached",
-        limitCheck.message || "You've hit today's photo limit. Try again tomorrow, or upgrade for unlimited photo posts.",
-        [
-          { text: "Maybe Later", style: "cancel" },
-          { text: "Upgrade", onPress: () => navigation.navigate("Paywall") },
-        ]
-      );
+      Alert.alert("Daily Limit Reached", limitCheck.message || "Try again tomorrow.", [
+        { text: "Maybe Later", style: "cancel" },
+        { text: "Upgrade", onPress: () => navigation.navigate("Paywall") },
+      ]);
       return;
     }
 
@@ -273,126 +233,84 @@ export default function PhotosListScreen() {
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
-    // Optimistic update
     const wasHelpful = helpfulStatuses[postId];
     setHelpfulStatuses(prev => ({ ...prev, [postId]: !wasHelpful }));
     setPhotoPosts(prev => 
-      prev.map(p => 
-        p.id === postId 
-          ? { ...p, helpfulCount: p.helpfulCount + (wasHelpful ? -1 : 1) }
-          : p
-      )
+      prev.map(p => p.id === postId ? { ...p, helpfulCount: p.helpfulCount + (wasHelpful ? -1 : 1) } : p)
     );
 
     try {
       await toggleHelpful(postId, currentUser.id);
-    } catch (err) {
-      // Revert on error
+    } catch {
       setHelpfulStatuses(prev => ({ ...prev, [postId]: wasHelpful }));
       setPhotoPosts(prev => 
-        prev.map(p => 
-          p.id === postId 
-            ? { ...p, helpfulCount: p.helpfulCount + (wasHelpful ? 1 : -1) }
-            : p
-        )
+        prev.map(p => p.id === postId ? { ...p, helpfulCount: p.helpfulCount + (wasHelpful ? 1 : -1) } : p)
       );
     }
   };
 
-  const handleFilterChipPress = (key: PhotoPostType | "all") => {
+  const handleCategoryPress = (key: PhotoPostType | "all") => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedPostType(key === "all" ? "all" : key);
+    setSelectedCategory(key);
+    // Keep tags visible if a category is selected (not All)
+    if (key !== "all" && !tagsExpanded) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setTagsExpanded(true);
+    }
   };
 
-  // Render header with helper text and quick post tiles
+  const handleTagPress = (key: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedTag(selectedTag === key ? null : key);
+  };
+
+  const handleClearFilters = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedCategory("all");
+    setSelectedTag(null);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setTagsExpanded(false);
+  };
+
+  const toggleTagsExpanded = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setTagsExpanded(!tagsExpanded);
+  };
+
+  // Memoized feed data
+  const feedData = useMemo(() => {
+    return photoPosts.length > 0 ? photoPosts : stories;
+  }, [photoPosts, stories]);
+
+  // Compact filter bar header
   const renderHeader = () => (
-    <View>
-      {/* Header Helper Block */}
-      <View 
-        className="mx-5 mb-4 p-4 rounded-xl border"
-        style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
-      >
-        <Text 
-          className="text-lg mb-1"
-          style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
-        >
-          Share a photo that helps someone camp better.
-        </Text>
-        <Text
-          className="text-sm"
-          style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-        >
-          Pick a category, add your tags, and post.
+    <View style={{ paddingBottom: 8 }}>
+      {/* Helper line - minimal */}
+      <View style={{ paddingHorizontal: GRID_PADDING, paddingTop: 4, paddingBottom: 8 }}>
+        <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 13, color: TEXT_MUTED }}>
+          Pick a category, add tags, post.
         </Text>
       </View>
 
-      {/* Primary Category Tiles - 2x2 Grid */}
-      <View className="mx-5 mb-4">
-        <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-          {PRIMARY_PHOTO_TILES.map((tile) => {
-            const isSelected = selectedPostType === tile.postType;
-            return (
-              <View key={tile.postType} style={{ width: "50%", paddingHorizontal: 6, marginBottom: 12 }}>
-                <Pressable
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    // Toggle selection - tap again to deselect
-                    if (isSelected) {
-                      setSelectedPostType("all");
-                    } else {
-                      setSelectedPostType(tile.postType);
-                    }
-                  }}
-                  onLongPress={() => handleQuickPostPress(tile.postType)}
-                  className="items-center justify-center rounded-xl p-4 active:opacity-90"
-                  style={{ 
-                    backgroundColor: isSelected ? DEEP_FOREST + "10" : CARD_BACKGROUND_LIGHT,
-                    borderWidth: isSelected ? 2 : 1,
-                    borderColor: isSelected ? DEEP_FOREST : BORDER_SOFT,
-                    minHeight: 100,
-                  }}
-                >
-                  <View 
-                    className="w-12 h-12 rounded-full items-center justify-center mb-2"
-                    style={{ 
-                      backgroundColor: isSelected ? DEEP_FOREST : tile.color,
-                    }}
-                  >
-                    <Ionicons name={tile.icon as any} size={24} color="white" />
-                  </View>
-                  <Text 
-                    className="text-sm text-center"
-                    style={{ 
-                      fontFamily: "SourceSans3_600SemiBold", 
-                      color: isSelected ? DEEP_FOREST : TEXT_PRIMARY_STRONG,
-                    }}
-                    numberOfLines={2}
-                  >
-                    {tile.label}
-                  </Text>
-                </Pressable>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Filter Pills */}
-      <View className="mb-4">
+      {/* Category chips row */}
+      <View style={{ marginBottom: 6 }}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
+          contentContainerStyle={{ paddingHorizontal: GRID_PADDING, gap: 6 }}
         >
-          {FILTER_CHIPS.map((chip) => {
-            const isActive = selectedPostType === chip.key;
+          {CATEGORY_CHIPS.map((chip) => {
+            const isActive = selectedCategory === chip.key;
             return (
               <Pressable
                 key={chip.key}
-                onPress={() => handleFilterChipPress(chip.key as PhotoPostType | "all")}
-                className="px-4 py-2 rounded-full"
+                onPress={() => handleCategoryPress(chip.key)}
                 style={{
-                  backgroundColor: isActive ? DEEP_FOREST : CARD_BACKGROUND_LIGHT,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 16,
+                  backgroundColor: isActive ? DEEP_FOREST : "transparent",
                   borderWidth: 1,
                   borderColor: isActive ? DEEP_FOREST : BORDER_SOFT,
                 }}
@@ -400,8 +318,8 @@ export default function PhotosListScreen() {
                 <Text
                   style={{
                     fontFamily: "SourceSans3_600SemiBold",
-                    color: isActive ? PARCHMENT : TEXT_PRIMARY_STRONG,
                     fontSize: 13,
+                    color: isActive ? PARCHMENT : TEXT_PRIMARY_STRONG,
                   }}
                 >
                   {chip.label}
@@ -409,573 +327,290 @@ export default function PhotosListScreen() {
               </Pressable>
             );
           })}
-          
-          {/* Filter Button */}
+
+          {/* Tags toggle */}
           <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setShowFilterModal(true);
-            }}
-            className="px-4 py-2 rounded-full flex-row items-center"
+            onPress={toggleTagsExpanded}
             style={{
-              backgroundColor: CARD_BACKGROUND_LIGHT,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 16,
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: tagsExpanded || selectedTag ? DEEP_FOREST + "15" : "transparent",
               borderWidth: 1,
-              borderColor: BORDER_SOFT,
+              borderColor: tagsExpanded || selectedTag ? DEEP_FOREST : BORDER_SOFT,
             }}
           >
-            <Ionicons name="options" size={16} color={TEXT_PRIMARY_STRONG} />
             <Text
-              className="ml-1"
               style={{
                 fontFamily: "SourceSans3_600SemiBold",
-                color: TEXT_PRIMARY_STRONG,
                 fontSize: 13,
+                color: tagsExpanded || selectedTag ? DEEP_FOREST : TEXT_SECONDARY,
               }}
             >
-              Filter
+              Tags
             </Text>
+            <Ionicons
+              name={tagsExpanded ? "chevron-up" : "chevron-down"}
+              size={14}
+              color={tagsExpanded || selectedTag ? DEEP_FOREST : TEXT_SECONDARY}
+              style={{ marginLeft: 2 }}
+            />
           </Pressable>
+
+          {/* Clear filters */}
+          {hasActiveFilters && (
+            <Pressable
+              onPress={handleClearFilters}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: "SourceSans3_600SemiBold",
+                  fontSize: 13,
+                  color: EARTH_GREEN,
+                }}
+              >
+                Clear
+              </Text>
+            </Pressable>
+          )}
         </ScrollView>
       </View>
+
+      {/* Tags row - collapsible */}
+      {tagsExpanded && (
+        <View style={{ marginBottom: 6 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: GRID_PADDING, gap: 6 }}
+          >
+            {TAG_CHIPS.map((chip) => {
+              const isActive = selectedTag === chip.key;
+              return (
+                <Pressable
+                  key={chip.key}
+                  onPress={() => handleTagPress(chip.key)}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 14,
+                    backgroundColor: isActive ? EARTH_GREEN : "transparent",
+                    borderWidth: 1,
+                    borderColor: isActive ? EARTH_GREEN : BORDER_SOFT,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: "SourceSans3_400Regular",
+                      fontSize: 12,
+                      color: isActive ? PARCHMENT : TEXT_SECONDARY,
+                    }}
+                  >
+                    {chip.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
     </View>
   );
 
-  // Render tag chips for a post
-  const renderTagChips = (post: PhotoPost) => {
-    const chips: { label: string; color: string }[] = [];
-    
-    // Post type chip (always first) - map legacy tip-or-fix to setup-ideas
-    if (post.postType) {
-      const mappedType = mapLegacyPostType(post.postType);
-      chips.push({
-        label: POST_TYPE_LABELS[mappedType] || "Photo",
-        color: POST_TYPE_COLORS[mappedType] || DEEP_FOREST,
-      });
-    }
-    
-    // Trip style chip
-    if (post.tripStyle) {
-      chips.push({
-        label: TRIP_STYLE_LABELS[post.tripStyle],
-        color: EARTH_GREEN,
-      });
-    }
-    
-    // One detail tag
-    if (post.detailTags && post.detailTags.length > 0) {
-      chips.push({
-        label: DETAIL_TAG_LABELS[post.detailTags[0]],
-        color: TEXT_SECONDARY,
-      });
-    }
+  // Render photo grid item
+  const renderPhotoItem = ({ item, index }: { item: PhotoPost | Story; index: number }) => {
+    const isPhotoPost = "photoUrls" in item;
+    const imageUrl = isPhotoPost ? (item as PhotoPost).photoUrls?.[0] : (item as Story).imageUrl;
+    const caption = isPhotoPost ? (item as PhotoPost).caption : (item as Story).caption;
+    const isHelpful = isPhotoPost ? helpfulStatuses[item.id] : false;
+    const helpfulCount = isPhotoPost ? (item as PhotoPost).helpfulCount : 0;
 
-    // Calculate remaining
-    const totalTags = 1 + (post.tripStyle ? 1 : 0) + (post.detailTags?.length || 0);
-    const remaining = totalTags - 3;
-
-    return (
-      <View className="flex-row flex-wrap gap-1 mt-1">
-        {chips.slice(0, 3).map((chip, idx) => (
-          <View 
-            key={idx}
-            className="px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: chip.color + "20" }}
-          >
-            <Text 
-              className="text-[10px]"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: chip.color }}
-            >
-              {chip.label}
-            </Text>
-          </View>
-        ))}
-        {remaining > 0 && (
-          <View 
-            className="px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: TEXT_MUTED + "20" }}
-          >
-            <Text 
-              className="text-[10px]"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_MUTED }}
-            >
-              +{remaining}
-            </Text>
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  // Render location line
-  const renderLocationLine = (post: PhotoPost) => {
-    if (!post.campgroundName) return null;
-    
-    let locationText = post.campgroundName;
-    if (post.campsiteNumber && !post.hideCampsiteNumber) {
-      locationText += ` • Site ${post.campsiteNumber}`;
-    }
-    
-    return (
-      <View className="flex-row items-center mt-1">
-        <Text className="text-[11px]" style={{ color: TEXT_SECONDARY }}>📍 </Text>
-        <Text 
-          className="text-[11px] flex-1"
-          style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-          numberOfLines={1}
-        >
-          {locationText}
-        </Text>
-      </View>
-    );
-  };
-
-  const renderPhotoPostItem = ({ item }: { item: PhotoPost }) => {
-    const isHelpful = helpfulStatuses[item.id] || false;
-    
     return (
       <Pressable
-        onPress={() => handlePhotoPostPress(item.id)}
-        className="mb-4 mx-2 rounded-xl overflow-hidden border"
-        style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT, width: ITEM_WIDTH, aspectRatio: 3 / 4 }}
+        onPress={() => handlePhotoPress(item.id)}
+        style={{
+          width: ITEM_WIDTH,
+          aspectRatio: 0.85,
+          marginBottom: GRID_GAP,
+          marginLeft: index % 2 === 0 ? GRID_PADDING : GRID_GAP / 2,
+          marginRight: index % 2 === 1 ? GRID_PADDING : GRID_GAP / 2,
+          borderRadius: 12,
+          overflow: "hidden",
+          backgroundColor: CARD_BACKGROUND_LIGHT,
+        }}
       >
-        {item.photoUrls && item.photoUrls[0] ? (
+        {imageUrl ? (
           <View style={{ flex: 1 }}>
             <Image
-              source={{ uri: item.photoUrls[0] }}
+              source={{ uri: imageUrl }}
               style={{ width: "100%", height: "100%" }}
               resizeMode="cover"
             />
-            {/* Overlay with info */}
-            <View 
-              style={{ 
-                position: "absolute", 
-                bottom: 0, 
-                left: 0, 
-                right: 0, 
-                backgroundColor: "rgba(0,0,0,0.7)",
+            {/* Bottom overlay */}
+            <View
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                backgroundColor: "rgba(0,0,0,0.65)",
                 paddingHorizontal: 8,
                 paddingVertical: 6,
               }}
             >
-              {/* Location Line */}
-              {renderLocationLine(item)}
-              
               {/* Caption preview */}
-              {!!item.caption && (
+              {!!caption && (
                 <Text
                   numberOfLines={2}
-                  style={{ 
-                    fontFamily: "SourceSans3_400Regular", 
-                    color: "#fff", 
+                  style={{
+                    fontFamily: "SourceSans3_400Regular",
+                    color: "#fff",
                     fontSize: 12,
-                    marginTop: 2,
+                    lineHeight: 16,
                   }}
                 >
-                  {item.caption}
+                  {caption}
                 </Text>
               )}
               
-              {/* Tag chips */}
-              {renderTagChips(item)}
-              
-              {/* Helpful button and count */}
-              <View className="flex-row items-center justify-between mt-2">
-                <Pressable
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleToggleHelpful(item.id);
-                  }}
-                  className="flex-row items-center px-2 py-1 rounded-full"
-                  style={{ 
-                    backgroundColor: isHelpful ? "#16a34a30" : "rgba(255,255,255,0.2)",
-                  }}
-                >
-                  <Ionicons 
-                    name={isHelpful ? "thumbs-up" : "thumbs-up-outline"} 
-                    size={14} 
-                    color={isHelpful ? "#16a34a" : "#fff"} 
-                  />
-                  <Text 
-                    className="ml-1" 
-                    style={{ 
-                      fontFamily: "SourceSans3_600SemiBold", 
-                      color: isHelpful ? "#16a34a" : "#fff", 
-                      fontSize: 11 
+              {/* Post type badge + helpful */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                {isPhotoPost && (item as PhotoPost).postType && (
+                  <View
+                    style={{
+                      backgroundColor: POST_TYPE_COLORS[mapLegacyPostType((item as PhotoPost).postType)] + "30",
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 8,
                     }}
                   >
-                    {item.helpfulCount > 0 ? `${item.helpfulCount} Helpful` : "Helpful"}
-                  </Text>
-                </Pressable>
-                
-                {item.commentCount !== undefined && item.commentCount > 0 && (
-                  <View className="flex-row items-center">
-                    <Ionicons name="chatbubble-outline" size={12} color="#9ca3af" />
-                    <Text 
-                      className="ml-1" 
-                      style={{ fontFamily: "SourceSans3_400Regular", color: "#9ca3af", fontSize: 11 }}
+                    <Text
+                      style={{
+                        fontFamily: "SourceSans3_600SemiBold",
+                        fontSize: 10,
+                        color: "#fff",
+                      }}
                     >
-                      {item.commentCount}
+                      {POST_TYPE_LABELS[mapLegacyPostType((item as PhotoPost).postType)]}
                     </Text>
                   </View>
+                )}
+                
+                {isPhotoPost && (
+                  <Pressable
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleToggleHelpful(item.id);
+                    }}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 8,
+                      backgroundColor: isHelpful ? "#16a34a30" : "rgba(255,255,255,0.15)",
+                    }}
+                  >
+                    <Ionicons
+                      name={isHelpful ? "thumbs-up" : "thumbs-up-outline"}
+                      size={12}
+                      color={isHelpful ? "#16a34a" : "#fff"}
+                    />
+                    {helpfulCount > 0 && (
+                      <Text
+                        style={{
+                          fontFamily: "SourceSans3_600SemiBold",
+                          fontSize: 10,
+                          color: isHelpful ? "#16a34a" : "#fff",
+                          marginLeft: 3,
+                        }}
+                      >
+                        {helpfulCount}
+                      </Text>
+                    )}
+                  </Pressable>
                 )}
               </View>
             </View>
           </View>
         ) : (
-          <View className="flex-1 items-center justify-center bg-gray-100">
-            <Ionicons name="image" size={32} color={TEXT_MUTED} />
-            <Text style={{ color: TEXT_MUTED, fontFamily: "SourceSans3_400Regular" }}>No image</Text>
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="image" size={28} color={TEXT_MUTED} />
           </View>
         )}
       </Pressable>
     );
   };
 
-  // Legacy story item renderer
-  const renderPhotoItem = ({ item }: { item: Story }) => {
-    const score = (item.upvotes || 0) - (item.downvotes || 0);
-    
-    return (
-      <Pressable
-        onPress={() => handlePhotoPress(item.id)}
-        className="mb-4 mx-2 rounded-xl overflow-hidden border"
-        style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT, width: ITEM_WIDTH, aspectRatio: 3 / 4 }}
-      >
-        {item.imageUrl ? (
-          <View style={{ flex: 1 }}>
-            <Image
-              source={{ uri: item.imageUrl }}
-              style={{ width: "100%", height: "100%" }}
-              resizeMode="cover"
-              onError={() => console.log("Image unavailable:", item.imageUrl)}
-            />
-            {/* Overlay with title and votes */}
-            <View 
-              style={{ 
-                position: "absolute", 
-                bottom: 0, 
-                left: 0, 
-                right: 0, 
-                backgroundColor: "rgba(0,0,0,0.6)",
-                paddingHorizontal: 10,
-                paddingVertical: 8,
-              }}
-            >
-              {!!item.caption && (
-                <Text
-                  numberOfLines={2}
-                  style={{ 
-                    fontFamily: "SourceSans3_600SemiBold", 
-                    color: "#fff", 
-                    fontSize: 13,
-                    marginBottom: 4,
-                  }}
-                >
-                  {item.caption}
-                </Text>
-              )}
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center">
-                  <Ionicons 
-                    name={score > 0 ? "arrow-up" : score < 0 ? "arrow-down" : "swap-vertical-outline"} 
-                    size={14} 
-                    color={score > 0 ? "#4ade80" : score < 0 ? "#f87171" : "#9ca3af"} 
-                  />
-                  <Text 
-                    className="ml-1" 
-                    style={{ 
-                      fontFamily: "SourceSans3_600SemiBold", 
-                      color: score > 0 ? "#4ade80" : score < 0 ? "#f87171" : "#9ca3af", 
-                      fontSize: 12 
-                    }}
-                  >
-                    {score}
-                  </Text>
-                </View>
-                <View className="flex-row items-center">
-                  <Ionicons name="chatbubble-outline" size={14} color="#9ca3af" />
-                  <Text className="ml-1" style={{ fontFamily: "SourceSans3_400Regular", color: "#9ca3af", fontSize: 12 }}>
-                    {item.commentCount || 0}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View className="flex-1 items-center justify-center bg-gray-100">
-            <Ionicons name="image" size={32} color={TEXT_MUTED} />
-            <Text style={{ color: TEXT_MUTED, fontFamily: "SourceSans3_400Regular" }}>Image unavailable</Text>
-          </View>
-        )}
-      </Pressable>
-    );
-  };
-
+  // Loading state
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-parchment">
+      <View style={{ flex: 1, backgroundColor: PARCHMENT, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator size="large" color={DEEP_FOREST} />
-        <Text
-          className="mt-4"
-          style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-        >
+        <Text style={{ marginTop: 12, fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
           Loading photos...
         </Text>
       </View>
     );
   }
 
+  // Error state
   if (error) {
     return (
-      <View className="flex-1 bg-parchment">
-        <CommunitySectionHeader
-          title="Camping photos"
-          onAddPress={handleUploadPhoto}
-        />
-        <View className="flex-1 items-center justify-center px-5">
-          <Ionicons name="alert-circle-outline" size={64} color={EARTH_GREEN} />
-          <Text
-            className="mt-4 text-center text-lg"
-            style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
-          >
+      <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
+        <CommunitySectionHeader title="Camping photos" onAddPress={handleUploadPhoto} />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 20 }}>
+          <Ionicons name="alert-circle-outline" size={48} color={EARTH_GREEN} />
+          <Text style={{ marginTop: 12, fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
             Failed to load photos
-          </Text>
-          <Text
-            className="mt-2 text-center"
-            style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-          >
-            {error}
           </Text>
           <Pressable
             onPress={() => loadPhotoPosts(true)}
-            className="mt-6 px-6 py-3 rounded-xl active:opacity-90"
-            style={{ backgroundColor: DEEP_FOREST }}
+            style={{ marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, backgroundColor: DEEP_FOREST }}
           >
-            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
-              Retry
-            </Text>
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>Retry</Text>
           </Pressable>
         </View>
       </View>
     );
   }
 
-  // Determine which data to show (new posts or legacy stories)
-  const hasNewPosts = photoPosts.length > 0;
-  const feedData = hasNewPosts ? photoPosts : stories;
-
   return (
-    <View className="flex-1 bg-parchment">
-      {/* Action Bar */}
-      <CommunitySectionHeader
-        title="Camping photos"
-        onAddPress={handleUploadPhoto}
-      />
+    <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
+      {/* Header */}
+      <CommunitySectionHeader title="Camping photos" onAddPress={handleUploadPhoto} />
 
-      {/* Enhanced Filter Modal */}
-      <Modal
-        visible={showFilterModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowFilterModal(false)}
-      >
-        <View className="flex-1 bg-parchment">
-          {/* Modal Header */}
-          <View className="px-5 py-4 border-b flex-row items-center justify-between" style={{ borderColor: BORDER_SOFT }}>
-            <Text
-              className="text-xl"
-              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
-            >
-              Filter Photos
-            </Text>
-            <Pressable
-              onPress={() => setShowFilterModal(false)}
-              className="active:opacity-70"
-            >
-              <Ionicons name="close" size={28} color={TEXT_PRIMARY_STRONG} />
-            </Pressable>
-          </View>
-
-          {/* Filter Options */}
-          <ScrollView className="flex-1 px-5 py-4">
-            {/* Sort By */}
-            <Text
-              className="mb-3 text-sm"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_SECONDARY }}
-            >
-              SORT BY
-            </Text>
-            <View className="flex-row flex-wrap gap-2 mb-6">
-              {SORT_OPTIONS.map(option => (
-                <Pressable
-                  key={option.key}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setSortBy(option.key);
-                  }}
-                  className="px-5 py-3 rounded-xl"
-                  style={{
-                    backgroundColor: sortBy === option.key ? DEEP_FOREST : CARD_BACKGROUND_LIGHT,
-                    borderWidth: 1,
-                    borderColor: sortBy === option.key ? DEEP_FOREST : BORDER_SOFT,
-                  }}
-                >
-                  <Text
-                    className="text-base"
-                    style={{
-                      fontFamily: "SourceSans3_600SemiBold",
-                      color: sortBy === option.key ? PARCHMENT : TEXT_PRIMARY_STRONG
-                    }}
-                  >
-                    {option.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            {/* Trip Style */}
-            <Text
-              className="mb-3 text-sm"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_SECONDARY }}
-            >
-              TRIP STYLE
-            </Text>
-            <View className="flex-row flex-wrap gap-2 mb-6">
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setSelectedTripStyle(null);
-                }}
-                className="px-4 py-2 rounded-xl"
-                style={{
-                  backgroundColor: selectedTripStyle === null ? DEEP_FOREST : CARD_BACKGROUND_LIGHT,
-                  borderWidth: 1,
-                  borderColor: selectedTripStyle === null ? DEEP_FOREST : BORDER_SOFT,
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: "SourceSans3_600SemiBold",
-                    color: selectedTripStyle === null ? PARCHMENT : TEXT_PRIMARY_STRONG
-                  }}
-                >
-                  All Styles
-                </Text>
-              </Pressable>
-              {TRIP_STYLE_OPTIONS.map(style => (
-                <Pressable
-                  key={style}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setSelectedTripStyle(style);
-                  }}
-                  className="px-4 py-2 rounded-xl"
-                  style={{
-                    backgroundColor: selectedTripStyle === style ? DEEP_FOREST : CARD_BACKGROUND_LIGHT,
-                    borderWidth: 1,
-                    borderColor: selectedTripStyle === style ? DEEP_FOREST : BORDER_SOFT,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: "SourceSans3_600SemiBold",
-                      color: selectedTripStyle === style ? PARCHMENT : TEXT_PRIMARY_STRONG
-                    }}
-                  >
-                    {TRIP_STYLE_LABELS[style]}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            {/* Legacy tag filter (for old data) */}
-            <Text
-              className="mb-3 text-sm"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_SECONDARY }}
-            >
-              FILTER BY TAG (LEGACY)
-            </Text>
-            <View className="flex-row flex-wrap gap-2">
-              {FILTER_TAGS.map(tag => (
-                <Pressable
-                  key={tag}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setSelectedTag(tag);
-                  }}
-                  className="px-4 py-2 rounded-xl"
-                  style={{
-                    backgroundColor: selectedTag === tag ? DEEP_FOREST : CARD_BACKGROUND_LIGHT,
-                    borderWidth: 1,
-                    borderColor: selectedTag === tag ? DEEP_FOREST : BORDER_SOFT,
-                  }}
-                >
-                  <Text
-                    className="capitalize"
-                    style={{
-                      fontFamily: "SourceSans3_600SemiBold",
-                      color: selectedTag === tag ? PARCHMENT : TEXT_PRIMARY_STRONG
-                    }}
-                  >
-                    {tag}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
-
-          {/* Apply Button */}
-          <View className="px-5 py-3 border-t" style={{ borderColor: BORDER_SOFT }}>
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                setShowFilterModal(false);
-              }}
-              className="py-3 rounded-lg active:opacity-90"
-              style={{ backgroundColor: DEEP_FOREST }}
-            >
-              <Text
-                className="text-center text-sm"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
-              >
-                Apply Filters
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Photos Feed */}
+      {/* Photo Grid */}
       <FlatList
-        data={hasNewPosts ? photoPosts : stories}
-        renderItem={hasNewPosts ? renderPhotoPostItem : renderPhotoItem}
-        keyExtractor={item => item.id}
+        data={feedData}
+        renderItem={renderPhotoItem}
+        keyExtractor={(item) => item.id}
         numColumns={2}
         ListHeaderComponent={renderHeader}
         contentContainerStyle={{ paddingBottom: 100 }}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
-        ListFooterComponent={loadingMore ? <ActivityIndicator size="small" color={DEEP_FOREST} /> : null}
+        ListFooterComponent={loadingMore ? <ActivityIndicator size="small" color={DEEP_FOREST} style={{ marginVertical: 20 }} /> : null}
         ListEmptyComponent={
-          <View className="items-center justify-center py-12 px-5">
+          <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 40, paddingHorizontal: 20 }}>
             <Ionicons name="images-outline" size={48} color={TEXT_MUTED} />
-            <Text 
-              className="mt-4 text-center"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
-            >
+            <Text style={{ marginTop: 12, fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
               No photos yet
             </Text>
-            <Text 
-              className="mt-2 text-center"
-              style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-            >
+            <Text style={{ marginTop: 6, fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY, textAlign: "center" }}>
               Be the first to share a camping moment!
             </Text>
           </View>
         }
       />
 
-      {/* Gating Modals */}
+      {/* Account Required Modal */}
       <AccountRequiredModal
         visible={showAccountModal}
         onCreateAccount={() => {
