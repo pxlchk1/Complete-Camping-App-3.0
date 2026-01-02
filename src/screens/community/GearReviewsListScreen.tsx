@@ -304,7 +304,7 @@ export default function GearReviewsListScreen() {
               // Gear Reviews require PRO subscription
               const canProceed = requirePro({
                 openAccountModal: () => setShowLoginModal(true),
-                openPaywallModal: () => navigation.navigate("Paywall"),
+                openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "gear_review_create", variant }),
               });
               if (!canProceed) return;
               
@@ -369,7 +369,7 @@ export default function GearReviewsListScreen() {
           // Gear Reviews require PRO subscription
           const canProceed = requirePro({
             openAccountModal: () => setShowLoginModal(true),
-            openPaywallModal: () => navigation.navigate("Paywall"),
+            openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "gear_review_create", variant }),
           });
           if (!canProceed) return;
           

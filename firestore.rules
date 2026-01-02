@@ -120,7 +120,8 @@ service cloud.firestore {
 
     // Profiles collection
     match /profiles/{userId} {
-      allow read: if isSignedIn();
+      // Allow anyone to read profiles (public profiles)
+      allow read: if true;
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update, delete: if isSignedIn() && request.auth.uid == userId;
     }
@@ -435,15 +436,15 @@ service cloud.firestore {
     // LEARNING CONTENT COLLECTIONS
     // ============================================
 
-    // Learning Tracks - readable by all signed-in users, writable by admins
+    // Learning Tracks - publicly readable (gating happens in app), writable by admins
     match /learningTracks/{trackId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 
-    // Learning Modules - readable by all signed-in users, writable by admins
+    // Learning Modules - publicly readable (gating happens in app), writable by admins
     match /learningModules/{moduleId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 

@@ -54,7 +54,7 @@ export default function PackingTabScreen({ onTabChange }: PackingTabScreenProps)
   const handleCreateTrip = () => {
     const canProceed = requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "create_trip", variant }),
     });
     if (!canProceed) return;
     navigation.navigate("CreateTrip");

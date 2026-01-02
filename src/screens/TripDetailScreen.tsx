@@ -356,6 +356,13 @@ export default function TripDetailScreen() {
     } catch {
       // ignore
     }
+    // Gate: PRO required to share trip with campground (sender must be Pro)
+    if (!requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "campground_sharing", variant }),
+    })) {
+      return;
+    }
     if (trip) navigation.navigate("AddPeopleToTrip", { tripId: trip.id });
   }, [navigation, trip]);
 
@@ -364,7 +371,7 @@ export default function TripDetailScreen() {
     // Gate: PRO required to edit trip notes
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "trip_notes", variant }),
     })) {
       return;
     }
@@ -394,7 +401,7 @@ export default function TripDetailScreen() {
     // Gate: PRO required to add links
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "trip_links", variant }),
     })) {
       return;
     }
@@ -446,7 +453,7 @@ export default function TripDetailScreen() {
       // Gate: PRO required to delete links
       if (!requirePro({
         openAccountModal: () => setShowAccountModal(true),
-        openPaywallModal: () => navigation.navigate("Paywall"),
+        openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "trip_links", variant }),
       })) {
         return;
       }

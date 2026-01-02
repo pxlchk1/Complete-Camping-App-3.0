@@ -127,6 +127,14 @@ export default function AdminDashboardScreen() {
       screen: "AdminBanned" as const,
       color: "#455A64",
     },
+    {
+      id: "gating-report",
+      title: "Gating Report",
+      subtitle: "View all access gates",
+      icon: "lock-closed" as const,
+      screen: "AdminGatingReport" as const,
+      color: "#0288D1",
+    },
   ];
 
   const handleSeedLearningContent = async () => {

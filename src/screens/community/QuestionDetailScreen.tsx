@@ -360,9 +360,15 @@ export default function QuestionDetailScreen() {
                       userId={question.authorId}
                       style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12 }}
                     />
+                  ) : question.authorId ? (
+                    <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: question.authorId })}>
+                      <Text className="text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
+                        {question.authorHandle ? `@${question.authorHandle}` : (authorName || "Anonymous")}
+                      </Text>
+                    </Pressable>
                   ) : (
                     <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                      @{question.authorHandle}
+                      {question.authorHandle ? `@${question.authorHandle}` : "Anonymous"}
                     </Text>
                   )}
                 </View>
@@ -442,9 +448,15 @@ export default function QuestionDetailScreen() {
                             userId={answer.authorId}
                             style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12 }}
                           />
+                        ) : answer.authorId ? (
+                          <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: answer.authorId })}>
+                            <Text className="text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
+                              {answer.authorHandle ? `@${answer.authorHandle}` : "Anonymous"}
+                            </Text>
+                          </Pressable>
                         ) : (
                           <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                            @{answer.authorHandle}
+                            {answer.authorHandle ? `@${answer.authorHandle}` : "Anonymous"}
                           </Text>
                         )}
                         <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>

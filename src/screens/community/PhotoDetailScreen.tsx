@@ -679,6 +679,12 @@ export default function PhotoDetailScreen() {
                     userId={authorUserId}
                     style={{ fontFamily: "SourceSans3_400Regular", fontSize: 14 }}
                   />
+                ) : authorUserId ? (
+                  <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: authorUserId })}>
+                    <Text className="text-sm" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
+                      {displayName}
+                    </Text>
+                  </Pressable>
                 ) : (
                   <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
                     {displayName}
@@ -817,6 +823,20 @@ export default function PhotoDetailScreen() {
                             fontSize: 13,
                           }}
                         />
+                      ) : comment.userId ? (
+                        <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: comment.userId })}>
+                          <Text
+                            style={{
+                              fontFamily: "SourceSans3_600SemiBold",
+                              fontSize: 13,
+                              color: DEEP_FOREST,
+                              textDecorationLine: "underline",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {comment.userHandle || comment.username || "Anonymous"}
+                          </Text>
+                        </Pressable>
                       ) : (
                         <Text
                           style={{
@@ -826,7 +846,7 @@ export default function PhotoDetailScreen() {
                             marginBottom: 4,
                           }}
                         >
-                          @{comment.userHandle || comment.username}
+                          {comment.userHandle || comment.username || "Anonymous"}
                         </Text>
                       )}
                       <Text

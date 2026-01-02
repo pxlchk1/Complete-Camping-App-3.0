@@ -40,7 +40,9 @@ import {
   resetPackingList,
 } from "../services/packingServiceV2";
 import { useTrips } from "../state/tripsStore";
+import { useSubscriptionStore } from "../state/subscriptionStore";
 import { useAuth } from "../context/AuthContext";
+import { requirePro } from "../utils/gating";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -68,6 +70,7 @@ export default function PackingListDetailScreen() {
   const { tripId } = route.params;
   const { user } = useAuth();
   const trips = useTrips();
+  const isPro = useSubscriptionStore((s) => s.isPro);
 
   const trip = useMemo(() => trips.find((t) => t.id === tripId), [trips, tripId]);
 
@@ -86,6 +89,18 @@ export default function PackingListDetailScreen() {
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [editingItem, setEditingItem] = useState<PackingItemV2 | null>(null);
   const [addToCategory, setAddToCategory] = useState<PackingCategory | undefined>();
+
+  // Pro gating check for customization actions
+  const checkProForCustomization = useCallback((): boolean => {
+    if (isPro) return true;
+    
+    // Show PaywallModal for non-Pro users (with tracking via requirePro)
+    // Note: requirePro handles the async tracking internally
+    return requirePro({
+      openAccountModal: () => {}, // Not used for Pro gates
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_customization", variant }),
+    });
+  }, [isPro, navigation]);
 
   // Load items
   const loadItems = useCallback(async () => {
@@ -146,9 +161,12 @@ export default function PackingListDetailScreen() {
     }
   };
 
-  // Delete item
+  // Delete item - REQUIRES PRO
   const handleDeleteItem = async (item: PackingItemV2) => {
     if (!user?.id) return;
+    
+    // Pro gating for customization
+    if (!checkProForCustomization()) return;
 
     Alert.alert("Delete Item", `Remove "${item.name}" from your packing list?`, [
       { text: "Cancel", style: "cancel" },
@@ -168,14 +186,20 @@ export default function PackingListDetailScreen() {
     ]);
   };
 
-  // Edit item
+  // Edit item - REQUIRES PRO
   const handleEditItem = (item: PackingItemV2) => {
+    // Pro gating for customization
+    if (!checkProForCustomization()) return;
+    
     setEditingItem(item);
     setShowAddItem(true);
   };
 
-  // Add item to category
+  // Add item to category - REQUIRES PRO
   const handleAddToCategory = (category: PackingCategory) => {
+    // Pro gating for customization
+    if (!checkProForCustomization()) return;
+    
     setAddToCategory(category);
     setEditingItem(null);
     setShowAddItem(true);
@@ -201,8 +225,11 @@ export default function PackingListDetailScreen() {
     );
   };
 
-  // Save as template
+  // Save as template - REQUIRES PRO
   const handleSaveAsTemplate = () => {
+    // Pro gating for customization
+    if (!checkProForCustomization()) return;
+    
     if (items.length === 0) {
       Alert.alert("No Items", "Add items to your packing list before saving as a template.");
       return;
@@ -569,6 +596,8 @@ export default function PackingListDetailScreen() {
         >
           <Pressable
             onPress={() => {
+              // Pro gating for adding items
+              if (!checkProForCustomization()) return;
               setAddToCategory(undefined);
               setEditingItem(null);
               setShowAddItem(true);
@@ -590,7 +619,11 @@ export default function PackingListDetailScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => setShowGearCloset(true)}
+            onPress={() => {
+              // Pro gating for adding from gear closet
+              if (!checkProForCustomization()) return;
+              setShowGearCloset(true);
+            }}
             className="flex-row items-center px-4 py-2 rounded-xl border"
             style={{ borderColor: DEEP_FOREST }}
           >

@@ -154,6 +154,10 @@ export default function ParksBrowseScreen({ onTabChange, selectedParkId: selecte
 
   // Gating modal state
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [accountModalTriggerKey, setAccountModalTriggerKey] = useState<string | undefined>(undefined);
+  
+  // Custom campground info modal
+  const [showCampgroundInfoModal, setShowCampgroundInfoModal] = useState(false);
 
   const trips = useTripsStore((s) => s.trips);
   const updateTrip = useTripsStore((s) => s.updateTrip);
@@ -468,7 +472,7 @@ export default function ParksBrowseScreen({ onTabChange, selectedParkId: selecte
     // Gate: PRO required to add custom campgrounds
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "custom_campsite", variant }),
     })) {
       return;
     }
@@ -881,14 +885,29 @@ export default function ParksBrowseScreen({ onTabChange, selectedParkId: selecte
           />
 
           {/* Add Private Campground Link */}
-          <TouchableOpacity
-            onPress={handleAddCampground}
-            style={{ alignItems: "center", marginBottom: spacing.md }}
-          >
-            <Text style={{ fontFamily: fonts.bodySemibold, fontSize: fontSizes.sm, color: EARTH_GREEN }}>
-              + Add your own campground
-            </Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: spacing.md }}>
+            <TouchableOpacity
+              onPress={handleAddCampground}
+            >
+              <Text style={{ fontFamily: fonts.bodySemibold, fontSize: fontSizes.sm, color: EARTH_GREEN }}>
+                + Add your own campground
+              </Text>
+            </TouchableOpacity>
+            <Pressable
+              onPress={() => setShowCampgroundInfoModal(true)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={({ pressed }) => ({
+                width: 44,
+                height: 44,
+                alignItems: "center",
+                justifyContent: "center",
+                marginLeft: -8,
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              <Ionicons name="information-circle-outline" size={20} color={EARTH_GREEN} />
+            </Pressable>
+          </View>
 
           {/* Error */}
           {error && (
@@ -1106,7 +1125,7 @@ export default function ParksBrowseScreen({ onTabChange, selectedParkId: selecte
               console.log("[ParksBrowse] Create new trip for park:", park.name);
               const canProceed = requirePro({
                 openAccountModal: () => setShowAccountModal(true),
-                openPaywallModal: () => navigation.navigate("Paywall"),
+                openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "second_trip", variant }),
               });
               if (!canProceed) {
                 setSelectedPark(null);
@@ -1118,6 +1137,15 @@ export default function ParksBrowseScreen({ onTabChange, selectedParkId: selecte
               onParkDetailClosed?.();
               navigation.navigate("CreateTrip" as never);
             }
+          }}
+          onRequireAccount={(triggerKey) => {
+            setAccountModalTriggerKey(triggerKey);
+            setShowAccountModal(true);
+          }}
+          onRequirePro={(triggerKey, variant) => {
+            setSelectedPark(null);
+            onParkDetailClosed?.();
+            navigation.navigate("Paywall", { triggerKey, variant });
           }}
           onCheckWeather={(park) => {
             console.log("Check weather for park:", park.name);
@@ -1138,12 +1166,63 @@ export default function ParksBrowseScreen({ onTabChange, selectedParkId: selecte
       {/* Gating Modals */}
       <AccountRequiredModal
         visible={showAccountModal}
+        triggerKey={accountModalTriggerKey}
         onCreateAccount={() => {
           setShowAccountModal(false);
+          setAccountModalTriggerKey(undefined);
           navigation.navigate("Auth" as never);
         }}
-        onMaybeLater={() => setShowAccountModal(false)}
+        onLogIn={() => {
+          setShowAccountModal(false);
+          setAccountModalTriggerKey(undefined);
+          navigation.navigate("Auth" as never);
+        }}
+        onMaybeLater={() => {
+          setShowAccountModal(false);
+          setAccountModalTriggerKey(undefined);
+        }}
       />
+
+      {/* Custom Campground Info Modal */}
+      <Modal
+        visible={showCampgroundInfoModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCampgroundInfoModal(false)}
+      >
+        <Pressable
+          style={styles.infoModalOverlay}
+          onPress={() => setShowCampgroundInfoModal(false)}
+        >
+          <Pressable
+            style={styles.infoModalContent}
+            onPress={(e) => e.stopPropagation?.()}
+          >
+            <View style={styles.infoModalHeader}>
+              <Ionicons name="information-circle" size={28} color={DEEP_FOREST} />
+              <Text style={styles.infoModalTitle}>What is this for?</Text>
+            </View>
+
+            <Text style={styles.infoModalBody}>
+              Use this to add private campgrounds that aren't in the national or state park system. Think campgrounds on private land, family property, farms, club campgrounds, or a friend's place.
+            </Text>
+
+            <Text style={styles.infoModalNote}>
+              Custom campgrounds are private to you.
+            </Text>
+
+            <Pressable
+              onPress={() => setShowCampgroundInfoModal(false)}
+              style={({ pressed }) => [
+                styles.infoModalButton,
+                { opacity: pressed ? 0.8 : 1 },
+              ]}
+            >
+              <Text style={styles.infoModalButtonText}>Got it</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -1193,5 +1272,56 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 12,
     color: "#111",
+  },
+  // Custom campground info modal styles
+  infoModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  infoModalContent: {
+    backgroundColor: "#F4EBD0",
+    borderRadius: 16,
+    padding: 24,
+    maxWidth: 340,
+    width: "100%",
+  },
+  infoModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  infoModalTitle: {
+    fontFamily: fonts.displaySemibold,
+    fontSize: 18,
+    color: "#1a1a1a",
+    marginLeft: 8,
+  },
+  infoModalBody: {
+    fontFamily: fonts.bodyRegular,
+    fontSize: 16,
+    color: "#666",
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  infoModalNote: {
+    fontFamily: fonts.bodyRegular,
+    fontSize: 14,
+    color: EARTH_GREEN,
+    fontStyle: "italic",
+    marginBottom: 20,
+  },
+  infoModalButton: {
+    backgroundColor: DEEP_FOREST,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  infoModalButtonText: {
+    fontFamily: fonts.bodySemibold,
+    fontSize: 16,
+    color: "#F4EBD0",
   },
 });

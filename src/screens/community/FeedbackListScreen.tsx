@@ -104,7 +104,7 @@ export default function FeedbackListScreen() {
       },
       {
         openAccountModal: () => setShowLoginModal(true),
-        openPaywallModal: () => navigation.navigate("Paywall"),
+        openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "feedback_create", variant }),
       }
     );
   };
@@ -125,7 +125,7 @@ export default function FeedbackListScreen() {
       },
       {
         openAccountModal: () => setShowLoginModal(true),
-        openPaywallModal: () => navigation.navigate("Paywall"),
+        openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "feedback_vote", variant }),
       }
     );
   };
@@ -146,7 +146,7 @@ export default function FeedbackListScreen() {
       },
       {
         openAccountModal: () => setShowLoginModal(true),
-        openPaywallModal: () => navigation.navigate("Paywall"),
+        openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "feedback_vote", variant }),
       }
     );
   };

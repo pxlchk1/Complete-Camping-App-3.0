@@ -1,6 +1,12 @@
 /**
- * Account Required Modal
- * Prompts non-logged-in users to create an account when attempting to save/modify data
+ * Account Required Modal (Updated 2026-01-01)
+ * 
+ * Prompts guests to create an account when attempting free-tier actions that require persistence.
+ * 
+ * ONLY use for: Actions that are FREE but need a logged-in user to persist data.
+ * Examples: First trip creation, favorites #1-5, trip-linked packing checklist, My Campsite
+ * 
+ * DO NOT use for: Pro-gated features (use PaywallModal instead)
  */
 
 import React from "react";
@@ -21,17 +27,73 @@ import {
   CARD_BACKGROUND_LIGHT,
 } from "../constants/colors";
 
+/**
+ * Modal content for each trigger key
+ */
+const ACCOUNT_MODAL_CONTENT: Record<string, { title: string; body: string }> = {
+  // Default
+  default: {
+    title: "Let's get you set up.",
+    body: "Create a free account so we can save your activity and keep the community running smoothly. It only takes a moment.",
+  },
+  // First trip
+  create_first_trip: {
+    title: "Save your first trip",
+    body: "Create a free account to save your trip plan and access it later.",
+  },
+  // Favorites
+  save_favorite: {
+    title: "Save favorites",
+    body: "Create a free account to save parks and campgrounds for later.",
+  },
+  // Packing
+  packing_for_trip: {
+    title: "Save your packing progress",
+    body: "Create a free account to track your packing list for this trip.",
+  },
+  // My Campsite
+  my_campsite: {
+    title: "Your campsite, saved",
+    body: "Create a free account to save trips, favorites, and your camping profile.",
+  },
+  // Trip Plans Quick Action
+  trip_plans_quick_action: {
+    title: "Save your trips",
+    body: "Create a free account to plan trips and keep everything in one place.",
+  },
+  // Gear Closet Quick Action
+  gear_closet_quick_action: {
+    title: "Save your gear list",
+    body: "Create a free account to track your gear and reuse it for every trip.",
+  },
+  // My Campground Quick Action
+  my_campground_quick_action: {
+    title: "Your camping people, saved",
+    body: "Create a free account to build your Campground and invite friends.",
+  },
+  // Ask a Camper Post
+  ask_a_camper_post: {
+    title: "Join the community",
+    body: "Create a free account to ask questions and help fellow campers.",
+  },
+};
+
 interface AccountRequiredModalProps {
   visible: boolean;
   onCreateAccount: () => void;
   onMaybeLater: () => void;
+  /** Optional trigger key for dynamic content */
+  triggerKey?: string;
 }
 
 export default function AccountRequiredModal({
   visible,
   onCreateAccount,
   onMaybeLater,
+  triggerKey = "default",
 }: AccountRequiredModalProps) {
+  const content = ACCOUNT_MODAL_CONTENT[triggerKey] || ACCOUNT_MODAL_CONTENT.default;
+  
   return (
     <Modal
       visible={visible}
@@ -51,21 +113,23 @@ export default function AccountRequiredModal({
           </View>
 
           {/* Title */}
-          <Text style={styles.title}>Let's get you set up.</Text>
+          <Text style={styles.title}>{content.title}</Text>
 
           {/* Message */}
-          <Text style={styles.message}>
-            Create a free account so we can save your activity and keep the community running smoothly. It only takes a moment.
-          </Text>
+          <Text style={styles.message}>{content.body}</Text>
 
           {/* Buttons */}
           <View style={styles.buttonContainer}>
             <Pressable style={styles.primaryButton} onPress={onCreateAccount}>
-              <Text style={styles.primaryButtonText}>Create an account</Text>
+              <Text style={styles.primaryButtonText}>Create account</Text>
+            </Pressable>
+            
+            <Pressable style={styles.loginButton} onPress={onCreateAccount}>
+              <Text style={styles.loginButtonText}>Log in</Text>
             </Pressable>
 
             <Pressable style={styles.secondaryButton} onPress={onMaybeLater}>
-              <Text style={styles.secondaryButtonText}>Maybe later</Text>
+              <Text style={styles.secondaryButtonText}>Not now</Text>
             </Pressable>
           </View>
         </View>
@@ -133,15 +197,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: PARCHMENT,
   },
+  loginButton: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: DEEP_FOREST,
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  loginButtonText: {
+    fontFamily: "SourceSans3_600SemiBold",
+    fontSize: 15,
+    color: DEEP_FOREST,
+  },
   secondaryButton: {
-    backgroundColor: CARD_BACKGROUND_LIGHT,
+    backgroundColor: "transparent",
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: "center",
   },
   secondaryButtonText: {
     fontFamily: "SourceSans3_600SemiBold",
-    fontSize: 18,
+    fontSize: 15,
     color: TEXT_SECONDARY,
   },
 });

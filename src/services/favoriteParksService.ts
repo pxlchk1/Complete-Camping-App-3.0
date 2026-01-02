@@ -160,6 +160,26 @@ export async function getFavoriteParks(
 }
 
 /**
+ * Get count of favorite parks for a user
+ * Used for gating - FREE users limited to 5 favorites
+ */
+export async function getFavoritesCount(userId: string): Promise<number> {
+  try {
+    const favsRef = collection(db, "users", userId, "favoriteParks");
+    const snapshot = await getDocs(favsRef);
+    return snapshot.size;
+  } catch (error) {
+    console.error("[FavoriteParks] Error counting favorites:", error);
+    return 0;
+  }
+}
+
+/**
+ * FREE tier favorites limit
+ */
+export const FREE_FAVORITES_LIMIT = 5;
+
+/**
  * Listen to a single park's favorite status
  */
 export function listenToFavoritePark(

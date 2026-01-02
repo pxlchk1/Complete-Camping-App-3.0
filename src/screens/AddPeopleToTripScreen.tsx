@@ -102,7 +102,7 @@ export default function AddPeopleToTripScreen() {
     // Gate: PRO required to add people to trips
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "trip_add_people", variant }),
     })) {
       return;
     }

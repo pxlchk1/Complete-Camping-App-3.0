@@ -8,7 +8,7 @@ import { useUserStore } from "../state/userStore";
 import { usePlanTabStore, PlanTab } from "../state/planTabStore";
 import { usePackingStore } from "../state/packingStore";
 import { useUserStatus } from "../utils/authHelper";
-import { requirePro } from "../utils/gating";
+import { requirePro, requireAccount } from "../utils/gating";
 import { useAuthStore } from "../state/authStore";
 import TripCard from "../components/TripCard";
 import CreateTripModal from "../components/CreateTripModal";
@@ -99,14 +99,32 @@ export default function MyTripsScreen() {
   const onResume = (trip: Trip) => nav.navigate("TripDetail", { tripId: trip.id });
   const onMenu = (trip: Trip) => setMenuTrip(trip);
 
+  /**
+   * Handle create trip with proper gating (2026-01-01)
+   * 
+   * Rules:
+   * - First trip (tripCount === 0): requiresAccount=true, requiresPro=false
+   *   → GUEST sees AccountRequiredModal, FREE/PRO can create
+   * - Second+ trip (tripCount >= 1): requiresPro=true
+   *   → GUEST or FREE sees PaywallModal, PRO can create
+   */
   const handleCreateTrip = () => {
-    // Trip creation requires PRO subscription
-    const canProceed = requirePro({
-      openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => nav.navigate("Paywall"),
-    });
+    const tripCount = trips.length;
     
-    if (!canProceed) return;
+    if (tripCount === 0) {
+      // First trip - only requires account (free-tier action)
+      const canProceed = requireAccount({
+        openAccountModal: () => setShowAccountModal(true),
+      });
+      if (!canProceed) return;
+    } else {
+      // Second+ trip - requires Pro (Pro-gated action)
+      const canProceed = requirePro({
+        openAccountModal: () => setShowAccountModal(true), // Not used for Pro gates
+        openPaywallModal: (variant) => nav.navigate("Paywall", { triggerKey: "second_trip", variant }),
+      });
+      if (!canProceed) return;
+    }
     
     setShowCreate(true);
   };
@@ -226,6 +244,7 @@ export default function MyTripsScreen() {
         />
         <AccountRequiredModal
           visible={showAccountModal}
+          triggerKey="create_first_trip"
           onCreateAccount={() => {
             setShowAccountModal(false);
             nav.navigate("Auth");
@@ -401,6 +420,7 @@ export default function MyTripsScreen() {
       {/* Account Required Modal */}
       <AccountRequiredModal
         visible={showAccountModal}
+        triggerKey="create_first_trip"
         onCreateAccount={() => {
           setShowAccountModal(false);
           nav.navigate("Auth");

@@ -3,29 +3,28 @@
  * 
  * Centralized access control for learning modules.
  * 
- * Access Rules:
- * - Leave No Trace module (moduleId="lnt-principles") is FREE for all authenticated users
- * - All other modules require Pro subscription
- * - Anonymous users cannot access any modules (must create account)
+ * Access Rules (2026-01-01):
+ * - Leave No Trace module (moduleId="lnt-principles") is FREE for ALL users including GUESTS
+ * - All other modules require Pro subscription (show PaywallModal for GUEST or FREE)
+ * - AccountRequiredModal is NOT used for learning - Pro modules show PaywallModal
  */
 
-// Free module IDs - available to all authenticated users
+// Free module IDs - available to all users including guests
 // Note: "lnt-principles" is the actual module ID in the Leave No Trace track
 export const FREE_MODULE_IDS = ["lnt-principles", "leave_no_trace", "leave-no-trace"] as const;
 
 /**
  * Lock reasons for modules
  */
-export type LockReason = "account_required" | "pro_required" | null;
+export type LockReason = "pro_required" | null;
 
 /**
  * Access state for a learning module
  */
 export type ModuleAccessState = 
-  | "anonymous_locked"    // Not logged in - show AccountRequiredModal
-  | "free_unlocked"       // Logged in, free module - can open
-  | "free_locked"         // Logged in, not Pro, Pro module - show PaywallModal
-  | "pro_unlocked";       // Logged in, Pro - can open all
+  | "free_unlocked"       // Free module - anyone can access (GUEST, FREE, PRO)
+  | "pro_locked"          // Pro module, user is GUEST or FREE - show PaywallModal
+  | "pro_unlocked";       // Pro module, user is PRO - can access
 
 /**
  * Check if a module is free (available to all authenticated users)
@@ -41,8 +40,12 @@ export function isFreeModule(moduleId: string): boolean {
 /**
  * Get the access state for a learning module
  * 
+ * Rules (2026-01-01):
+ * - Leave No Trace: accessible to ALL (GUEST, FREE, PRO)
+ * - Other modules: Pro-gated (GUEST or FREE sees PaywallModal)
+ * 
  * @param moduleId - The module's ID
- * @param isAuthenticated - Whether the user is logged in
+ * @param isAuthenticated - Whether the user is logged in (not used for free modules)
  * @param isPro - Whether the user has an active Pro subscription
  * @returns ModuleAccessState
  */
@@ -51,18 +54,18 @@ export function getModuleAccessState(
   isAuthenticated: boolean,
   isPro: boolean
 ): ModuleAccessState {
-  // State A: Anonymous (not logged in)
-  if (!isAuthenticated) {
-    return "anonymous_locked";
+  // Free modules (Leave No Trace) - accessible to everyone
+  if (isFreeModule(moduleId)) {
+    return "free_unlocked";
   }
 
-  // State B: Logged in, Free (not Pro)
-  if (!isPro) {
-    return isFreeModule(moduleId) ? "free_unlocked" : "free_locked";
+  // Pro modules - check if user has Pro
+  if (isPro) {
+    return "pro_unlocked";
   }
 
-  // State C: Logged in, Pro
-  return "pro_unlocked";
+  // GUEST or FREE trying to access Pro module
+  return "pro_locked";
 }
 
 /**
@@ -85,6 +88,9 @@ export function canOpenLearningModule(
 /**
  * Get the lock reason for a module
  * 
+ * Returns "pro_required" if user needs Pro, null if accessible
+ * Note: AccountRequiredModal is NOT used for learning modules
+ * 
  * @param moduleId - The module's ID
  * @param isAuthenticated - Whether the user is logged in
  * @param isPro - Whether the user has an active Pro subscription
@@ -97,14 +103,11 @@ export function getLearningModuleLockReason(
 ): LockReason {
   const state = getModuleAccessState(moduleId, isAuthenticated, isPro);
   
-  switch (state) {
-    case "anonymous_locked":
-      return "account_required";
-    case "free_locked":
-      return "pro_required";
-    default:
-      return null;
+  if (state === "pro_locked") {
+    return "pro_required";
   }
+  
+  return null;
 }
 
 /**
@@ -124,12 +127,8 @@ export function getModuleBadgeType(moduleId: string): "Free" | "Pro" {
  * @returns string - Helper text to display
  */
 export function getLockedModuleHelperText(lockReason: LockReason): string {
-  switch (lockReason) {
-    case "account_required":
-      return "Create an account to start";
-    case "pro_required":
-      return "Included with Pro";
-    default:
-      return "";
+  if (lockReason === "pro_required") {
+    return "Included with Pro";
   }
+  return "";
 }

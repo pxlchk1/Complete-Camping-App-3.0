@@ -242,9 +242,15 @@ export default function QuestionsListScreen() {
               userId={item.authorId}
               style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12 }}
             />
+          ) : item.authorId ? (
+            <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: item.authorId })}>
+              <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: DEEP_FOREST, textDecorationLine: "underline" }}>
+                {item.authorHandle ? `@${item.authorHandle}` : "Anonymous"}
+              </Text>
+            </Pressable>
           ) : (
             <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
-              @{item.authorHandle}
+              {item.authorHandle ? `@${item.authorHandle}` : "Anonymous"}
             </Text>
           )}
           <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>

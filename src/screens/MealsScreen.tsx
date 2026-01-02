@@ -220,7 +220,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
     // Gate: PRO required to add meals to trips
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meals_add_to_trip", variant }),
     })) {
       return;
     }
@@ -287,7 +287,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
     // Gate: PRO required to add custom meals
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meals_custom", variant }),
     })) {
       return;
     }
@@ -427,7 +427,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
               onPress={() => {
                 const canProceed = requirePro({
                   openAccountModal: () => setShowAccountModal(true),
-                  openPaywallModal: () => navigation.navigate("Paywall"),
+                  openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "create_trip", variant }),
                 });
                 if (!canProceed) return;
                 navigation.navigate("CreateTrip");
@@ -529,7 +529,7 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
                   // Gate: PRO required to add custom meals
                   if (!requirePro({
                     openAccountModal: () => setShowAccountModal(true),
-                    openPaywallModal: () => navigation.navigate("Paywall"),
+                    openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meals_custom", variant }),
                   })) {
                     return;
                   }

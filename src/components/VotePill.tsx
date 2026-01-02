@@ -20,6 +20,7 @@ import * as Haptics from "expo-haptics";
 import { genericVotesService } from "../services/firestore/genericVotesService";
 import { useCurrentUser, useUserStore } from "../state/userStore";
 import { useSubscriptionStore } from "../state/subscriptionStore";
+import { getPaywallVariantAndTrack, type PaywallVariant } from "../services/proAttemptService";
 import { TEXT_MUTED } from "../constants/colors";
 
 interface VotePillProps {
@@ -28,8 +29,8 @@ interface VotePillProps {
   initialScore?: number;
   initialUserVote?: "up" | "down" | null;
   onRequireAccount: () => void;
-  /** Optional: If provided, voting requires Pro subscription */
-  onRequirePro?: () => void;
+  /** Optional: If provided, voting requires Pro subscription. Receives variant for nudge paywall. */
+  onRequirePro?: (variant?: PaywallVariant) => void;
   size?: "small" | "medium";
 }
 
@@ -80,7 +81,9 @@ export default function VotePill({
 
     // If Pro is required for this collection, check subscription (admins bypass)
     if (onRequirePro && !isPro && !isAdmin) {
-      onRequirePro();
+      // Track Pro attempt and get variant for nudge paywall
+      const variant = await getPaywallVariantAndTrack(!!currentUser, isPro);
+      onRequirePro(variant);
       return;
     }
 

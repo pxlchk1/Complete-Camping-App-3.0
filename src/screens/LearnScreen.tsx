@@ -35,6 +35,7 @@ import {
   getLockedModuleHelperText,
   LockReason,
 } from "../utils/learningGating";
+import { getPaywallVariantAndTrack } from "../services/proAttemptService";
 
 // Types
 import {
@@ -121,28 +122,28 @@ export default function LearnScreen() {
   );
 
   /**
-   * Handle module press with gating logic
-   * - Anonymous: Show AccountRequiredModal
-   * - Free user + non-free module: Show Paywall
-   * - Free user + free module (Leave No Trace): Open module
-   * - Pro user: Open module
+   * Handle module press with gating logic (2026-01-01)
+   * 
+   * Rules:
+   * - Leave No Trace: accessible to ALL (GUEST, FREE, PRO)
+   * - Other modules: Pro-gated (GUEST or FREE sees PaywallModal)
+   * - AccountRequiredModal is NOT used for learning
+   * - Tracks Pro attempts for nudge paywall (3rd attempt shows nudge variant)
    */
-  const handleModulePress = (moduleId: string) => {
+  const handleModulePress = async (moduleId: string) => {
     // Check if user can open this module
     if (canOpenLearningModule(moduleId, isAuthenticated, isPro)) {
       navigation.navigate("ModuleDetail", { moduleId });
       return;
     }
 
-    // Get the lock reason to determine which modal to show
+    // Pro-gated module - show PaywallModal (for GUEST or FREE)
     const lockReason = getLearningModuleLockReason(moduleId, isAuthenticated, isPro);
     
-    if (lockReason === "account_required") {
-      // State A: Anonymous - show account required modal
-      setShowAccountModal(true);
-    } else if (lockReason === "pro_required") {
-      // State B: Free user trying to access Pro content - show paywall
-      navigation.navigate("Paywall");
+    if (lockReason === "pro_required") {
+      // Track Pro attempt and determine variant (standard vs nudge_trial)
+      const variant = await getPaywallVariantAndTrack(isAuthenticated, isPro);
+      navigation.navigate("Paywall", { triggerKey: "learning_locked", variant });
     }
   };
 

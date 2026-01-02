@@ -1,6 +1,11 @@
 /**
  * My Gear Closet Screen
  * Private list of gear the user owns
+ * 
+ * GATING:
+ * - GUEST: Can view but redirected to Auth for add (handled here)
+ * - FREE: Can add up to 15 items; item #16 triggers gear_closet_limit paywall
+ * - PRO: Unlimited gear items
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -22,6 +27,9 @@ import { getUserGear, deleteGearItem, deleteGearImages } from "../services/gearC
 import { GearItem, GearCategory, GEAR_CATEGORIES } from "../types/gear";
 import { RootStackNavigationProp } from "../navigation/types";
 import { useUserStatus } from "../utils/authHelper";
+import { useSubscriptionStore } from "../state/subscriptionStore";
+import { getPaywallVariantAndTrack } from "../services/proAttemptService";
+import { useAuth } from "../context/AuthContext";
 import ModalHeader from "../components/ModalHeader";
 import {
   DEEP_FOREST,
@@ -34,11 +42,17 @@ import {
   TEXT_MUTED,
 } from "../constants/colors";
 
+// FREE user gear limit
+const FREE_GEAR_LIMIT = 15;
+
 type FilterOption = "all" | GearCategory;
 
 export default function MyGearClosetScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const { isLoggedIn, isGuest } = useUserStatus();
+  const isPro = useSubscriptionStore((s) => s.isPro);
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
 
   const [gear, setGear] = useState<GearItem[]>([]);
   const [filteredGear, setFilteredGear] = useState<GearItem[]>([]);
@@ -99,12 +113,19 @@ export default function MyGearClosetScreen() {
     loadGear();
   };
 
-  const handleAddGear = () => {
+  const handleAddGear = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
     // Gate: Login required
     if (isGuest) {
       navigation.navigate("Auth");
+      return;
+    }
+
+    // Gate: FREE users limited to 15 items; item #16 triggers paywall
+    if (!isPro && gear.length >= FREE_GEAR_LIMIT) {
+      const variant = await getPaywallVariantAndTrack(isAuthenticated, isPro);
+      navigation.navigate("Paywall", { triggerKey: "gear_closet_limit", variant });
       return;
     }
 

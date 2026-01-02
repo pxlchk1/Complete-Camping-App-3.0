@@ -179,7 +179,7 @@ export default function MealPlanningScreen() {
     // Gate: PRO required to add meals
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meal_planning_add", variant }),
     })) {
       return;
     }
@@ -234,7 +234,7 @@ export default function MealPlanningScreen() {
     // Gate: PRO required to add custom meals
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meal_planning_custom", variant }),
     })) {
       return;
     }
@@ -296,7 +296,7 @@ export default function MealPlanningScreen() {
     // Gate: PRO required to delete meals
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meal_planning_delete", variant }),
     })) {
       return;
     }
@@ -344,7 +344,7 @@ export default function MealPlanningScreen() {
     if (tab === "suggest") {
       if (!requirePro({
         openAccountModal: () => setShowAccountModal(true),
-        openPaywallModal: () => navigation.navigate("Paywall"),
+        openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meal_suggestions", variant }),
       })) {
         return;
       }
@@ -498,7 +498,7 @@ export default function MealPlanningScreen() {
     // Gate: PRO required
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meal_planning_recipe", variant }),
     })) {
       return;
     }
@@ -511,7 +511,7 @@ export default function MealPlanningScreen() {
     // Gate: PRO required
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meal_suggestion", variant }),
     })) {
       return;
     }
@@ -524,7 +524,7 @@ export default function MealPlanningScreen() {
     // Gate: PRO required
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meal_planning_custom", variant }),
     })) {
       return;
     }
@@ -586,7 +586,7 @@ export default function MealPlanningScreen() {
     // Gate: PRO required
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meal_autofill", variant }),
     })) {
       return;
     }
@@ -684,7 +684,7 @@ export default function MealPlanningScreen() {
     // Gate: PRO required
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meal_planning_recipe", variant }),
     })) {
       return;
     }

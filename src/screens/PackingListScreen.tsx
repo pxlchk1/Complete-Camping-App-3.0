@@ -413,7 +413,7 @@ export default function PackingListScreen() {
     // Gate: PRO required to add items
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_add_item", variant }),
     })) {
       return;
     }
@@ -469,7 +469,7 @@ export default function PackingListScreen() {
     // Gate: PRO required to delete items
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_delete_item", variant }),
     })) {
       return;
     }

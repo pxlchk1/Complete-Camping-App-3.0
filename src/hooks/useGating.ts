@@ -168,37 +168,37 @@ export function getPaywallMessage(context: PaywallContext): {
     case 'feedback':
       return {
         title: 'Feedback is a Pro feature',
-        subtitle: 'Start your 3-day free trial to share your ideas and suggestions.',
+        subtitle: 'Upgrade to Pro to share your ideas and suggestions.',
       };
     case 'gearReview':
       return {
         title: 'Gear Reviews are a Pro feature',
-        subtitle: 'Start your 3-day free trial to share and read in-depth gear reviews.',
+        subtitle: 'Upgrade to Pro to share and read in-depth gear reviews.',
       };
     case 'trip':
       return {
         title: 'Planning trips is part of Pro',
-        subtitle: 'Start your 3-day free trial to create unlimited trips.',
+        subtitle: 'Upgrade to Pro to create unlimited trips.',
       };
     case 'packing':
       return {
         title: 'Packing lists are part of Pro',
-        subtitle: 'Start your 3-day free trial to build custom packing lists.',
+        subtitle: 'Upgrade to Pro to build custom packing lists.',
       };
     case 'meal':
       return {
         title: 'Meal planning is part of Pro',
-        subtitle: 'Start your 3-day free trial to plan meals for your trips.',
+        subtitle: 'Upgrade to Pro to plan meals for your trips.',
       };
     case 'plan':
       return {
         title: 'Trip planning is part of Pro',
-        subtitle: 'Start your 3-day free trial to unlock the full planning toolkit.',
+        subtitle: 'Upgrade to Pro to unlock the full planning toolkit.',
       };
     default:
       return {
         title: 'Unlock Complete Camping Pro',
-        subtitle: 'Start your 3-day free trial for full app access.',
+        subtitle: 'Upgrade to Pro for full app access.',
       };
   }
 }

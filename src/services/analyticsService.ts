@@ -43,6 +43,15 @@ export const AnalyticsEvents = {
   // Engagement
   RETURN_DAY_7: "return_day_7",
   SESSION_START: "session_start",
+  
+  // Gating & Monetization
+  PAYWALL_SHOWN: "paywall_shown",
+  PAYWALL_PRIMARY_CTA_TAPPED: "paywall_primary_cta_tapped",
+  PAYWALL_DISMISSED: "paywall_dismissed",
+  ACCOUNT_REQUIRED_SHOWN: "account_required_shown",
+  ACCOUNT_REQUIRED_CTA_TAPPED: "account_required_cta_tapped",
+  ACCOUNT_REQUIRED_DISMISSED: "account_required_dismissed",
+  PRO_ATTEMPT_GATE: "pro_attempt_gate",
 } as const;
 
 // ============================================
@@ -389,3 +398,20 @@ export const trackSavedPlaceAdded = (placeType?: string) => analyticsService.tra
 export const trackWeatherAddedToTrip = (tripId?: string) => analyticsService.trackWeatherAddedToTrip(tripId);
 export const trackBuddyInviteSent = (method?: "email" | "text" | "copy") => analyticsService.trackBuddyInviteSent(method);
 export const trackReturnDay7 = () => analyticsService.trackReturnDay7();
+
+// Gating & Monetization tracking functions
+export const trackPaywallShown = (triggerKey: string, variant?: string) => 
+  analyticsService.trackEvent(AnalyticsEvents.PAYWALL_SHOWN, { trigger_key: triggerKey, variant });
+export const trackPaywallCtaTapped = (triggerKey: string, variant?: string) => 
+  analyticsService.trackEvent(AnalyticsEvents.PAYWALL_PRIMARY_CTA_TAPPED, { trigger_key: triggerKey, variant });
+export const trackPaywallDismissed = (triggerKey: string, variant?: string) => 
+  analyticsService.trackEvent(AnalyticsEvents.PAYWALL_DISMISSED, { trigger_key: triggerKey, variant });
+export const trackAccountRequiredShown = (triggerKey: string) => 
+  analyticsService.trackEvent(AnalyticsEvents.ACCOUNT_REQUIRED_SHOWN, { trigger_key: triggerKey });
+export const trackAccountRequiredCtaTapped = (triggerKey: string) => 
+  analyticsService.trackEvent(AnalyticsEvents.ACCOUNT_REQUIRED_CTA_TAPPED, { trigger_key: triggerKey });
+export const trackAccountRequiredDismissed = (triggerKey: string) => 
+  analyticsService.trackEvent(AnalyticsEvents.ACCOUNT_REQUIRED_DISMISSED, { trigger_key: triggerKey });
+export const trackProAttemptGate = (gateKey: string, attemptCount: number) => 
+  analyticsService.trackEvent(AnalyticsEvents.PRO_ATTEMPT_GATE, { gate_key: gateKey, attempt_count: attemptCount });
+

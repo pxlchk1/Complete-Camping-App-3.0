@@ -74,7 +74,7 @@ export default function PackingTabScreenNew({ onTabChange }: PackingTabScreenPro
   const handleCreateList = useCallback(() => {
     const canProceed = requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_create_list", variant }),
     });
     if (!canProceed) return;
 

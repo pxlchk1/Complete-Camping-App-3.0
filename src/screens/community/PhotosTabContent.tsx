@@ -18,6 +18,7 @@ import HandleLink from "../../components/HandleLink";
 // Component to handle individual photo rendering with error state
 function PhotoCard({ item, onVote }: { item: any; onVote: (id: string, type: "up" | "down") => void }) {
   const [imageError, setImageError] = useState(false);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   // Don't render if image failed to load
   if (imageError) {
@@ -47,8 +48,16 @@ function PhotoCard({ item, onVote }: { item: any; onVote: (id: string, type: "up
                 userId={item.authorId}
                 style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12 }}
               />
+            ) : item.authorId ? (
+              <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: item.authorId })}>
+                <Text className="text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
+                  {item.authorHandle ? `@${item.authorHandle}` : (item.authorName || "Anonymous")}
+                </Text>
+              </Pressable>
             ) : (
-              <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>@{item.authorHandle}</Text>
+              <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                {item.authorHandle ? `@${item.authorHandle}` : "Anonymous"}
+              </Text>
             )}
           </View>
 

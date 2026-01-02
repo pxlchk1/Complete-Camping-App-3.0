@@ -199,7 +199,7 @@ export default function FeedbackDetailScreen() {
       },
       {
         openAccountModal: () => setShowAccountRequired(true),
-        openPaywallModal: () => navigation.navigate("Paywall"),
+        openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "feedback_comment", variant }),
       }
     );
   };
@@ -345,9 +345,17 @@ export default function FeedbackDetailScreen() {
 
             <View className="flex-row items-center justify-between pt-4 border-t" style={{ borderColor: BORDER_SOFT }}>
               <View>
-                <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                  Posted by {authorName || "Anonymous"}
-                </Text>
+                {post.authorId ? (
+                  <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: post.authorId })}>
+                    <Text className="text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
+                      Posted by {authorName || "Anonymous"}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                    Posted by {authorName || "Anonymous"}
+                  </Text>
+                )}
                 <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
                   {formatTimeAgo(post.createdAt)}
                 </Text>
@@ -358,7 +366,7 @@ export default function FeedbackDetailScreen() {
                 itemId={postId}
                 initialScore={post.score || (post.upvoteCount || 0) - (post.downvoteCount || 0)}
                 onRequireAccount={() => setShowAccountRequired(true)}
-                onRequirePro={() => navigation.navigate("Paywall")}
+                onRequirePro={(variant) => navigation.navigate("Paywall", { triggerKey: "feedback_vote", variant })}
               />
             </View>
           </View>

@@ -1,6 +1,10 @@
 /**
  * Paywall Screen
  * Redesigned with CTAs at top, hero image, and features below
+ * 
+ * Supports:
+ * - triggerKey for dynamic title/body based on context (2026-01-01)
+ * - variant for standard vs nudge_trial paywall (2026-01-01)
  */
 
 import React, { useEffect, useState } from "react";
@@ -15,13 +19,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import Purchases, { PurchasesPackage, PACKAGE_TYPE } from "react-native-purchases";
 
 // Services
 import { fetchOfferingsSafe, subscribeToPlan, restorePurchases, syncSubscriptionToFirestore } from "../services/subscriptionService";
 import { useSubscriptionStore } from "../state/subscriptionStore";
+import { useUserStatus } from "../utils/authHelper";
+import { getProAttemptState } from "../services/proAttemptService";
+import { RootStackParamList } from "../navigation/types";
 
 // Constants
 import {
@@ -36,6 +43,63 @@ import {
   TEXT_MUTED,
 } from "../constants/colors";
 
+/**
+ * Paywall content for each trigger key
+ */
+const PAYWALL_CONTENT: Record<string, { title: string; body: string }> = {
+  // Default
+  default: {
+    title: "Go Pro",
+    body: "Unlock the full camping toolkit.",
+  },
+  // Learning
+  learning_locked: {
+    title: "Unlock Learning with Pro",
+    body: "Get access to all learning modules beyond Leave No Trace.",
+  },
+  // Trips
+  second_trip: {
+    title: "Ready for trip #2?",
+    body: "Pro lets you plan unlimited trips and keep everything organized.",
+  },
+  // Favorites
+  favorites_limit: {
+    title: "Save more favorites with Pro",
+    body: "Keep unlimited campgrounds and parks saved for later.",
+  },
+  // Packing
+  packing_customization: {
+    title: "Customize your packing list",
+    body: "Edit items, add your own gear, and save lists with Pro.",
+  },
+  // Custom Campsites
+  custom_campsite: {
+    title: "Create custom campsites with Pro",
+    body: "Add your own campsites and keep them saved in My Campsite.",
+  },
+  // Gear Closet limit (15 items)
+  gear_closet_limit: {
+    title: "Save more gear with Pro",
+    body: "Pro keeps an unlimited Gear Closet, so you can reuse it for every trip.",
+  },
+  // Campground sharing (Pro-only for sender)
+  campground_sharing: {
+    title: "Share your trip plan with your Campground",
+    body: "Pro lets you share dates, location, route, weather outlook, and meals, all in one place.",
+  },
+};
+
+/**
+ * Nudge trial variant content (shown on 3rd Pro attempt)
+ */
+const NUDGE_TRIAL_CONTENT = {
+  title: "Looks like Pro would help",
+  bodyWithTrial: "You've bumped into a few Pro features. Want to try them? Start a free 3-day trial and unlock everything.",
+  bodyWithoutTrial: "You've bumped into a few Pro features. Want to try them? Upgrade to Pro and unlock everything.",
+  ctaWithTrial: "Start free trial",
+  ctaWithoutTrial: "Upgrade to Pro",
+};
+
 const PRO_FEATURES = [
   "Share trip plans with your camping buddies in My Campground",
   "Build a day-by-day itinerary with trail and map links",
@@ -46,9 +110,21 @@ const PRO_FEATURES = [
   "Track your gear closet and add items to trips fast",
 ];
 
+type PaywallScreenRouteProp = RouteProp<RootStackParamList, "Paywall">;
+
 export default function PaywallScreen() {
   const navigation = useNavigation();
+  const route = useRoute<PaywallScreenRouteProp>();
   const subscriptionLoading = useSubscriptionStore((s) => s.subscriptionLoading);
+  const { isLoggedIn, isGuest } = useUserStatus();
+  
+  // Get triggerKey and variant from route params
+  const triggerKey = route.params?.triggerKey || "default";
+  const variant = route.params?.variant || "standard";
+  const isNudgeVariant = variant === "nudge_trial";
+  
+  // For standard variant, use trigger-specific content; for nudge, use nudge content
+  const standardContent = PAYWALL_CONTENT[triggerKey] || PAYWALL_CONTENT.default;
 
   const [monthlyPackage, setMonthlyPackage] = useState<PurchasesPackage | null>(null);
   const [annualPackage, setAnnualPackage] = useState<PurchasesPackage | null>(null);
@@ -57,6 +133,52 @@ export default function PaywallScreen() {
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasTrialEligibility, setHasTrialEligibility] = useState(false);
+  const [proAttemptCount, setProAttemptCount] = useState(0);
+
+  // Determine display content based on variant
+  const displayTitle = isNudgeVariant ? NUDGE_TRIAL_CONTENT.title : standardContent.title;
+  const displayBody = isNudgeVariant 
+    ? (hasTrialEligibility ? NUDGE_TRIAL_CONTENT.bodyWithTrial : NUDGE_TRIAL_CONTENT.bodyWithoutTrial)
+    : standardContent.body;
+  const primaryCtaText = isNudgeVariant
+    ? (hasTrialEligibility ? NUDGE_TRIAL_CONTENT.ctaWithTrial : NUDGE_TRIAL_CONTENT.ctaWithoutTrial)
+    : null; // null means use default plan-based text
+
+  useEffect(() => {
+    loadOfferings();
+    loadProAttemptCount();
+    
+    // Log paywall shown analytics
+    logPaywallShown();
+  }, []);
+
+  const loadProAttemptCount = async () => {
+    try {
+      const state = await getProAttemptState();
+      setProAttemptCount(state.proAttemptCount);
+    } catch (error) {
+      console.error("[Paywall] Error loading pro attempt count:", error);
+    }
+  };
+
+  const logPaywallShown = () => {
+    // Analytics: paywall_shown
+    console.log("[Paywall Analytics] paywall_shown", {
+      triggerKey,
+      userState: isGuest ? "GUEST" : (isLoggedIn ? "FREE" : "GUEST"),
+      variant,
+      proAttemptCount,
+    });
+    
+    if (isNudgeVariant) {
+      // Analytics: pro_nudge_trial_shown
+      console.log("[Paywall Analytics] pro_nudge_trial_shown", {
+        triggerKey,
+        proAttemptCount,
+      });
+    }
+  };
 
   useEffect(() => {
     loadOfferings();
@@ -105,6 +227,16 @@ export default function PaywallScreen() {
 
       setMonthlyPackage(monthly || null);
       setAnnualPackage(annual || null);
+      
+      // Check for trial eligibility on the selected package
+      // RevenueCat: check if product has intro pricing (trial) configured
+      const selectedPkg = annual || monthly;
+      if (selectedPkg) {
+        const introPrice = selectedPkg.product.introPrice;
+        const hasTrial = introPrice && introPrice.price === 0;
+        setHasTrialEligibility(!!hasTrial);
+        console.log("[Paywall] Trial eligibility:", hasTrial, introPrice);
+      }
       
       console.log("[Paywall] Loaded packages:", {
         monthly: monthly ? {
@@ -186,6 +318,16 @@ export default function PaywallScreen() {
     }
   };
 
+  const handleDismiss = () => {
+    // Analytics: paywall_dismissed
+    console.log("[Paywall Analytics] paywall_dismissed", {
+      triggerKey,
+      variant,
+      proAttemptCount,
+    });
+    navigation.goBack();
+  };
+
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-parchment">
@@ -210,10 +352,10 @@ export default function PaywallScreen() {
           className="text-2xl"
           style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
         >
-          Go Pro
+          {displayTitle}
         </Text>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={handleDismiss}
           className="p-2 active:opacity-70"
           accessibilityLabel="Not now"
           accessibilityRole="button"
@@ -227,8 +369,23 @@ export default function PaywallScreen() {
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Value Props */}
+        {/* Dynamic Body Text */}
         <View className="px-6 pt-6 pb-4">
+          <Text
+            style={{
+              fontFamily: "SourceSans3_400Regular",
+              fontSize: 17,
+              color: TEXT_SECONDARY,
+              marginBottom: 16,
+              lineHeight: 24,
+            }}
+          >
+            {displayBody}
+          </Text>
+        </View>
+
+        {/* Value Props */}
+        <View className="px-6 pb-4">
           {PRO_FEATURES.map((feature, index) => (
             <View key={index} className="flex-row items-center mb-3">
               <View
@@ -453,6 +610,13 @@ export default function PaywallScreen() {
             {/* Primary CTA */}
             <Pressable
               onPress={() => {
+                // Analytics: paywall_primary_cta_tapped
+                console.log("[Paywall Analytics] paywall_primary_cta_tapped", {
+                  triggerKey,
+                  variant,
+                  proAttemptCount,
+                  selectedPlan,
+                });
                 const pkg = selectedPlan === "annual" ? annualPackage : monthlyPackage;
                 if (pkg) handlePurchase(pkg);
               }}
@@ -474,7 +638,7 @@ export default function PaywallScreen() {
                     color: PARCHMENT,
                   }}
                 >
-                  {selectedPlan === "annual" ? "Start Annual" : "Start Monthly"}
+                  {primaryCtaText || (selectedPlan === "annual" ? "Start Annual" : "Start Monthly")}
                 </Text>
               )}
             </Pressable>
@@ -484,7 +648,14 @@ export default function PaywallScreen() {
         {/* Restore Purchases */}
         <View className="px-6 pb-2">
           <Pressable
-            onPress={handleRestore}
+            onPress={() => {
+              // Analytics: restore_purchases_tapped
+              console.log("[Paywall Analytics] restore_purchases_tapped", {
+                triggerKey,
+                variant,
+              });
+              handleRestore();
+            }}
             disabled={restoring}
             className="py-3 active:opacity-70"
           >
@@ -514,6 +685,21 @@ export default function PaywallScreen() {
           >
             Cancel anytime. Manage in Apple subscriptions.
           </Text>
+          
+          {/* Guest-only footer message */}
+          {!isLoggedIn && (
+            <Text
+              className="text-center mt-3"
+              style={{
+                fontFamily: "SourceSans3_400Regular",
+                fontSize: 13,
+                color: TEXT_SECONDARY,
+                lineHeight: 18,
+              }}
+            >
+              Create a free account to save your trips and favorites. Upgrade anytime for Pro tools.
+            </Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

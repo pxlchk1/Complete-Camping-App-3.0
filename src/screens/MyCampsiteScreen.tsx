@@ -28,6 +28,7 @@ import { listenToSavedPlaces, removeSavedPlace, SavedPlace } from "../services/s
 import { useUserStatus } from "../utils/authHelper";
 import { useIsModerator, useIsAdministrator } from "../state/userStore";
 import { HERO_IMAGES } from "../constants/images";
+import AccountRequiredModal from "../components/AccountRequiredModal";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -122,6 +123,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
   const [userPhotosLoading, setUserPhotosLoading] = useState(true);
   const [connectContributions, setConnectContributions] = useState<ConnectContribution[]>([]);
   const [connectLoading, setConnectLoading] = useState(true);
+  const [showAccountModal, setShowAccountModal] = useState(false);
   const insets = useSafeAreaInsets();
 
   const loadProfile = useCallback(async (userId: string) => {
@@ -360,7 +362,9 @@ export default function MyCampsiteScreen({ navigation }: any) {
       const targetUserId = viewingUserId || auth.currentUser?.uid;
       
       if (!targetUserId) {
-        navigation.replace("Auth");
+        // Guest trying to view their own profile - show account required modal
+        setLoading(false);
+        setShowAccountModal(true);
         return;
       }
 
@@ -660,7 +664,53 @@ export default function MyCampsiteScreen({ navigation }: any) {
     );
   }
 
-  if (!auth.currentUser || !profile) {
+  // Guest viewing their own My Campsite tab - show account required modal
+  if (showAccountModal || (!viewingUserId && !auth.currentUser)) {
+    return (
+      <View className="flex-1 items-center justify-center" style={{ backgroundColor: PARCHMENT }}>
+        <View className="items-center px-6">
+          <Ionicons name="person-circle-outline" size={80} color={DEEP_FOREST} />
+          <Text
+            className="mt-4 text-center"
+            style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 20, color: TEXT_PRIMARY_STRONG }}
+          >
+            Your Campsite Awaits
+          </Text>
+          <Text
+            className="mt-2 text-center"
+            style={{ fontFamily: "SourceSans3_400Regular", fontSize: 16, color: TEXT_SECONDARY }}
+          >
+            Create an account to save your favorite parks, track trips, and build your camping profile.
+          </Text>
+        </View>
+        <AccountRequiredModal
+          visible={true}
+          triggerKey="my_campsite"
+          onCreateAccount={() => {
+            setShowAccountModal(false);
+            navigation.navigate("Auth");
+          }}
+          onLogIn={() => {
+            setShowAccountModal(false);
+            navigation.navigate("Auth");
+          }}
+          onMaybeLater={() => {
+            setShowAccountModal(false);
+            // Navigate back or to home
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate("Explore" as never);
+            }
+          }}
+        />
+      </View>
+    );
+  }
+
+  // When viewing another user's profile, we don't need auth.currentUser
+  // Only require auth.currentUser when viewing own profile (no viewingUserId)
+  if (!profile) {
     return (
       <View className="flex-1 items-center justify-center" style={{ backgroundColor: PARCHMENT }}>
         <ActivityIndicator color={DEEP_FOREST} />

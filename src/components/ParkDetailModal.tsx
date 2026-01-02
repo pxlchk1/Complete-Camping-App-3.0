@@ -7,12 +7,16 @@ import * as Haptics from "expo-haptics";
 import { Park } from "../types/camping";
 import { useTripsStore } from "../state/tripsStore";
 import { useUserStatus } from "../utils/authHelper";
+import { useSubscriptionStore } from "../state/subscriptionStore";
 import { auth } from "../config/firebase";
 import { 
   isParkFavorited, 
   addFavoritePark, 
-  removeFavoritePark 
+  removeFavoritePark,
+  getFavoritesCount,
+  FREE_FAVORITES_LIMIT,
 } from "../services/favoriteParksService";
+import { getPaywallVariantAndTrack, type PaywallVariant } from "../services/proAttemptService";
 import { DEEP_FOREST, PARCHMENT, BORDER_SOFT, RUST, GRANITE_GOLD, EARTH_GREEN } from "../constants/colors";
 
 // Success green color for confirmation
@@ -23,7 +27,9 @@ interface ParkDetailModalProps {
   park: Park | null;
   onClose: () => void;
   onAddToTrip: (park: Park, tripId?: string) => void;
-  onRequireAccount?: () => void;
+  onRequireAccount?: (triggerKey?: string) => void;
+  /** Called when user needs Pro to add more favorites (6th+). Receives variant for nudge paywall. */
+  onRequirePro?: (triggerKey?: string, variant?: PaywallVariant) => void;
   /** When set, modal is opened from a trip context - show "Set as destination" instead of "Add to trip" */
   tripIdForDestination?: string;
   /** Called when user taps "Set as trip destination" - parent handles save + navigation */
@@ -36,12 +42,14 @@ export default function ParkDetailModal({
   onClose, 
   onAddToTrip, 
   onRequireAccount,
+  onRequirePro,
   tripIdForDestination,
   onSetAsDestination,
 }: ParkDetailModalProps) {
   const mapRef = useRef<MapView>(null);
   const navigation = useNavigation();
   const { isGuest } = useUserStatus();
+  const isPro = useSubscriptionStore((s) => s.isPro);
   const trips = useTripsStore((s) => s.trips);
   
   // Favorites state
@@ -175,10 +183,10 @@ export default function ParkDetailModal({
   const handleToggleFavorite = async () => {
     const user = auth.currentUser;
     
+    // GUEST: Show AccountRequiredModal (saving favorites requires account)
     if (!user || isGuest) {
-      // Show account required modal
       if (onRequireAccount) {
-        onRequireAccount();
+        onRequireAccount("save_favorite");
       } else {
         onClose();
         navigation.navigate("Auth" as any);
@@ -193,10 +201,28 @@ export default function ParkDetailModal({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
       if (isFavorited) {
+        // Removing favorite - always allowed
         await removeFavoritePark(user.uid, park.id);
         setIsFavorited(false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
+        // Adding favorite - check limit for FREE users (first 5 free, 6+ requires Pro)
+        if (!isPro) {
+          const currentCount = await getFavoritesCount(user.uid);
+          if (currentCount >= FREE_FAVORITES_LIMIT) {
+            // FREE user at limit - track Pro attempt and show PaywallModal
+            setFavoriteLoading(false);
+            const isAuthenticated = !!user;
+            const variant = await getPaywallVariantAndTrack(isAuthenticated, isPro);
+            if (onRequirePro) {
+              onRequirePro("favorites_limit", variant);
+            } else {
+              navigation.navigate("Paywall" as any, { triggerKey: "favorites_limit", variant });
+            }
+            return;
+          }
+        }
+        
         await addFavoritePark(user.uid, park);
         setIsFavorited(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

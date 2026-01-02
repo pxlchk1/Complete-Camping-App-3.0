@@ -12,6 +12,8 @@ import AccountButtonHeader from "../components/AccountButtonHeader";
 import { SectionTitle, BodyText, BodyTextMedium } from "../components/Typography";
 import PushPermissionPrompt from "../components/PushPermissionPrompt";
 import HandleLink from "../components/HandleLink";
+import AccountRequiredModal from "../components/AccountRequiredModal";
+import MyCampgroundInfoModal from "../components/MyCampgroundInfoModal";
 
 // Services
 import { getPhotoPosts } from "../services/photoPostsService";
@@ -23,9 +25,14 @@ import { useTripsStore } from "../state/tripsStore";
 import { useGearStore } from "../state/gearStore";
 import { useUserStore, createTestUser } from "../state/userStore";
 import { usePlanTabStore } from "../state/planTabStore";
+import { useSubscriptionStore } from "../state/subscriptionStore";
 
 // Utils
 import { getWelcomeTitle, getWelcomeSubtext } from "../utils/welcomeCopy";
+import { useUserStatus } from "../utils/authHelper";
+
+// Services
+import { checkAndSetMyCampgroundInfoSeen, hasSeenMyCampgroundInfo } from "../services/userFlagsService";
 
 // Constants
 import {
@@ -77,11 +84,19 @@ export default function HomeScreen() {
   const setCurrentUser = useUserStore((s) => s.setCurrentUser);
   const currentUser = useUserStore((s) => s.currentUser);
   const setActivePlanTab = usePlanTabStore((s) => s.setActiveTab);
+  const isPro = useSubscriptionStore((s) => s.isPro);
+  const { isLoggedIn: isAuthenticated, isGuest } = useUserStatus();
 
   // Featured Community Photo state
   const [featuredPhoto, setFeaturedPhoto] = useState<PhotoPost | null>(null);
   const [featuredPhotoHandle, setFeaturedPhotoHandle] = useState<string | null>(null);
   const [photoLoading, setPhotoLoading] = useState(true);
+
+  // Gating modals state
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [accountModalTriggerKey, setAccountModalTriggerKey] = useState<string>("default");
+  const [showCampgroundInfoModal, setShowCampgroundInfoModal] = useState(false);
+  const [pendingCampgroundNavigation, setPendingCampgroundNavigation] = useState(false);
 
   // Fetch a random featured photo on screen focus
   useFocusEffect(
@@ -310,6 +325,12 @@ export default function HomeScreen() {
                 style={{ backgroundColor: "#59625C", paddingVertical: 14, borderRadius: 10 }}
                 onPress={() => {
                   safeHaptic();
+                  // Gate: GUEST needs account to view trip data
+                  if (isGuest) {
+                    setAccountModalTriggerKey("trip_plans_quick_action");
+                    setShowAccountModal(true);
+                    return;
+                  }
                   setActivePlanTab("trips");
                   navigation.navigate("Plan");
                 }}
@@ -408,6 +429,12 @@ export default function HomeScreen() {
                 style={{ backgroundColor: "#6B5B4F", paddingVertical: 14, borderRadius: 10 }}
                 onPress={() => {
                   safeHaptic();
+                  // Gate: GUEST needs account for personal data
+                  if (isGuest) {
+                    setAccountModalTriggerKey("gear_closet_quick_action");
+                    setShowAccountModal(true);
+                    return;
+                  }
                   navigation.navigate("MyGearCloset");
                 }}
                 accessibilityLabel="My Gear Closet"
@@ -438,8 +465,23 @@ export default function HomeScreen() {
               <Pressable
                 className="rounded-xl active:scale-95"
                 style={{ backgroundColor: "#4A6B5D", paddingVertical: 14, borderRadius: 10 }}
-                onPress={() => {
+                onPress={async () => {
                   safeHaptic();
+                  // Gate: GUEST needs account for personal data
+                  if (isGuest) {
+                    setAccountModalTriggerKey("my_campground_quick_action");
+                    setShowAccountModal(true);
+                    return;
+                  }
+                  // First-time info modal for FREE users only (Pro skips)
+                  if (!isPro) {
+                    const hasSeen = await userFlagsService.hasSeenMyCampgroundInfo();
+                    if (!hasSeen) {
+                      setPendingCampgroundNavigation(true);
+                      setShowCampgroundInfoModal(true);
+                      return;
+                    }
+                  }
                   navigation.navigate("MyCampsite");
                 }}
                 accessibilityLabel="My Campground"
@@ -590,6 +632,30 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
       </View>
+
+      {/* Account Required Modal for Quick Actions */}
+      <AccountRequiredModal
+        visible={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+        triggerKey={accountModalTriggerKey}
+      />
+
+      {/* My Campground Info Modal for first-time FREE users */}
+      <MyCampgroundInfoModal
+        visible={showCampgroundInfoModal}
+        onClose={async () => {
+          setShowCampgroundInfoModal(false);
+          await userFlagsService.setMyCampgroundInfoSeen();
+          if (pendingCampgroundNavigation) {
+            setPendingCampgroundNavigation(false);
+            navigation.navigate("MyCampsite");
+          }
+        }}
+        onUpgrade={() => {
+          setShowCampgroundInfoModal(false);
+          navigation.navigate("Paywall", { triggerKey: "my_campground_quick_action" });
+        }}
+      />
     </View>
   );
 }

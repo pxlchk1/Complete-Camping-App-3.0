@@ -84,7 +84,7 @@ export default function CreateTripScreen() {
     // Gate: PRO required to create trips
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "create_trip", variant }),
     })) {
       return;
     }

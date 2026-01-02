@@ -961,7 +961,7 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
                   onPress={() => {
                     const canProceed = requirePro({
                       openAccountModal: () => setShowAccountModal(true),
-                      openPaywallModal: () => navigation.navigate("Paywall"),
+                      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "weather_trip", variant }),
                     });
                     if (canProceed) {
                       setActivePlanTab("trips");

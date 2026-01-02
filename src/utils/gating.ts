@@ -1,21 +1,30 @@
 // src/utils/gating.ts
 /**
- * Centralized Access Gating System
+ * Centralized Access Gating System (Updated 2026-01-01)
+ * 
+ * PRIMARY PRINCIPLE (NON-NEGOTIABLE):
+ * - If a user taps a Pro-gated feature, ALWAYS show PaywallModal first, even if not logged in.
+ * - Do not send guests to AccountRequiredModal for Pro features.
+ * - AccountRequiredModal is only for free-tier allowed actions that require login to save/persist.
  * 
  * User States:
- * - NO_ACCOUNT: Not logged in
+ * - NO_ACCOUNT (GUEST): Not logged in
  * - FREE: Logged in, not subscribed
  * - PRO: Subscribed (includes active trial)
  * 
- * Usage:
- * 1. Use getAccessState() to determine current user state
- * 2. Use requireAccount() for actions that need a logged-in user
- * 3. Use requirePro() for actions that need Pro subscription
+ * Gating Rules:
+ * - requiresPro=true → Show PaywallModal for GUEST or FREE
+ * - requiresAccount=true (and requiresPro=false) → Show AccountRequiredModal for GUEST only
  * 
- * Connect Permissions (updated):
+ * Pro Attempt Tracking (2026-01-01):
+ * - Every blocked Pro attempt increments a counter
+ * - On the 3rd attempt, show "nudge_trial" variant of PaywallModal
+ * - Nudge is rate-limited to once per 30 days
+ * 
+ * Connect Permissions:
  * - FREE allowed: Vote, Profile, Questions, Tips, Photos (1/day)
  * - FREE blocked: Feedback, Gear Reviews (paywall)
- * - NO_ACCOUNT: All write actions blocked (account prompt)
+ * - NO_ACCOUNT: All write actions blocked (account prompt for free-tier, paywall for pro-tier)
  */
 
 import { auth } from '../config/firebase';
@@ -23,6 +32,10 @@ import { useSubscriptionStore } from '../state/subscriptionStore';
 import { useAuthStore } from '../state/authStore';
 import { useUserStore } from '../state/userStore';
 import { SUBSCRIPTIONS_ENABLED, PAYWALL_ENABLED } from '../config/subscriptions';
+import { getPaywallVariantAndTrack, type PaywallVariant } from '../services/proAttemptService';
+
+// Re-export PaywallVariant for convenience
+export type { PaywallVariant };
 
 // ============================================
 // ACCESS STATE TYPES
@@ -33,7 +46,7 @@ export type AccessState = 'NO_ACCOUNT' | 'FREE' | 'PRO';
 export interface AccessGateCallbacks {
   showAccountPrompt?: () => void;
   openAccountModal: () => void;
-  openPaywallModal: () => void;
+  openPaywallModal: (variant?: PaywallVariant) => void;
 }
 
 // ============================================
@@ -105,54 +118,58 @@ export function useAccessState(): AccessState {
 // ============================================
 
 /**
- * requireProForAction: Unified gate that runs the action only if user is Pro
+ * requireProForAction: Unified gate for Pro-gated actions (2026-01-01)
  * 
- * This is the single helper for all participation actions (submit, vote, comment).
- * - If signed out: opens AccountRequiredModal
+ * PRIMARY RULE: Pro-gated features ALWAYS show PaywallModal first,
+ * even for guests. Never show AccountRequiredModal for Pro features.
+ * 
+ * Pro Attempt Tracking: Increments counter and shows "nudge_trial" variant
+ * on the 3rd attempt (rate-limited to once per 30 days).
+ * 
+ * - If guest (NO_ACCOUNT): opens PaywallModal (NOT AccountRequiredModal)
  * - If logged in but not Pro: opens PaywallModal
  * - If logged in and Pro: runs the action
  * 
  * Usage:
  * requireProForAction(
  *   () => submitVote(),
- *   { openAccountModal, openPaywallModal }
+ *   { openPaywallModal: (variant) => navigation.navigate("Paywall", { variant }) }
  * );
  * 
  * @param action - The function to run if user is Pro
- * @param callbacks - Modal callbacks
+ * @param callbacks - Modal callbacks (only openPaywallModal needed)
  */
-export function requireProForAction(
+export async function requireProForAction(
   action: () => void | Promise<void>,
   callbacks: Pick<AccessGateCallbacks, 'openAccountModal' | 'openPaywallModal'>
-): void {
-  // First check account
-  if (!auth.currentUser) {
-    callbacks.openAccountModal();
-    return;
-  }
-  
+): Promise<void> {
   // If subscriptions disabled, allow
   if (!SUBSCRIPTIONS_ENABLED || !PAYWALL_ENABLED) {
-    action();
+    await action();
     return;
   }
   
   // Check if user is an administrator (admins bypass paywall)
   const isAdmin = useUserStore.getState().isAdministrator();
   if (isAdmin) {
-    action();
+    await action();
     return;
   }
   
-  // Check Pro status
+  // Check if user is logged in AND has Pro
+  const isLoggedIn = !!auth.currentUser;
   const isPro = useSubscriptionStore.getState().isPro;
-  if (!isPro) {
-    callbacks.openPaywallModal();
+  
+  if (!isLoggedIn || !isPro) {
+    // GUEST or FREE - track attempt and show PaywallModal
+    // This increments the counter and returns the variant to use
+    const variant = await getPaywallVariantAndTrack();
+    callbacks.openPaywallModal(variant);
     return;
   }
   
   // User is Pro - run the action
-  action();
+  await action();
 }
 
 // ============================================
@@ -160,9 +177,12 @@ export function requireProForAction(
 // ============================================
 
 /**
- * requireAccount: Gate for actions that require a logged-in user
+ * requireAccount: Gate for free-tier actions that require persistence (2026-01-01)
  * 
- * Use for: Voting, My Campsite profile, any Connect submissions
+ * ONLY use for: Actions that are FREE but need a logged-in user to persist data.
+ * Examples: First trip creation, favorites #1-5, trip-linked packing checklist, My Campsite
+ * 
+ * DO NOT use for: Pro-gated features (use requirePro instead)
  * 
  * @param callbacks - showAccountPrompt (optional toast), openAccountModal (required)
  * @returns true if user can proceed, false if blocked
@@ -179,21 +199,21 @@ export function requireAccount(callbacks: Pick<AccessGateCallbacks, 'showAccount
 }
 
 /**
- * requirePro: Gate for actions that require Pro subscription
+ * requirePro: Gate for Pro-gated actions (2026-01-01)
  * 
- * Use for: Feedback submission, trip creation, packing list edits, meal plan edits
+ * PRIMARY RULE: Pro-gated features ALWAYS show PaywallModal first,
+ * even for guests. Never show AccountRequiredModal for Pro features.
  * 
- * @param callbacks - full callbacks including paywall
+ * Note: This is synchronous for backwards compatibility. It tracks Pro attempts
+ * in the background. For full async tracking with nudge variant support, use
+ * requireProAsync instead.
+ * 
+ * Use for: Trip #2+, packing customization, favorites #6+, custom campsites, learning modules
+ * 
+ * @param callbacks - full callbacks (only openPaywallModal used for Pro gates)
  * @returns true if user can proceed, false if blocked
  */
 export function requirePro(callbacks: AccessGateCallbacks): boolean {
-  // First check account
-  if (!auth.currentUser) {
-    callbacks.showAccountPrompt?.();
-    callbacks.openAccountModal();
-    return false;
-  }
-  
   // If subscriptions disabled, allow
   if (!SUBSCRIPTIONS_ENABLED || !PAYWALL_ENABLED) {
     return true;
@@ -205,10 +225,54 @@ export function requirePro(callbacks: AccessGateCallbacks): boolean {
     return true;
   }
   
-  // Check Pro status
+  // Check if user is logged in AND has Pro
+  const isLoggedIn = !!auth.currentUser;
   const isPro = useSubscriptionStore.getState().isPro;
-  if (!isPro) {
-    callbacks.openPaywallModal();
+  
+  if (!isLoggedIn || !isPro) {
+    // GUEST or FREE - track attempt and show PaywallModal
+    // Track in background, determine variant, then open paywall
+    getPaywallVariantAndTrack().then((variant) => {
+      callbacks.openPaywallModal(variant);
+    }).catch(() => {
+      // Fallback: show standard paywall if tracking fails
+      callbacks.openPaywallModal('standard');
+    });
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * requireProAsync: Async gate for Pro-gated actions with full tracking (2026-01-01)
+ * 
+ * Same as requirePro but properly awaits the Pro attempt tracking
+ * to determine the correct paywall variant.
+ * 
+ * @param callbacks - full callbacks (only openPaywallModal used for Pro gates)
+ * @returns Promise<true> if user can proceed, Promise<false> if blocked
+ */
+export async function requireProAsync(callbacks: AccessGateCallbacks): Promise<boolean> {
+  // If subscriptions disabled, allow
+  if (!SUBSCRIPTIONS_ENABLED || !PAYWALL_ENABLED) {
+    return true;
+  }
+  
+  // Check if user is an administrator (admins bypass paywall)
+  const isAdmin = useUserStore.getState().isAdministrator();
+  if (isAdmin) {
+    return true;
+  }
+  
+  // Check if user is logged in AND has Pro
+  const isLoggedIn = !!auth.currentUser;
+  const isPro = useSubscriptionStore.getState().isPro;
+  
+  if (!isLoggedIn || !isPro) {
+    // GUEST or FREE - track attempt and show PaywallModal with correct variant
+    const variant = await getPaywallVariantAndTrack();
+    callbacks.openPaywallModal(variant);
     return false;
   }
   

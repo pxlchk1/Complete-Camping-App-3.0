@@ -43,7 +43,7 @@ export type RootStackParamList = {
   Notifications: undefined;
   Settings: undefined;
   Auth: undefined;
-  Paywall: undefined;
+  Paywall: { triggerKey?: string; variant?: "standard" | "nudge_trial" } | undefined;
   SeedData: undefined;
 
   // Gear Closet
@@ -111,6 +111,7 @@ export type RootStackParamList = {
   AdminPhotos: undefined;
   AdminContent: undefined;
   AdminBanned: undefined;
+  AdminGatingReport: undefined;
 
   // Invitation
   AcceptInvitation: { invitationToken: string };
