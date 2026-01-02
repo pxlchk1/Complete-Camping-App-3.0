@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, ScrollView, TextInput, KeyboardAvoidingView, Platform, Modal, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -10,8 +10,8 @@ import { useTripsStore } from "../state/tripsStore";
 import { Heading2, BodyText } from "../components/Typography";
 import Button from "../components/Button";
 import AccountButton from "../components/AccountButton";
-import { RootStackParamList } from "../navigation/types";
-import { CampingStyle } from "../types/camping";
+import { RootStackParamList, PrefillLocation } from "../navigation/types";
+import { CampingStyle, TripDestination } from "../types/camping";
 import { requirePro } from "../utils/gating";
 import AccountRequiredModal from "../components/AccountRequiredModal";
 import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, RIVER_ROCK, SIERRA_SKY, PARCHMENT, PARCHMENT_BORDER } from "../constants/colors";
@@ -23,6 +23,8 @@ type CreateTripScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   "CreateTrip"
 >;
+
+type CreateTripScreenRouteProp = RouteProp<RootStackParamList, "CreateTrip">;
 
 const CAMPING_STYLES: { value: CampingStyle; label: string }[] = [
   { value: "CAR_CAMPING", label: "Car camping" },
@@ -39,8 +41,12 @@ const CAMPING_STYLES: { value: CampingStyle; label: string }[] = [
 
 export default function CreateTripScreen() {
   const navigation = useNavigation<CreateTripScreenNavigationProp>();
+  const route = useRoute<CreateTripScreenRouteProp>();
   const addTrip = useTripsStore((s) => s.addTrip);
   const { user } = useAuth();
+
+  // Get prefill location from navigation params
+  const prefillLocation = route.params?.prefillLocation;
 
   const [tripName, setTripName] = useState("");
   const [startDate, setStartDate] = useState(new Date());
@@ -50,8 +56,24 @@ export default function CreateTripScreen() {
   const [campingStyle, setCampingStyle] = useState<CampingStyle | undefined>();
   const [partySize, setPartySize] = useState("");
 
+  // Destination state from prefill
+  const [destination, setDestination] = useState<PrefillLocation | null>(prefillLocation || null);
+
   // Gating modal state
   const [showAccountModal, setShowAccountModal] = useState(false);
+
+  // Pre-populate trip name from destination if available
+  useEffect(() => {
+    if (prefillLocation && !tripName) {
+      // Suggest a trip name based on destination
+      setTripName(`Trip to ${prefillLocation.name}`);
+    }
+  }, [prefillLocation]);
+
+  const handleClearDestination = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDestination(null);
+  };
 
   const handleCreate = async () => {
     if (!tripName.trim()) {
@@ -67,12 +89,28 @@ export default function CreateTripScreen() {
       return;
     }
 
+    // Build trip destination from prefill location if set
+    const tripDestination: TripDestination | undefined = destination ? {
+      sourceType: destination.placeType === "park" ? "parks" : "custom",
+      placeId: destination.placeId,
+      name: destination.name,
+      addressLine1: destination.address,
+      city: null, // Could be parsed from address if needed
+      state: destination.state,
+      lat: destination.lat,
+      lng: destination.lng,
+      formattedAddress: destination.address,
+      parkType: destination.placeType === "park" ? "State Park" : null,
+    } : undefined;
+
     const tripId = addTrip({
       name: tripName.trim(),
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
       campingStyle,
       partySize: partySize ? parseInt(partySize) : undefined,
+      tripDestination,
+      parkId: destination?.placeType === "park" && destination?.placeId ? destination.placeId : undefined,
     });
 
     // Track analytics and core action
@@ -108,6 +146,51 @@ export default function CreateTripScreen() {
         </View>
 
         <ScrollView className="flex-1 px-5 pt-6" showsVerticalScrollIndicator={false}>
+          {/* Destination Chip - shown when prefilled from Favorites/Saved Places */}
+          {destination && (
+            <View className="mb-6">
+              <Text className="text-[#16492f] text-base font-semibold mb-2" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Destination</Text>
+              <View 
+                className="flex-row items-center justify-between p-4 rounded-xl border"
+                style={{ backgroundColor: "#f0f9f4", borderColor: EARTH_GREEN }}
+              >
+                <View className="flex-row items-center flex-1">
+                  <Ionicons 
+                    name={destination.placeType === "park" ? "leaf" : "location"} 
+                    size={20} 
+                    color={EARTH_GREEN} 
+                  />
+                  <View className="ml-3 flex-1">
+                    <Text 
+                      className="text-base"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+                      numberOfLines={1}
+                    >
+                      {destination.name}
+                    </Text>
+                    {destination.subtitle && (
+                      <Text 
+                        className="text-sm"
+                        style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
+                        numberOfLines={1}
+                      >
+                        {destination.subtitle}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                <Pressable
+                  onPress={handleClearDestination}
+                  className="w-8 h-8 rounded-full items-center justify-center active:opacity-70"
+                  style={{ backgroundColor: "rgba(0,0,0,0.1)" }}
+                  accessibilityLabel="Clear destination"
+                >
+                  <Ionicons name="close" size={18} color={DEEP_FOREST} />
+                </Pressable>
+              </View>
+            </View>
+          )}
+
           {/* Trip Name */}
           <View className="mb-6">
             <Text className="text-[#16492f] text-base font-semibold mb-2" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Trip Name</Text>

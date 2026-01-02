@@ -9,7 +9,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { auth, db } from "../config/firebase";
+import { auth, db, functions } from "../config/firebase";
+import { httpsCallable } from "firebase/functions";
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, deleteDoc, writeBatch } from "firebase/firestore";
 import ModalHeader from "../components/ModalHeader";
 import { seedLearningContent } from "../services/seedLearningContent";
@@ -36,6 +37,7 @@ export default function AdminDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [clearingPhotos, setClearingPhotos] = useState(false);
+  const [updatingProfile, setUpdatingProfile] = useState(false);
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalPosts: 0,
@@ -246,6 +248,85 @@ export default function AdminDashboardScreen() {
     );
   };
 
+  const handleUpdateTentAndLanternProfile = async () => {
+    Alert.alert(
+      "Update @tentandlantern Profile",
+      "This will set stats to:\n• 220 Trips\n• 7 Tips\n• 3 Reviews\n• 1 Question\n• 4 Photos\n\nAnd add all Merit Badges.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Update Profile",
+          onPress: async () => {
+            setUpdatingProfile(true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            
+            try {
+              const adminUpdateProfile = httpsCallable<
+                {
+                  targetUserId: string;
+                  stats?: {
+                    tripsCount?: number;
+                    tipsCount?: number;
+                    gearReviewsCount?: number;
+                    questionsCount?: number;
+                    photosCount?: number;
+                  };
+                  addBadge?: {
+                    id: string;
+                    name: string;
+                    icon: string;
+                    color: string;
+                  };
+                },
+                { success: boolean; updated: string[] }
+              >(functions, "adminUpdateProfile");
+
+              // Target user: tentandlantern (alana@tentandlantern.com)
+              const targetUserId = "CumHF5enTFQJgroqRIf72uLI9N52";
+
+              // First update stats
+              await adminUpdateProfile({
+                targetUserId,
+                stats: {
+                  tripsCount: 220,
+                  tipsCount: 7,
+                  gearReviewsCount: 3,
+                  questionsCount: 1,
+                  photosCount: 4,
+                },
+              });
+
+              // Add all badges (using approved site color palette)
+              // Leave No Trace first - it's the first Learning Module everyone takes
+              const badges = [
+                { id: "leave-no-trace", name: "Leave No Trace", icon: "leaf", color: "#1A4C39" }, // DEEP_FOREST
+                { id: "weekend-camper", name: "Weekend Camper", icon: "bonfire", color: "#92AFB1" }, // SIERRA_SKY
+                { id: "trail-leader", name: "Trail Leader", icon: "compass", color: "#986C42" }, // GRANITE_GOLD
+                { id: "backcountry-guide", name: "Backcountry Guide", icon: "navigate", color: "#485951" }, // EARTH_GREEN
+              ];
+
+              for (const badge of badges) {
+                await adminUpdateProfile({
+                  targetUserId,
+                  addBadge: badge,
+                });
+              }
+
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert("Success", "Profile updated with new stats and all Merit Badges!");
+            } catch (error) {
+              console.error("Error updating profile:", error);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              Alert.alert("Error", error instanceof Error ? error.message : "Failed to update profile");
+            } finally {
+              setUpdatingProfile(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader title="Admin dashboard" showTitle />
@@ -434,6 +515,41 @@ export default function AdminDashboardScreen() {
                 </Text>
               </View>
               <Ionicons name="alert-circle" size={20} color="#D32F2F" />
+            </View>
+          </Pressable>
+
+          <Pressable
+            onPress={handleUpdateTentAndLanternProfile}
+            disabled={updatingProfile}
+            className="mb-3 p-4 rounded-xl border active:opacity-70"
+            style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT, opacity: updatingProfile ? 0.7 : 1 }}
+          >
+            <View className="flex-row items-center">
+              <View
+                className="w-12 h-12 rounded-full items-center justify-center mr-3"
+                style={{ backgroundColor: "#9C27B020" }}
+              >
+                {updatingProfile ? (
+                  <ActivityIndicator size="small" color="#9C27B0" />
+                ) : (
+                  <Ionicons name="person" size={24} color="#9C27B0" />
+                )}
+              </View>
+              <View className="flex-1">
+                <Text
+                  className="text-base mb-1"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  Update @tentandlantern
+                </Text>
+                <Text
+                  className="text-sm"
+                  style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                >
+                  Set stats + Leave No Trace badge
+                </Text>
+              </View>
+              <Ionicons name="create" size={20} color={TEXT_SECONDARY} />
             </View>
           </Pressable>
         </View>

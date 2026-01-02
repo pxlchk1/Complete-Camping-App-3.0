@@ -173,7 +173,7 @@ export default function PackingTabScreenNew({ onTabChange }: PackingTabScreenPro
   return (
     <View className="flex-1 bg-parchment">
       {!hasAnyLists ? (
-        <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
+        <View className="flex-1 bg-parchment">
           <EmptyState
             iconName="bag"
             title="No packing lists yet"

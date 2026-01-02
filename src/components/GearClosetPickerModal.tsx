@@ -155,6 +155,11 @@ export default function GearClosetPickerModal({
     });
   }, [gearItems, searchQuery, selectedCategory]);
 
+  // Get available favorites (not already in list)
+  const availableFavorites = useMemo(() => {
+    return gearItems.filter((item) => item.isFavorite && !isItemInList(item));
+  }, [gearItems, existingGearIds, existingItemNames]);
+
   // Toggle selection
   const toggleSelection = (gearId: string) => {
     Haptics.selectionAsync();
@@ -165,6 +170,17 @@ export default function GearClosetPickerModal({
       } else {
         next.add(gearId);
       }
+      return next;
+    });
+  };
+
+  // Select all favorites
+  const handleSelectAllFavorites = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const favoriteIds = availableFavorites.map((item) => item.id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      favoriteIds.forEach((id) => next.add(id));
       return next;
     });
   };
@@ -410,6 +426,32 @@ export default function GearClosetPickerModal({
                 )}
               </View>
             </View>
+
+            {/* Quick Actions - Add All Favorites */}
+            {availableFavorites.length > 0 && (
+              <Pressable
+                onPress={handleSelectAllFavorites}
+                className="flex-row items-center mx-4 mb-2 px-4 py-3 rounded-xl border"
+                style={{
+                  borderColor: GRANITE_GOLD,
+                  backgroundColor: "rgba(152, 108, 66, 0.08)",
+                }}
+              >
+                <Ionicons name="star" size={18} color={GRANITE_GOLD} />
+                <Text
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    fontSize: 14,
+                    color: GRANITE_GOLD,
+                    marginLeft: 8,
+                    flex: 1,
+                  }}
+                >
+                  Select All Favorites ({availableFavorites.length})
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={GRANITE_GOLD} />
+              </Pressable>
+            )}
 
             {/* Category Filter Chips */}
             <ScrollView

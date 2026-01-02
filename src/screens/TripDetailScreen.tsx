@@ -21,6 +21,7 @@ import * as Haptics from "expo-haptics";
 import { useTripsStore } from "../state/tripsStore";
 import { usePlanTabStore } from "../state/planTabStore";
 import { useLocationStore } from "../state/locationStore";
+import { usePackingStore } from "../state/packingStore";
 import { useUserStatus } from "../utils/authHelper";
 import {
   getTripParticipants,
@@ -36,8 +37,10 @@ import ItineraryLinksSection from "../components/ItineraryLinksSection";
 import WeatherForecastSection from "../components/WeatherForecastSection";
 import ItineraryPromptPanel from "../components/ItineraryPromptPanel";
 import AddItineraryLinkModal from "../components/AddItineraryLinkModal";
+import ParkDetailModal from "../components/ParkDetailModal";
 import { CreateItineraryLinkData } from "../types/itinerary";
 import { createItineraryLink } from "../services/itineraryLinksService";
+import { Park } from "../types/camping";
 import * as WebBrowser from "expo-web-browser";
 import { v4 as uuidv4 } from "uuid";
 import { updateDoc, doc, serverTimestamp } from "firebase/firestore";
@@ -53,6 +56,7 @@ import {
   GRANITE_GOLD,
   PARCHMENT,
   PARCHMENT_BORDER,
+  TEXT_SECONDARY,
 } from "../constants/colors";
 
 type TripDetailScreenRouteProp = RouteProp<RootStackParamList, "TripDetail">;
@@ -74,9 +78,21 @@ export default function TripDetailScreen() {
   const { tripId, showItineraryPrompt } = route.params;
   const { isGuest } = useUserStatus();
 
-  const trip = useTripsStore((s) => s.getTripById(tripId));
+  // Select trip from trips array directly to ensure reactivity on updates
+  const trips = useTripsStore((s) => s.trips);
+  const trip = useMemo(() => trips.find((t) => t.id === tripId), [trips, tripId]);
+  
   const setActivePlanTab = usePlanTabStore((s) => s.setActiveTab);
+  const setDestinationPickerTripId = usePlanTabStore((s) => s.setDestinationPickerTripId);
+  const setWeatherPickerTripId = usePlanTabStore((s) => s.setWeatherPickerTripId);
   const setSelectedLocation = useLocationStore((s) => s.setSelectedLocation);
+  
+  // Get all local packing lists and filter for this trip (avoids infinite loop from function selector)
+  const allLocalPackingLists = usePackingStore((s) => s.packingLists);
+  const localPackingLists = useMemo(
+    () => allLocalPackingLists.filter((list) => list.tripId === tripId),
+    [allLocalPackingLists, tripId]
+  );
 
   // Itinerary prompt state (shown after trip creation for PRO users)
   const [showItineraryPromptPanel, setShowItineraryPromptPanel] = useState(showItineraryPrompt || false);
@@ -101,6 +117,33 @@ export default function TripDetailScreen() {
 
   // Gating modal state
   const [showAccountModal, setShowAccountModal] = useState(false);
+
+  // Park detail modal state (for viewing destination)
+  const [showParkDetail, setShowParkDetail] = useState(false);
+
+  // Build Park object from trip destination for the modal (no Firestore query needed)
+  const parkDataFromTrip: Park | null = useMemo(() => {
+    const dest = trip?.tripDestination;
+    if (!dest?.placeId || !dest?.name) return null;
+    
+    // Map parkType to filter value
+    const filterMap: Record<string, "national_park" | "state_park" | "national_forest"> = {
+      "National Park": "national_park",
+      "State Park": "state_park",
+      "National Forest": "national_forest",
+    };
+    
+    return {
+      id: dest.placeId,
+      name: dest.name,
+      filter: filterMap[dest.parkType || ""] || "state_park",
+      address: dest.formattedAddress || dest.addressLine1 || "",
+      state: dest.state || "",
+      latitude: dest.lat || 0,
+      longitude: dest.lng || 0,
+      url: "", // Not available from TripDestination, modal handles missing URL gracefully
+    };
+  }, [trip?.tripDestination]);
 
   const startDate = useMemo(() => (trip ? new Date(trip.startDate) : null), [trip]);
   const endDate = useMemo(() => (trip ? new Date(trip.endDate) : null), [trip]);
@@ -189,14 +232,22 @@ export default function TripDetailScreen() {
     
     if (!trip) return;
     
+    // First check if there's a local packing list for this trip (created via PackingListCreate)
+    if (localPackingLists.length > 0) {
+      // Navigate to the local packing list editor
+      navigation.navigate("PackingListEditor", { listId: localPackingLists[0].id });
+      return;
+    }
+    
+    // Otherwise use Firestore-backed packing list
     if (hasPackingList) {
-      // Has items - go to view/manage existing packing list
+      // Has items in Firestore - go to view/manage existing packing list
       navigation.navigate("PackingList", { tripId: trip.id, intent: "view" });
     } else {
-      // No items - go to the full builder experience (same as Pack tab)
-      navigation.navigate("PackingListCreate", { tripId: trip.id, tripName: trip.name });
+      // No items - go to packing list with build intent to add items
+      navigation.navigate("PackingList", { tripId: trip.id, intent: "build" });
     }
-  }, [navigation, trip, hasPackingList]);
+  }, [navigation, trip, hasPackingList, localPackingLists]);
 
   const handleOpenMeals = useCallback(async () => {
     try {
@@ -214,18 +265,90 @@ export default function TripDetailScreen() {
       // ignore
     }
     
-    // If trip has a saved weather destination, set it as the selected location
+    // Set trip context so Weather screen can navigate back after adding
+    setWeatherPickerTripId(tripId);
+    
+    // Priority: 1) weatherDestination, 2) tripDestination, 3) destination
     if (trip?.weatherDestination) {
+      // Already have weather location saved
       setSelectedLocation({
         name: trip.weatherDestination.label,
         latitude: trip.weatherDestination.lat,
         longitude: trip.weatherDestination.lon,
       });
+    } else if (trip?.tripDestination && trip.tripDestination.lat && trip.tripDestination.lng) {
+      // Pre-populate from destination
+      setSelectedLocation({
+        name: trip.tripDestination.name,
+        latitude: trip.tripDestination.lat,
+        longitude: trip.tripDestination.lng,
+      });
+    } else if (trip?.destination?.coordinates) {
+      // Legacy destination with coordinates
+      setSelectedLocation({
+        name: trip.destination.name,
+        latitude: trip.destination.coordinates.latitude,
+        longitude: trip.destination.coordinates.longitude,
+      });
     }
     
     setActivePlanTab("weather");
     navigation.goBack();
-  }, [navigation, setActivePlanTab, trip, setSelectedLocation]);
+  }, [navigation, setActivePlanTab, trip, setSelectedLocation, setWeatherPickerTripId, tripId]);
+
+  // Handler: Change weather location (go to weather without pre-population)
+  const handleChangeWeather = useCallback(async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // ignore
+    }
+    
+    // Clear selected location so user can pick fresh
+    setSelectedLocation(null);
+    setActivePlanTab("weather");
+    navigation.goBack();
+  }, [navigation, setActivePlanTab, setSelectedLocation]);
+
+  // Handler: Open destination - view park detail if selected, or browse if not
+  const handleOpenDestination = useCallback(async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // ignore
+    }
+    
+    if (!trip) return;
+    
+    // Check if trip has a destination with a park ID
+    const hasDestination = parkDataFromTrip !== null;
+    
+    if (hasDestination) {
+      // Has a park selected - show the park detail modal directly (instant, no query)
+      setShowParkDetail(true);
+    } else {
+      // No park selected - go to parks browser to select one
+      setDestinationPickerTripId(tripId);
+      setActivePlanTab("parks");
+      navigation.goBack();
+    }
+  }, [navigation, setActivePlanTab, setDestinationPickerTripId, tripId, trip, parkDataFromTrip]);
+
+  // Handler: Change destination (go to Parks tab)
+  const handleChangeDestination = useCallback(async () => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // ignore
+    }
+    
+    // Set trip context for destination picker flow
+    setDestinationPickerTripId(tripId);
+    
+    // Navigate to Plan screen with Parks tab active
+    setActivePlanTab("parks");
+    navigation.goBack();
+  }, [navigation, setActivePlanTab, setDestinationPickerTripId, tripId]);
 
   const handleAddPeople = useCallback(async () => {
     try {
@@ -430,93 +553,7 @@ export default function TripDetailScreen() {
             </BodyText>
           </View>
 
-          {/* Destination - uses tripDestination (new) with fallback to legacy destination */}
-          <Pressable 
-            className="mb-4"
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              // If has park destination, go to park detail
-              if (trip.tripDestination?.placeId && trip.tripDestination.sourceType === "parks") {
-                navigation.navigate("ParkDetail", { parkId: trip.tripDestination.placeId });
-              } else if (trip.parkId) {
-                // Legacy: use parkId
-                navigation.navigate("ParkDetail", { parkId: trip.parkId });
-              } else {
-                // No destination set - go to Plan > Parks to set one
-                setActivePlanTab("parks");
-                navigation.goBack();
-              }
-            }}
-            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-          >
-            <View className="flex-row items-center justify-between mb-2">
-              <View className="flex-row items-center">
-                <Ionicons name="location" size={20} color={DEEP_FOREST} />
-                <Text
-                  className="text-base ml-2"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
-                >
-                  Destination
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={EARTH_GREEN} />
-            </View>
 
-            {/* New tripDestination format */}
-            {trip.tripDestination ? (
-              <>
-                <BodyText style={{ color: EARTH_GREEN }}>
-                  {trip.tripDestination.name}
-                </BodyText>
-                {(trip.tripDestination.city || trip.tripDestination.state) && (
-                  <BodyText className="text-earthGreen">
-                    {[trip.tripDestination.city, trip.tripDestination.state].filter(Boolean).join(", ")}
-                  </BodyText>
-                )}
-                {trip.tripDestination.parkType && (
-                  <Text 
-                    className="mt-1"
-                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: EARTH_GREEN }}
-                  >
-                    {trip.tripDestination.parkType} • Tap for details
-                  </Text>
-                )}
-              </>
-            ) : trip.destination ? (
-              /* Legacy destination format fallback */
-              <>
-                <BodyText style={trip.parkId ? { color: EARTH_GREEN } : undefined}>
-                  {trip.destination.name}
-                </BodyText>
-                {trip.destination.city && trip.destination.state && (
-                  <BodyText className="text-earthGreen">
-                    {trip.destination.city}, {trip.destination.state}
-                  </BodyText>
-                )}
-                {trip.parkId && (
-                  <Text 
-                    className="mt-1"
-                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: EARTH_GREEN }}
-                  >
-                    Tap for park details, map & reservations
-                  </Text>
-                )}
-              </>
-            ) : (
-              /* No destination set - prompt to add one */
-              <>
-                <BodyText style={{ color: EARTH_GREEN }}>
-                  Add a destination
-                </BodyText>
-                <Text 
-                  className="mt-1"
-                  style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: EARTH_GREEN }}
-                >
-                  Tap to browse parks or add your campground
-                </Text>
-              </>
-            )}
-          </Pressable>
 
           {/* Party Size */}
           {trip.partySize ? (
@@ -612,12 +649,73 @@ export default function TripDetailScreen() {
 
         {/* Trip Planning shortcuts */}
         <View className="pb-6">
-          <Text
-            className="text-lg mb-4"
-            style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
+          {/* Destination */}
+          <Pressable
+            onPress={handleOpenDestination}
+            className="bg-white rounded-xl p-4 mb-3 active:opacity-80"
+            style={{ borderWidth: 1, borderColor: "#e7e5e4" }}
           >
-            Trip Planning
-          </Text>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1">
+                <View
+                  className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                  style={{ backgroundColor: DEEP_FOREST }}
+                >
+                  <Ionicons name="location-outline" size={20} color={PARCHMENT} />
+                </View>
+
+                <View className="flex-1">
+                  <Text
+                    className="text-base mb-1"
+                    style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+                  >
+                    Destination
+                  </Text>
+
+                  <Text
+                    className="text-sm"
+                    style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
+                    numberOfLines={1}
+                  >
+                    {trip.tripDestination?.name || trip.destination?.name || trip.locationName
+                      ? trip.tripDestination?.name || trip.destination?.name || trip.locationName
+                      : "Choose a park or campground"}
+                  </Text>
+
+                  {(trip.tripDestination?.name || trip.destination?.name || trip.locationName) && (
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleChangeDestination();
+                      }}
+                      className="mt-2 self-start active:opacity-70"
+                      style={{ 
+                        backgroundColor: "#f5f5f4", 
+                        paddingHorizontal: 10, 
+                        paddingVertical: 4, 
+                        borderRadius: 12,
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text
+                        style={{ 
+                          fontFamily: "SourceSans3_400Regular", 
+                          fontSize: 12,
+                          color: TEXT_SECONDARY,
+                        }}
+                      >
+                        change
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+
+              <View className="flex-row items-center">
+                <Ionicons name="chevron-forward" size={20} color={EARTH_GREEN} />
+              </View>
+            </View>
+          </Pressable>
 
           {/* Packing */}
           <Pressable
@@ -657,7 +755,7 @@ export default function TripDetailScreen() {
                       className="text-sm"
                       style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
                     >
-                      {hasPackingList
+                      {hasPackingList || localPackingLists.length > 0
                         ? "Get packed for your trip"
                         : "Build your packing list (We'll even help!)"}
                     </Text>
@@ -715,6 +813,8 @@ export default function TripDetailScreen() {
                 locationName={trip.weatherDestination?.label || trip.destination?.name || "Unknown location"}
                 lastUpdated={trip.weather.lastUpdated}
                 onViewMore={handleOpenWeather}
+                onChangeLocation={handleChangeWeather}
+                tripStartDate={trip.startDate}
               />
             ) : (
               <Pressable
@@ -867,6 +967,16 @@ export default function TripDetailScreen() {
           tripEndDate={trip.endDate}
         />
       )}
+
+      {/* Park Detail Modal (view-only, for viewing destination) */}
+      <ParkDetailModal
+        visible={showParkDetail && parkDataFromTrip !== null}
+        park={parkDataFromTrip}
+        onClose={() => setShowParkDetail(false)}
+        onAddToTrip={() => {
+          // Not used in view mode, but required by props
+        }}
+      />
     </SafeAreaView>
   );
 }

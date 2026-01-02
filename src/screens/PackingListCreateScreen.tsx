@@ -55,7 +55,6 @@ export default function PackingListCreateScreen() {
   const [listName, setListName] = useState(tripName ? `${tripName} Packing List` : "");
   const [tripType, setTripType] = useState<TripType>("weekend");
   const [season, setSeason] = useState<Season>("summer");
-  const [isTemplate, setIsTemplate] = useState(false);
   const [selectedTemplates, setSelectedTemplates] = useState<Set<PackingTemplateKey>>(
     new Set(["essential"])
   );
@@ -82,13 +81,13 @@ export default function PackingListCreateScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     const templateKeys = Array.from(selectedTemplates);
-    const listId = createPackingList(listName.trim(), tripType, season, templateKeys, tripId, isTemplate);
+    const listId = createPackingList(listName.trim(), tripType, season, templateKeys, tripId, false);
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     // Navigate to the editor
     navigation.replace("PackingListEditor" as any, { listId });
-  }, [listName, tripType, season, selectedTemplates, tripId, isTemplate, createPackingList, navigation]);
+  }, [listName, tripType, season, selectedTemplates, tripId, createPackingList, navigation]);
 
   const canCreate = listName.trim().length > 0;
 
@@ -249,63 +248,6 @@ export default function PackingListCreateScreen() {
                 );
               })}
             </View>
-          </View>
-
-          {/* Save as Template Toggle */}
-          <View className="px-4 pt-5">
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setIsTemplate(!isTemplate);
-              }}
-              className="flex-row items-center bg-white rounded-xl p-4"
-              style={{
-                borderWidth: 2,
-                borderColor: isTemplate ? DEEP_FOREST : BORDER_SOFT,
-                borderStyle: isTemplate ? "solid" : "dashed",
-              }}
-            >
-              <View
-                className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                style={{
-                  backgroundColor: isTemplate ? DEEP_FOREST : "#F4F2EC",
-                }}
-              >
-                <Ionicons
-                  name="copy-outline"
-                  size={20}
-                  color={isTemplate ? PARCHMENT : DEEP_FOREST}
-                />
-              </View>
-
-              <View className="flex-1">
-                <Text
-                  className="text-base"
-                  style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
-                >
-                  Save as Template
-                </Text>
-                <Text
-                  className="text-xs"
-                  style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
-                >
-                  Create a reusable template you can copy to future trips
-                </Text>
-              </View>
-
-              <View
-                className="w-6 h-6 rounded-full items-center justify-center"
-                style={{
-                  backgroundColor: isTemplate ? DEEP_FOREST : "#F4F2EC",
-                  borderWidth: isTemplate ? 0 : 2,
-                  borderColor: BORDER_SOFT,
-                }}
-              >
-                {isTemplate && (
-                  <Ionicons name="checkmark" size={16} color={PARCHMENT} />
-                )}
-              </View>
-            </Pressable>
           </View>
 
           {/* Templates */}

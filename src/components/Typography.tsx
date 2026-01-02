@@ -36,27 +36,27 @@ export function Heading3({ children, style, ...props }: TypographyProps) {
 }
 
 // Section titles (same as Heading2)
-export function SectionTitle({ children, style, ...props }: TypographyProps) {
+export function SectionTitle({ children, style, color, ...props }: TypographyProps) {
   return (
-    <Text style={[textStyles.headingSection, style]} {...props}>
+    <Text style={[textStyles.headingSection, color ? { color } : undefined, style]} {...props}>
       {children}
     </Text>
   );
 }
 
 // Normal body copy
-export function BodyText({ children, style, ...props }: TypographyProps) {
+export function BodyText({ children, style, color, ...props }: TypographyProps) {
   return (
-    <Text style={[textStyles.body, style]} {...props}>
+    <Text style={[textStyles.body, color ? { color } : undefined, style]} {...props}>
       {children}
     </Text>
   );
 }
 
 // Secondary body (subtle text, helper copy)
-export function BodyTextMedium({ children, style, ...props }: TypographyProps) {
+export function BodyTextMedium({ children, style, color, ...props }: TypographyProps) {
   return (
-    <Text style={[textStyles.bodySecondary, style]} {...props}>
+    <Text style={[textStyles.bodySecondary, color ? { color } : undefined, style]} {...props}>
       {children}
     </Text>
   );

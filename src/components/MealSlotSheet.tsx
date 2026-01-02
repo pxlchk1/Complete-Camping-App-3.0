@@ -16,7 +16,6 @@ import {
   TextInput,
   ActivityIndicator,
   Keyboard,
-  TouchableWithoutFeedback,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -67,9 +66,10 @@ interface MealSlotSheetProps {
   category: MealCategory;
   dayIndex: number;
   context?: SuggestionContext;
+  initialTab?: "suggest" | "recipes" | "custom";
   onSelectRecipe: (recipe: MealLibraryItem) => void;
   onSelectSuggestion: (suggestion: MealSuggestion) => void;
-  onAddCustomMeal: (name: string, ingredients?: string[], notes?: string) => void;
+  onAddCustomMeal: (name: string, ingredients?: string[], notes?: string, saveToLibrary?: boolean) => void;
 }
 
 export default function MealSlotSheet({
@@ -78,6 +78,7 @@ export default function MealSlotSheet({
   category,
   dayIndex,
   context = {},
+  initialTab = "suggest",
   onSelectRecipe,
   onSelectSuggestion,
   onAddCustomMeal,
@@ -95,6 +96,7 @@ export default function MealSlotSheet({
   const [customName, setCustomName] = useState("");
   const [customIngredients, setCustomIngredients] = useState("");
   const [customNotes, setCustomNotes] = useState("");
+  const [saveToLibrary, setSaveToLibrary] = useState(true);
 
   // Load suggestions when sheet opens
   useEffect(() => {
@@ -113,12 +115,16 @@ export default function MealSlotSheet({
 
     if (visible) {
       fetchSuggestions();
-      setActiveSection("suggest");
+      setActiveSection(initialTab);
       setSearchQuery("");
       setSelectedFilter("all");
       resetCustomForm();
+      // If opening to recipes tab, load them
+      if (initialTab === "recipes") {
+        loadRecipes();
+      }
     }
-  }, [visible, category, context]);
+  }, [visible, category, context, initialTab]);
 
   const loadSuggestions = async () => {
     setLoadingSuggestions(true);
@@ -167,6 +173,7 @@ export default function MealSlotSheet({
     setCustomName("");
     setCustomIngredients("");
     setCustomNotes("");
+    setSaveToLibrary(true);
   };
 
   // Filter recipes
@@ -221,7 +228,8 @@ export default function MealSlotSheet({
     onAddCustomMeal(
       customName.trim(),
       ingredients.length > 0 ? ingredients : undefined,
-      customNotes.trim() || undefined
+      customNotes.trim() || undefined,
+      saveToLibrary
     );
     onClose();
   };
@@ -238,20 +246,19 @@ export default function MealSlotSheet({
       transparent={true}
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View className="flex-1 justify-end">
-          {/* Backdrop */}
-          <Pressable
-            className="absolute inset-0"
-            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-            onPress={onClose}
-          />
+      <View className="flex-1 justify-end">
+        {/* Backdrop */}
+        <Pressable
+          className="absolute inset-0"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          onPress={onClose}
+        />
 
-          {/* Content */}
-          <View
-            className="rounded-t-3xl overflow-hidden flex-1"
-            style={{ backgroundColor: PARCHMENT, maxHeight: "85%" }}
-          >
+        {/* Content */}
+        <View
+          className="rounded-t-3xl overflow-hidden"
+          style={{ backgroundColor: PARCHMENT, height: "92%" }}
+        >
             <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
               {/* Header */}
               <View
@@ -747,6 +754,33 @@ export default function MealSlotSheet({
                       />
                     </View>
 
+                    {/* Save to My Recipes checkbox */}
+                    <Pressable
+                      onPress={() => setSaveToLibrary(!saveToLibrary)}
+                      className="flex-row items-center py-3 active:opacity-80"
+                    >
+                      <View
+                        className="w-6 h-6 rounded-md border-2 items-center justify-center mr-3"
+                        style={{
+                          borderColor: saveToLibrary ? DEEP_FOREST : BORDER_SOFT,
+                          backgroundColor: saveToLibrary ? DEEP_FOREST : "transparent",
+                        }}
+                      >
+                        {saveToLibrary && (
+                          <Ionicons name="checkmark" size={16} color={PARCHMENT} />
+                        )}
+                      </View>
+                      <Text
+                        style={{
+                          fontFamily: "SourceSans3_400Regular",
+                          fontSize: 15,
+                          color: TEXT_PRIMARY_STRONG,
+                        }}
+                      >
+                        Save to My Recipes for future use
+                      </Text>
+                    </Pressable>
+
                     {/* Save button */}
                     <Pressable
                       onPress={handleSaveCustomMeal}
@@ -772,7 +806,6 @@ export default function MealSlotSheet({
             </SafeAreaView>
           </View>
         </View>
-      </TouchableWithoutFeedback>
     </Modal>
   );
 }

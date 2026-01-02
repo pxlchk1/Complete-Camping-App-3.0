@@ -15,19 +15,18 @@ import {
   Alert,
   Modal,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useRoute, RouteProp } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { auth, db } from "../config/firebase";
-import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp, orderBy, limit } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { restorePurchases, syncSubscriptionToFirestore } from "../services/subscriptionService";
-import { listenToFavoriteParks, FavoritePark } from "../services/favoriteParksService";
-import { listenToSavedPlaces, SavedPlace } from "../services/savedPlacesService";
+import { listenToFavoriteParks, removeFavoritePark, FavoritePark } from "../services/favoriteParksService";
+import { listenToSavedPlaces, removeSavedPlace, SavedPlace } from "../services/savedPlacesService";
 import { useUserStatus } from "../utils/authHelper";
 import { useIsModerator, useIsAdministrator } from "../state/userStore";
-import { useTripsStore } from "../state/tripsStore";
 import { HERO_IMAGES } from "../constants/images";
 import {
   DEEP_FOREST,
@@ -40,6 +39,7 @@ import {
   BORDER_SOFT,
   RUST,
 } from "../constants/colors";
+import { PrefillLocation, RootStackParamList } from "../navigation/types";
 
 type MembershipTier = "free" | "freeMember" | "subscribed" | "weekendCamper" | "trailLeader" | "backcountryGuide" | "isAdmin" | "isModerator";
 
@@ -49,6 +49,14 @@ type ProfileStats = {
   gearReviewsCount: number;
   questionsCount: number;
   photosCount: number;
+};
+
+type MeritBadge = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  earnedAt?: any;
 };
 
 type UserProfile = {
@@ -66,27 +74,54 @@ type UserProfile = {
   favoriteGear?: Record<string, string>;
   joinedAt: any;
   stats?: ProfileStats;
+  meritBadges?: MeritBadge[]; // Dynamic merit badges from Firestore
+  isProfileContentPublic?: boolean; // Default true - whether content below header is public
 };
 
-type ActivityTab = "trips" | "gear" | "photos" | "questions";
+type ActivityTab = "photos" | "connect";
+
+// Type for user's recent photos
+type UserPhoto = {
+  id: string;
+  imageUrl: string;
+  createdAt: any;
+};
+
+// Type for user's recent Connect contributions
+type ConnectContribution = {
+  id: string;
+  type: "tip" | "review" | "question" | "answer";
+  title: string;
+  createdAt: any;
+};
 
 const COVER_HEIGHT = 260;
 const PROFILE_SIZE = 120;
 
 export default function MyCampsiteScreen({ navigation }: any) {
+  const route = useRoute<RouteProp<RootStackParamList, "MyCampsite">>();
+  const viewingUserId = route.params?.userId;
+  const viewAsPublic = route.params?.viewAsPublic || false;
+  const isViewingOtherUser = !!viewingUserId && viewingUserId !== auth.currentUser?.uid;
+  // When viewing as public (preview mode), treat it like viewing another user
+  const shouldHidePrivateContent = isViewingOtherUser || viewAsPublic;
+  
   const { isGuest } = useUserStatus();
   const isModerator = useIsModerator();
   const isAdministrator = useIsAdministrator();
-  const trips = useTripsStore((state) => state.trips);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<ActivityTab>("trips");
+  const [activeTab, setActiveTab] = useState<ActivityTab>("photos");
   const [restoring, setRestoring] = useState(false);
   const [favoriteParks, setFavoriteParks] = useState<FavoritePark[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(true);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
   const [savedPlacesLoading, setSavedPlacesLoading] = useState(true);
   const [showBadgesInfo, setShowBadgesInfo] = useState(false);
+  const [userPhotos, setUserPhotos] = useState<UserPhoto[]>([]);
+  const [userPhotosLoading, setUserPhotosLoading] = useState(true);
+  const [connectContributions, setConnectContributions] = useState<ConnectContribution[]>([]);
+  const [connectLoading, setConnectLoading] = useState(true);
   const insets = useSafeAreaInsets();
 
   const loadProfile = useCallback(async (userId: string) => {
@@ -121,35 +156,248 @@ export default function MyCampsiteScreen({ navigation }: any) {
     }
   }, []);
 
+  // Load user's latest 9 photos
+  const loadUserPhotos = useCallback(async (userId: string) => {
+    try {
+      setUserPhotosLoading(true);
+      const photos: UserPhoto[] = [];
+      console.log("[MyCampsite] Loading photos for userId:", userId);
+      
+      // Get photos from photoPosts collection
+      const photoPostsQuery = query(
+        collection(db, "photoPosts"),
+        where("userId", "==", userId),
+        orderBy("createdAt", "desc"),
+        limit(9)
+      );
+      const photoPostsSnap = await getDocs(photoPostsQuery);
+      console.log("[MyCampsite] Found photoPosts:", photoPostsSnap.size);
+      photoPostsSnap.forEach((doc) => {
+        const data = doc.data();
+        const imageUrl = data.photoUrls?.[0] || data.imageUrl;
+        if (imageUrl) {
+          photos.push({
+            id: doc.id,
+            imageUrl,
+            createdAt: data.createdAt,
+          });
+        }
+      });
+      
+      // If we don't have 9 yet, also check stories collection (legacy)
+      if (photos.length < 9) {
+        const storiesQuery = query(
+          collection(db, "stories"),
+          where("userId", "==", userId),
+          orderBy("createdAt", "desc"),
+          limit(9 - photos.length)
+        );
+        const storiesSnap = await getDocs(storiesQuery);
+        console.log("[MyCampsite] Found stories:", storiesSnap.size);
+        storiesSnap.forEach((doc) => {
+          const data = doc.data();
+          if (data.imageUrl) {
+            photos.push({
+              id: doc.id,
+              imageUrl: data.imageUrl,
+              createdAt: data.createdAt,
+            });
+          }
+        });
+      }
+      
+      // Sort by createdAt and take first 9
+      photos.sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+        const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+        return bTime - aTime;
+      });
+      
+      console.log("[MyCampsite] Total photos loaded:", photos.length);
+      setUserPhotos(photos.slice(0, 9));
+    } catch (error) {
+      console.error("[MyCampsite] Error loading user photos:", error);
+      setUserPhotos([]);
+    } finally {
+      setUserPhotosLoading(false);
+    }
+  }, []);
+
+  // Load user's latest 9 Connect contributions (tips, reviews, questions, answers)
+  const loadConnectContributions = useCallback(async (userId: string) => {
+    try {
+      setConnectLoading(true);
+      const contributions: ConnectContribution[] = [];
+      console.log("[MyCampsite] Loading contributions for userId:", userId);
+      
+      // Get tips
+      const tipsQuery = query(
+        collection(db, "tips"),
+        where("userId", "==", userId),
+        orderBy("createdAt", "desc"),
+        limit(9)
+      );
+      const tipsSnap = await getDocs(tipsQuery);
+      console.log("[MyCampsite] Found tips:", tipsSnap.size);
+      tipsSnap.forEach((doc) => {
+        const data = doc.data();
+        contributions.push({
+          id: doc.id,
+          type: "tip",
+          title: data.title || data.description?.substring(0, 50) || "Tip",
+          createdAt: data.createdAt,
+        });
+      });
+      
+      // Get gear reviews
+      const reviewsQuery = query(
+        collection(db, "gearReviews"),
+        where("userId", "==", userId),
+        orderBy("createdAt", "desc"),
+        limit(9)
+      );
+      const reviewsSnap = await getDocs(reviewsQuery);
+      console.log("[MyCampsite] Found gearReviews:", reviewsSnap.size);
+      reviewsSnap.forEach((doc) => {
+        const data = doc.data();
+        contributions.push({
+          id: doc.id,
+          type: "review",
+          title: data.gearName || data.title || "Gear Review",
+          createdAt: data.createdAt,
+        });
+      });
+      
+      // Get questions - check both authorId and userId fields since different services use different fields
+      try {
+        const questionsQuery1 = query(
+          collection(db, "questions"),
+          where("authorId", "==", userId),
+          orderBy("createdAt", "desc"),
+          limit(9)
+        );
+        const questionsSnap1 = await getDocs(questionsQuery1);
+        console.log("[MyCampsite] Found questions (authorId):", questionsSnap1.size);
+        questionsSnap1.forEach((doc) => {
+          const data = doc.data();
+          contributions.push({
+            id: doc.id,
+            type: "question",
+            title: data.title || data.question || data.body?.substring(0, 50) || "Question",
+            createdAt: data.createdAt,
+          });
+        });
+      } catch (e) {
+        console.log("[MyCampsite] authorId questions query failed, trying userId");
+      }
+      
+      // Also try userId field for legacy questions
+      try {
+        const questionsQuery2 = query(
+          collection(db, "questions"),
+          where("userId", "==", userId),
+          orderBy("createdAt", "desc"),
+          limit(9)
+        );
+        const questionsSnap2 = await getDocs(questionsQuery2);
+        console.log("[MyCampsite] Found questions (userId):", questionsSnap2.size);
+        questionsSnap2.forEach((doc) => {
+          const data = doc.data();
+          // Only add if not already added (avoid duplicates)
+          if (!contributions.some(c => c.id === doc.id)) {
+            contributions.push({
+              id: doc.id,
+              type: "question",
+              title: data.title || data.question || data.body?.substring(0, 50) || "Question",
+              createdAt: data.createdAt,
+            });
+          }
+        });
+      } catch (e) {
+        console.log("[MyCampsite] userId questions query failed");
+      }
+      
+      // Get answers
+      const answersQuery = query(
+        collection(db, "answers"),
+        where("authorId", "==", userId),
+        orderBy("createdAt", "desc"),
+        limit(9)
+      );
+      const answersSnap = await getDocs(answersQuery);
+      console.log("[MyCampsite] Found answers:", answersSnap.size);
+      answersSnap.forEach((doc) => {
+        const data = doc.data();
+        contributions.push({
+          id: doc.id,
+          type: "answer",
+          title: data.body?.substring(0, 50) || "Answer",
+          createdAt: data.createdAt,
+        });
+      });
+      
+      // Sort all by createdAt and take first 9
+      contributions.sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+        const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+        return bTime - aTime;
+      });
+      
+      console.log("[MyCampsite] Total contributions:", contributions.length);
+      
+      setConnectContributions(contributions.slice(0, 9));
+    } catch (error) {
+      console.error("[MyCampsite] Error loading Connect contributions:", error);
+      setConnectContributions([]);
+    } finally {
+      setConnectLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      const user = auth.currentUser;
-      if (!user) {
+      // If viewing another user's profile, use their ID
+      const targetUserId = viewingUserId || auth.currentUser?.uid;
+      
+      if (!targetUserId) {
         navigation.replace("Auth");
         return;
       }
 
-      loadProfile(user.uid);
+      loadProfile(targetUserId);
       
-      // Listen to favorite parks
-      setFavoritesLoading(true);
-      const unsubscribeFavorites = listenToFavoriteParks(user.uid, (favorites) => {
-        setFavoriteParks(favorites);
-        setFavoritesLoading(false);
-      });
+      // Load user photos and Connect contributions
+      loadUserPhotos(targetUserId);
+      loadConnectContributions(targetUserId);
+      
+      // Only load favorites and saved places for the current user's own profile
+      if (!isViewingOtherUser) {
+        // Listen to favorite parks
+        setFavoritesLoading(true);
+        const unsubscribeFavorites = listenToFavoriteParks(targetUserId, (favorites) => {
+          setFavoriteParks(favorites);
+          setFavoritesLoading(false);
+        });
 
-      // Listen to saved places
-      setSavedPlacesLoading(true);
-      const unsubscribeSavedPlaces = listenToSavedPlaces(user.uid, (places) => {
-        setSavedPlaces(places);
+        // Listen to saved places
+        setSavedPlacesLoading(true);
+        const unsubscribeSavedPlaces = listenToSavedPlaces(targetUserId, (places) => {
+          setSavedPlaces(places);
+          setSavedPlacesLoading(false);
+        });
+        
+        return () => {
+          unsubscribeFavorites();
+          unsubscribeSavedPlaces();
+        };
+      } else {
+        // For other users, don't show favorites/saved places
+        setFavoritesLoading(false);
         setSavedPlacesLoading(false);
-      });
-      
-      return () => {
-        unsubscribeFavorites();
-        unsubscribeSavedPlaces();
-      };
-    }, [navigation, loadProfile])
+        setFavoriteParks([]);
+        setSavedPlaces([]);
+      }
+    }, [navigation, loadProfile, loadUserPhotos, loadConnectContributions, viewingUserId, isViewingOtherUser])
   );
 
   const createDefaultProfile = async (userId: string) => {
@@ -237,14 +485,16 @@ export default function MyCampsiteScreen({ navigation }: any) {
       const gearReviewsCount = gearSnap.size;
 
       // Count questions
-      const questionsQuery = query(collection(db, "questions"), where("userId", "==", userId));
+      const questionsQuery = query(collection(db, "questions"), where("authorId", "==", userId));
       const questionsSnap = await getDocs(questionsQuery);
       const questionsCount = questionsSnap.size;
 
-      // Count photos
-      const photosQuery = query(collection(db, "stories"), where("userId", "==", userId));
-      const photosSnap = await getDocs(photosQuery);
-      const photosCount = photosSnap.size;
+      // Count photos from both legacy stories and new photoPosts collections
+      const storiesQuery = query(collection(db, "stories"), where("userId", "==", userId));
+      const storiesSnap = await getDocs(storiesQuery);
+      const photoPostsQuery = query(collection(db, "photoPosts"), where("userId", "==", userId));
+      const photoPostsSnap = await getDocs(photoPostsQuery);
+      const photosCount = storiesSnap.size + photoPostsSnap.size;
 
       const stats: ProfileStats = {
         tripsCount,
@@ -327,6 +577,57 @@ export default function MyCampsiteScreen({ navigation }: any) {
     }
   };
 
+  // Handler for "Plan a trip" from Favorite Parks
+  const handlePlanFromFavorite = (fav: FavoritePark) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Gate: Login required to create trips
+    if (isGuest || !auth.currentUser) {
+      navigation.navigate("Auth");
+      return;
+    }
+
+    const prefillLocation: PrefillLocation = {
+      source: "favorites",
+      placeType: "park",
+      placeId: fav.parkId,
+      name: fav.name,
+      subtitle: [fav.type, fav.state].filter(Boolean).join(" • "),
+      state: fav.state || null,
+      address: null,
+      lat: null,
+      lng: null,
+    };
+
+    navigation.navigate("CreateTrip", { prefillLocation });
+  };
+
+  // Handler for "Plan a trip" from Saved Places
+  const handlePlanFromSavedPlace = (place: SavedPlace) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Gate: Login required to create trips
+    if (isGuest || !auth.currentUser) {
+      navigation.navigate("Auth");
+      return;
+    }
+
+    const prefillLocation: PrefillLocation = {
+      source: "saved_places",
+      placeType: place.placeType === "campground" ? "campground" : 
+                 place.placeType === "park" ? "park" : "custom",
+      placeId: place.placeId,
+      name: place.name,
+      subtitle: place.address || null,
+      state: null,
+      address: place.address || null,
+      lat: place.lat || null,
+      lng: place.lng || null,
+    };
+
+    navigation.navigate("CreateTrip", { prefillLocation });
+  };
+
   const getMembershipBadgeColor = (tier: MembershipTier): string => {
     // Check admin/moderator status first (from hooks)
     if (isAdministrator || tier === "isAdmin") return "#dc2626"; // Red for admin
@@ -374,11 +675,52 @@ export default function MyCampsiteScreen({ navigation }: any) {
     .slice(0, 2)
     .toUpperCase();
 
+  // Determine if profile content should be visible
+  // Content is visible if:
+  // 1. Viewing own profile (not as public preview)
+  // 2. Profile content is set to public (default is true)
+  const isProfileContentVisible = 
+    (!shouldHidePrivateContent) || 
+    (profile.isProfileContentPublic !== false);
+
   // Use safe area bottom padding for consistent tab bar height
   const bottomSpacer = Math.max(insets.bottom || 0, 18) + 72;
 
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
+      {/* Viewing as public banner */}
+      {viewAsPublic && (
+        <View 
+          style={{ 
+            backgroundColor: EARTH_GREEN, 
+            paddingTop: insets.top + 8,
+            paddingBottom: 8,
+            paddingHorizontal: 20,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <View className="flex-row items-center flex-1">
+            <Ionicons name="eye-outline" size={18} color={PARCHMENT} />
+            <Text
+              className="ml-2"
+              style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT, fontSize: 14 }}
+            >
+              Viewing as public
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            className="px-3 py-1 rounded-full active:opacity-70"
+            style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
+          >
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT, fontSize: 13 }}>
+              Done
+            </Text>
+          </Pressable>
+        </View>
+      )}
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Hero Header with Background Image */}
         <View style={{ height: COVER_HEIGHT + insets.top }}>
@@ -419,23 +761,28 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 <Ionicons name="arrow-back" size={24} color={PARCHMENT} />
               </Pressable>
 
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  
-                  // Gate: Login required to edit profile
-                  if (isGuest || !auth.currentUser) {
-                    navigation.navigate("Auth");
-                    return;
-                  }
-                  
-                  navigation.navigate("EditProfile");
-                }}
-                className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
-                style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
-              >
-                <Ionicons name="create-outline" size={24} color={PARCHMENT} />
-              </Pressable>
+              {/* Only show edit button for own profile */}
+              {!isViewingOtherUser ? (
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    
+                    // Gate: Login required to edit profile
+                    if (isGuest || !auth.currentUser) {
+                      navigation.navigate("Auth");
+                      return;
+                    }
+                    
+                    navigation.navigate("EditProfile");
+                  }}
+                  className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
+                  style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+                >
+                  <Ionicons name="create-outline" size={24} color={PARCHMENT} />
+                </Pressable>
+              ) : (
+                <View style={{ width: 40 }} />
+              )}
             </View>
 
             {/* Centered Avatar and User Identity */}
@@ -548,119 +895,65 @@ export default function MyCampsiteScreen({ navigation }: any) {
 
           {/* Merit Badges Row */}
           <View className="flex-row items-start justify-center mb-4">
-            {/* Merit Badges */}
-            <View className="flex-row gap-2">
-                {/* Weekend Camper Badge */}
-                <View
-                  className="items-center"
-                  style={{ width: 70 }}
-                >
-                  <View
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
-                      backgroundColor: "#92AFB1",
-                      borderWidth: 3,
-                      borderColor: PARCHMENT,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.15,
-                      shadowRadius: 3,
-                      elevation: 3,
-                    }}
-                  >
-                    <Ionicons name="bonfire" size={28} color={PARCHMENT} />
+            {/* Merit Badges from Firebase */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4 }}>
+              <View className="flex-row gap-2">
+                {/* Show badges from Firestore or a "No badges yet" message */}
+                {profile.meritBadges && profile.meritBadges.length > 0 ? (
+                  profile.meritBadges.map((badge) => (
+                    <View
+                      key={badge.id}
+                      className="items-center"
+                      style={{ width: 70 }}
+                    >
+                      <View
+                        style={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 28,
+                          backgroundColor: badge.color,
+                          borderWidth: 3,
+                          borderColor: PARCHMENT,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          shadowColor: "#000",
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.15,
+                          shadowRadius: 3,
+                          elevation: 3,
+                        }}
+                      >
+                        <Ionicons name={badge.icon as any} size={28} color={PARCHMENT} />
+                      </View>
+                      <Text
+                        className="text-center mt-1"
+                        style={{
+                          fontFamily: "SourceSans3_600SemiBold",
+                          fontSize: 9,
+                          color: TEXT_SECONDARY,
+                          lineHeight: 11,
+                        }}
+                      >
+                        {badge.name.split(' ').join('\n')}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <View className="items-center px-4 py-2">
+                    <Text
+                      style={{
+                        fontFamily: "SourceSans3_400Regular",
+                        fontSize: 13,
+                        color: TEXT_SECONDARY,
+                        fontStyle: "italic",
+                      }}
+                    >
+                      No badges earned yet
+                    </Text>
                   </View>
-                  <Text
-                    className="text-center mt-1"
-                    style={{
-                      fontFamily: "SourceSans3_600SemiBold",
-                      fontSize: 9,
-                      color: TEXT_SECONDARY,
-                      lineHeight: 11,
-                    }}
-                  >
-                    Weekend{'\n'}Camper
-                  </Text>
-                </View>
-
-                {/* Trail Leader Badge */}
-                <View
-                  className="items-center"
-                  style={{ width: 70 }}
-                >
-                  <View
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
-                      backgroundColor: "#AC9A6D",
-                      borderWidth: 3,
-                      borderColor: PARCHMENT,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.15,
-                      shadowRadius: 3,
-                      elevation: 3,
-                    }}
-                  >
-                    <Ionicons name="compass" size={28} color={PARCHMENT} />
-                  </View>
-                  <Text
-                    className="text-center mt-1"
-                    style={{
-                      fontFamily: "SourceSans3_600SemiBold",
-                      fontSize: 9,
-                      color: TEXT_SECONDARY,
-                      lineHeight: 11,
-                    }}
-                  >
-                    Trail{'\n'}Leader
-                  </Text>
-                </View>
-
-                {/* Backcountry Guide Badge */}
-                <View
-                  className="items-center"
-                  style={{ width: 70 }}
-                >
-                  <View
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
-                      backgroundColor: "#485952",
-                      borderWidth: 3,
-                      borderColor: PARCHMENT,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.15,
-                      shadowRadius: 3,
-                      elevation: 3,
-                    }}
-                  >
-                    <Ionicons name="navigate" size={28} color={PARCHMENT} />
-                  </View>
-                  <Text
-                    className="text-center mt-1"
-                    style={{
-                      fontFamily: "SourceSans3_600SemiBold",
-                      fontSize: 9,
-                      color: TEXT_SECONDARY,
-                      lineHeight: 11,
-                    }}
-                  >
-                    Backcountry{'\n'}Guide
-                  </Text>
-                </View>
-            </View>
+                )}
+              </View>
+            </ScrollView>
           </View>
 
           {/* Social Stats Row */}
@@ -741,47 +1034,49 @@ export default function MyCampsiteScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Quick Links - Side by Side */}
-          <View className="flex-row gap-3 mb-4">
-            {/* My Gear Closet */}
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                navigation.navigate("MyGearCloset");
-              }}
-              className="flex-1 p-4 rounded-xl border items-center active:opacity-70"
-              style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
-            >
-              <Ionicons name="bag-handle-outline" size={28} color={EARTH_GREEN} />
-              <Text
-                className="mt-2 text-center"
-                style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: TEXT_PRIMARY_STRONG }}
+          {/* Quick Links - Only show on own profile (not when viewing others or as public) */}
+          {!shouldHidePrivateContent && (
+            <View className="flex-row gap-3 mb-4">
+              {/* My Gear Closet */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("MyGearCloset");
+                }}
+                className="flex-1 p-4 rounded-xl border items-center active:opacity-70"
+                style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
               >
-                My Gear Closet
-              </Text>
-            </Pressable>
+                <Ionicons name="bag-handle-outline" size={28} color={EARTH_GREEN} />
+                <Text
+                  className="mt-2 text-center"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: TEXT_PRIMARY_STRONG }}
+                >
+                  My Gear Closet
+                </Text>
+              </Pressable>
 
-            {/* My Campground */}
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                navigation.navigate("MyCampground");
-              }}
-              className="flex-1 p-4 rounded-xl border items-center active:opacity-70"
-              style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
-            >
-              <Ionicons name="people-outline" size={28} color={EARTH_GREEN} />
-              <Text
-                className="mt-2 text-center"
-                style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: TEXT_PRIMARY_STRONG }}
+              {/* My Campground */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("MyCampground");
+                }}
+                className="flex-1 p-4 rounded-xl border items-center active:opacity-70"
+                style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
               >
-                My Campground
-              </Text>
-            </Pressable>
-          </View>
+                <Ionicons name="people-outline" size={28} color={EARTH_GREEN} />
+                <Text
+                  className="mt-2 text-center"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: TEXT_PRIMARY_STRONG }}
+                >
+                  My Campground
+                </Text>
+              </Pressable>
+            </View>
+          )}
 
-          {/* Admin Dashboard - Only for admins */}
-          {isAdministrator && (
+          {/* Admin Dashboard - Only for admins on own profile */}
+          {isAdministrator && !shouldHidePrivateContent && (
             <Pressable
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -915,7 +1210,8 @@ export default function MyCampsiteScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* My Activity Section */}
+        {/* My Activity Section - only visible if profile content is public or viewing own profile */}
+        {isProfileContentVisible && (
         <View className="mb-6 px-5">
             <Text
               className="text-lg mb-3"
@@ -930,18 +1226,12 @@ export default function MyCampsiteScreen({ navigation }: any) {
               showsHorizontalScrollIndicator={false}
               className="mb-4"
             >
-              {(["trips", "photos", "questions"] as ActivityTab[]).map((tab) => (
+              {(["photos", "connect"] as ActivityTab[]).map((tab) => (
                 <Pressable
                   key={tab}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-                    // Navigate to the appropriate screen based on tab
-                    if (tab === "trips") {
-                      navigation.navigate("HomeTabs", { screen: "Plan" });
-                    } else {
-                      setActiveTab(tab);
-                    }
+                    setActiveTab(tab);
                   }}
                   className="mr-3 px-4 py-2 rounded-full"
                   style={{
@@ -961,130 +1251,172 @@ export default function MyCampsiteScreen({ navigation }: any) {
               ))}
             </ScrollView>
 
-            {/* Activity Content */}
-            {activeTab === "trips" ? (
-              trips.length === 0 ? (
+            {/* Activity Content - Photos Tab */}
+            {activeTab === "photos" && (
+              userPhotosLoading ? (
                 <View className="p-6 rounded-xl items-center" style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}>
-                  <Ionicons name="calendar-outline" size={40} color={EARTH_GREEN} />
+                  <ActivityIndicator size="small" color={EARTH_GREEN} />
+                  <Text
+                    className="mt-2"
+                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 14, color: TEXT_SECONDARY }}
+                  >
+                    Loading photos...
+                  </Text>
+                </View>
+              ) : userPhotos.length === 0 ? (
+                <View className="p-6 rounded-xl items-center" style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}>
+                  <Ionicons name="images-outline" size={40} color={EARTH_GREEN} />
                   <Text
                     className="mt-3"
                     style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: TEXT_PRIMARY_STRONG }}
                   >
-                    No trips yet
+                    No photos yet
                   </Text>
                   <Text
                     className="mt-1 text-center"
                     style={{ fontFamily: "SourceSans3_400Regular", fontSize: 14, color: TEXT_SECONDARY }}
                   >
-                    Plan your first camping adventure!
+                    Your photos will appear here
                   </Text>
-                  <Pressable
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      navigation.navigate("HomeTabs", { screen: "Plan" });
-                    }}
-                    className="mt-4 px-5 py-2 rounded-full"
-                    style={{ backgroundColor: EARTH_GREEN }}
-                  >
-                    <Text
-                      style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 14, color: PARCHMENT }}
-                    >
-                      Plan a Trip
-                    </Text>
-                  </Pressable>
                 </View>
               ) : (
-                <View>
-                  {trips.slice(0, 3).map((trip) => (
-                    <Pressable
-                      key={trip.id}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        navigation.navigate("TripDetail", { tripId: trip.id });
-                      }}
-                      className="p-4 rounded-xl border mb-3 active:opacity-90"
-                      style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
-                    >
-                      <View className="flex-row items-start justify-between">
-                        <View className="flex-1 mr-3">
-                          <Text
-                            className="text-base mb-1"
-                            style={{ fontFamily: "Raleway_600SemiBold", color: TEXT_PRIMARY_STRONG }}
-                            numberOfLines={2}
-                          >
-                            {trip.name}
-                          </Text>
-                          <View className="flex-row items-center">
-                            <Ionicons name="calendar-outline" size={14} color={TEXT_SECONDARY} />
-                            <Text
-                              className="text-sm ml-1"
-                              style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-                            >
-                              {new Date(trip.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                              {trip.endDate && trip.endDate !== trip.startDate && 
-                                ` - ${new Date(trip.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-                              }
-                            </Text>
-                          </View>
-                          {trip.destination?.name && (
-                            <View className="flex-row items-center mt-1">
-                              <Ionicons name="location-outline" size={14} color={TEXT_SECONDARY} />
-                              <Text
-                                className="text-sm ml-1"
-                                style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-                                numberOfLines={1}
-                              >
-                                {trip.destination.name}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={TEXT_SECONDARY} />
-                      </View>
-                    </Pressable>
-                  ))}
-                  {trips.length > 3 && (
-                    <Pressable
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        navigation.navigate("HomeTabs", { screen: "Plan" });
-                      }}
-                      className="py-2"
-                    >
-                      <Text
-                        className="text-center"
-                        style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 14, color: EARTH_GREEN }}
+                <View className="rounded-xl overflow-hidden" style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}>
+                  {/* 3x3 Photo Grid */}
+                  <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                    {userPhotos.map((photo, index) => (
+                      <Pressable
+                        key={photo.id}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          navigation.navigate("PhotoDetail", { photoId: photo.id });
+                        }}
+                        style={{
+                          width: "33.33%",
+                          aspectRatio: 1,
+                          padding: 1,
+                        }}
                       >
-                        View all {trips.length} trips
-                      </Text>
-                    </Pressable>
-                  )}
+                        <Image
+                          source={{ uri: photo.imageUrl }}
+                          style={{ width: "100%", height: "100%", backgroundColor: BORDER_SOFT }}
+                        />
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
               )
-            ) : (
-              <View className="p-6 rounded-xl items-center" style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}>
-                <Ionicons 
-                  name={activeTab === "photos" ? "images-outline" : "help-circle-outline"} 
-                  size={40} 
-                  color={EARTH_GREEN} 
-                />
-                <Text
-                  className="mt-3"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: TEXT_PRIMARY_STRONG }}
-                >
-                  No {activeTab} yet
-                </Text>
-                <Text
-                  className="mt-1 text-center"
-                  style={{ fontFamily: "SourceSans3_400Regular", fontSize: 14, color: TEXT_SECONDARY }}
-                >
-                  Your {activeTab} will appear here
-                </Text>
-              </View>
+            )}
+
+            {/* Activity Content - Connect Tab */}
+            {activeTab === "connect" && (
+              connectLoading ? (
+                <View className="p-6 rounded-xl items-center" style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}>
+                  <ActivityIndicator size="small" color={EARTH_GREEN} />
+                  <Text
+                    className="mt-2"
+                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 14, color: TEXT_SECONDARY }}
+                  >
+                    Loading contributions...
+                  </Text>
+                </View>
+              ) : connectContributions.length === 0 ? (
+                <View className="p-6 rounded-xl items-center" style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}>
+                  <Ionicons name="chatbubbles-outline" size={40} color={EARTH_GREEN} />
+                  <Text
+                    className="mt-3"
+                    style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: TEXT_PRIMARY_STRONG }}
+                  >
+                    No contributions yet
+                  </Text>
+                  <Text
+                    className="mt-1 text-center"
+                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 14, color: TEXT_SECONDARY }}
+                  >
+                    Your tips, reviews, and questions will appear here
+                  </Text>
+                </View>
+              ) : (
+                <View className="rounded-xl overflow-hidden" style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}>
+                  {connectContributions.map((contribution, index) => (
+                    <Pressable
+                      key={`${contribution.type}-${contribution.id}`}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        // Navigate to appropriate screen based on type
+                        if (contribution.type === "question") {
+                          navigation.navigate("QuestionDetail", { questionId: contribution.id });
+                        } else if (contribution.type === "review") {
+                          navigation.navigate("GearReviewDetail", { reviewId: contribution.id });
+                        } else if (contribution.type === "tip") {
+                          navigation.navigate("TipDetail", { tipId: contribution.id });
+                        }
+                        // Answers don't have their own detail screen
+                      }}
+                      className="flex-row items-center px-4 py-3"
+                      style={{
+                        borderBottomWidth: index < connectContributions.length - 1 ? 1 : 0,
+                        borderBottomColor: BORDER_SOFT,
+                      }}
+                    >
+                      <View
+                        className="w-8 h-8 rounded-full items-center justify-center mr-3"
+                        style={{
+                          backgroundColor: 
+                            contribution.type === "tip" ? "#dcfce7" :
+                            contribution.type === "review" ? "#fef3c7" :
+                            contribution.type === "question" ? "#dbeafe" :
+                            "#f3e8ff",
+                        }}
+                      >
+                        <Ionicons
+                          name={
+                            contribution.type === "tip" ? "bulb-outline" :
+                            contribution.type === "review" ? "star-outline" :
+                            contribution.type === "question" ? "help-circle-outline" :
+                            "chatbubble-outline"
+                          }
+                          size={16}
+                          color={
+                            contribution.type === "tip" ? "#16a34a" :
+                            contribution.type === "review" ? "#d97706" :
+                            contribution.type === "question" ? "#2563eb" :
+                            "#9333ea"
+                          }
+                        />
+                      </View>
+                      <View className="flex-1">
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            fontFamily: "SourceSans3_600SemiBold",
+                            fontSize: 14,
+                            color: TEXT_PRIMARY_STRONG,
+                          }}
+                        >
+                          {contribution.title}
+                        </Text>
+                        <Text
+                          style={{
+                            fontFamily: "SourceSans3_400Regular",
+                            fontSize: 12,
+                            color: TEXT_SECONDARY,
+                            textTransform: "capitalize",
+                          }}
+                        >
+                          {contribution.type === "review" ? "Gear Review" : contribution.type}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color={TEXT_SECONDARY} />
+                    </Pressable>
+                  ))}
+                </View>
+              )
             )}
         </View>
+        )}
 
-        {/* Favorite Parks Section */}
+        {/* Favorite Parks Section - only visible if profile content is public or viewing own profile */}
+        {isProfileContentVisible && (
         <View className="mb-6 px-5">
           <Text
             className="text-lg mb-3"
@@ -1184,15 +1516,57 @@ export default function MyCampsiteScreen({ navigation }: any) {
                         )}
                       </View>
                     </View>
-                    <Ionicons name="heart" size={20} color={RUST} />
+                    <View className="flex-row items-center" style={{ gap: 8 }}>
+                      {/* Plan a trip button */}
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handlePlanFromFavorite(fav);
+                        }}
+                        className="w-9 h-9 rounded-full items-center justify-center active:opacity-70"
+                        style={{ backgroundColor: "#f0f9f4" }}
+                        accessibilityLabel="Plan a trip here"
+                      >
+                        <Ionicons name="calendar-outline" size={18} color={EARTH_GREEN} />
+                      </Pressable>
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          Alert.alert(
+                            "Remove from Favorites?",
+                            `Remove ${fav.name} from your favorites?`,
+                            [
+                              { text: "Cancel", style: "cancel" },
+                              {
+                                text: "Remove",
+                                style: "destructive",
+                                onPress: async () => {
+                                  const userId = auth.currentUser?.uid;
+                                  if (!userId) return;
+                                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                  await removeFavoritePark(userId, fav.parkId);
+                                },
+                              },
+                            ]
+                          );
+                        }}
+                        className="w-9 h-9 rounded-full items-center justify-center active:opacity-70"
+                        style={{ backgroundColor: "#fff5f5" }}
+                        accessibilityLabel="Remove from favorites"
+                      >
+                        <Ionicons name="heart" size={20} color={RUST} />
+                      </Pressable>
+                    </View>
                   </View>
                 </Pressable>
               ))}
             </View>
           )}
         </View>
+        )}
 
-        {/* Parks I've Added Section */}
+        {/* Parks I've Added Section - only visible if profile content is public or viewing own profile */}
+        {isProfileContentVisible && (
         <View className="mb-6 px-5">
           <Text
             className="text-lg mb-3"
@@ -1244,9 +1618,13 @@ export default function MyCampsiteScreen({ navigation }: any) {
           ) : (
             <View>
               {savedPlaces.map((place) => (
-                <View
+                <Pressable
                   key={place.placeId}
-                  className="p-4 rounded-xl border mb-3"
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    // Could navigate to place detail if available
+                  }}
+                  className="p-4 rounded-xl border mb-3 active:opacity-90"
                   style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
                 >
                   <View className="flex-row items-start justify-between">
@@ -1290,15 +1668,57 @@ export default function MyCampsiteScreen({ navigation }: any) {
                         </Text>
                       )}
                     </View>
-                    <Ionicons name="location" size={20} color={EARTH_GREEN} />
+                    <View className="flex-row items-center" style={{ gap: 8 }}>
+                      {/* Plan a trip button */}
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handlePlanFromSavedPlace(place);
+                        }}
+                        className="w-9 h-9 rounded-full items-center justify-center active:opacity-70"
+                        style={{ backgroundColor: "#f0f9f4" }}
+                        accessibilityLabel="Plan a trip here"
+                      >
+                        <Ionicons name="calendar-outline" size={18} color={EARTH_GREEN} />
+                      </Pressable>
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          Alert.alert(
+                            "Remove Park?",
+                            `Remove ${place.name} from your saved parks?`,
+                            [
+                              { text: "Cancel", style: "cancel" },
+                              {
+                                text: "Remove",
+                                style: "destructive",
+                                onPress: async () => {
+                                  const userId = auth.currentUser?.uid;
+                                  if (!userId) return;
+                                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                  await removeSavedPlace(userId, place.placeId);
+                                },
+                              },
+                            ]
+                          );
+                        }}
+                        className="w-9 h-9 rounded-full items-center justify-center active:opacity-70"
+                        style={{ backgroundColor: "#f0f9f4" }}
+                        accessibilityLabel="Remove park"
+                      >
+                        <Ionicons name="location" size={20} color={EARTH_GREEN} />
+                      </Pressable>
+                    </View>
                   </View>
-                </View>
+                </Pressable>
               ))}
             </View>
           )}
         </View>
+        )}
 
-        {/* Account Actions */}
+        {/* Account Actions - only show on own profile (not when viewing others) */}
+        {!shouldHidePrivateContent && (
         <View className="px-5">
           {/* Restore Purchases Button */}
           <Pressable
@@ -1349,6 +1769,31 @@ export default function MyCampsiteScreen({ navigation }: any) {
             </Text>
           </Pressable>
         </View>
+        )}
+
+        {/* Private Profile Message - shown when viewing other user's private profile */}
+        {shouldHidePrivateContent && !isProfileContentVisible && (
+          <View className="mb-6 px-5">
+            <View 
+              className="p-6 rounded-xl items-center" 
+              style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}
+            >
+              <Ionicons name="lock-closed-outline" size={40} color={TEXT_MUTED} />
+              <Text
+                className="mt-3 text-center"
+                style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: TEXT_PRIMARY_STRONG }}
+              >
+                This profile is private
+              </Text>
+              <Text
+                className="mt-1 text-center"
+                style={{ fontFamily: "SourceSans3_400Regular", fontSize: 14, color: TEXT_SECONDARY }}
+              >
+                The user has chosen to keep their activity and content private.
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Bottom Spacer for Tab Bar */}
         <View style={{ height: bottomSpacer }} />

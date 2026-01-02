@@ -7,13 +7,13 @@
 - **Android**: Not configured yet
 
 ### Products (App Store Connect)
-- **Monthly**: `cca_monthly_sub_399` ($3.99 USD)
-- **Annual**: `cca_annual_sub_2499` ($24.99 USD)
+- **Monthly**: `cca_monthly_sub` ($6.99 USD) - Apple ID: 6757283844
+- **Annual**: `cca_annual_sub` ($39.99 USD) - Apple ID: 6757283672
 - **Status**: Waiting for Review
 - **Subscription Group**: 21829224 (Complete Camping App Subscriptions)
 
 ### RevenueCat Setup
-- **Offering ID**: `default`
+- **Offering ID**: `ofrng763ff4779a`
 - **Entitlement ID**: `Pro` (case-sensitive!)
 - **SDK Version**: react-native-purchases ^9.6.7
 
@@ -94,7 +94,7 @@ When offerings unavailable (products in review, wrong storefront):
 ```typescript
 // Prioritize exact product IDs
 const monthly = pkgs.find((p) => 
-  p.product.identifier === "cca_monthly_sub_399" ||
+  p.product.identifier === "cca_monthly_sub" ||
   p.packageType === PACKAGE_TYPE.MONTHLY
 );
 ```

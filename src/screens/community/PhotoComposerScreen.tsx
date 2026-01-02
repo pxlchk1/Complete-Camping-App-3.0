@@ -222,6 +222,7 @@ export default function PhotoComposerScreen() {
       const postId = await createPhotoPost({
         userId: currentUser.id,
         displayName: currentUser.displayName || "Anonymous",
+        userHandle: currentUser.handle,
         photoUrls: [downloadURL],
         storagePaths: [storagePath],
         postType,

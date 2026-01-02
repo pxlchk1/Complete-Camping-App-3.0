@@ -1916,3 +1916,142 @@ export const handleSendGridWebhook = functions.https.onRequest(async (req, res) 
 
   res.status(200).send("OK");
 });
+
+// ============================================
+// ADMIN: UPDATE PROFILE STATS AND BADGES
+// ============================================
+
+/**
+ * Admin function to update a user's profile stats and add merit badges
+ * Only callable by admins (checks isAdministrator flag in profiles)
+ */
+export const adminUpdateProfile = functions.https.onCall(
+  async (
+    data: {
+      targetUserId: string;
+      stats?: {
+        tripsCount?: number;
+        tipsCount?: number;
+        gearReviewsCount?: number;
+        questionsCount?: number;
+        photosCount?: number;
+      };
+      addBadge?: {
+        id: string;
+        name: string;
+        icon: string;
+        color: string;
+      };
+    },
+    context
+  ) => {
+    // Require authentication
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Must be authenticated"
+      );
+    }
+
+    const callerUid = context.auth.uid;
+    const db = admin.firestore();
+
+    // Check if caller is an administrator (check multiple fields like Firestore rules do)
+    const callerProfile = await db.collection("profiles").doc(callerUid).get();
+    const profileData = callerProfile.data();
+    const isAdminUser = callerProfile.exists && (
+      profileData?.isAdministrator === true ||
+      profileData?.isAdmin === true ||
+      profileData?.role === "admin" ||
+      profileData?.role === "administrator" ||
+      profileData?.membershipTier === "isAdmin"
+    );
+    
+    if (!isAdminUser) {
+      functions.logger.warn("Admin check failed for user", {
+        callerUid,
+        profileExists: callerProfile.exists,
+        profileData: profileData ? {
+          isAdministrator: profileData.isAdministrator,
+          isAdmin: profileData.isAdmin,
+          role: profileData.role,
+          membershipTier: profileData.membershipTier,
+        } : null,
+      });
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Only administrators can update profiles"
+      );
+    }
+
+    const { targetUserId, stats, addBadge } = data;
+
+    if (!targetUserId) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Target user ID is required"
+      );
+    }
+
+    const profileRef = db.collection("profiles").doc(targetUserId);
+    const profileSnap = await profileRef.get();
+
+    if (!profileSnap.exists) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Target profile not found"
+      );
+    }
+
+    const currentData = profileSnap.data() || {};
+    const updateData: Record<string, unknown> = {};
+
+    // Update stats if provided
+    if (stats) {
+      updateData.stats = {
+        ...(currentData.stats || {}),
+        ...stats,
+      };
+    }
+
+    // Add or update badge if provided
+    if (addBadge) {
+      const currentBadges = currentData.meritBadges || [];
+      // Find existing badge index
+      const existingIndex = currentBadges.findIndex(
+        (b: { id: string }) => b.id === addBadge.id
+      );
+      
+      if (existingIndex >= 0) {
+        // Update existing badge (keep earnedAt, update other fields)
+        const updatedBadges = [...currentBadges];
+        updatedBadges[existingIndex] = {
+          ...currentBadges[existingIndex],
+          ...addBadge,
+        };
+        updateData.meritBadges = updatedBadges;
+      } else {
+        // Add new badge
+        updateData.meritBadges = [
+          ...currentBadges,
+          {
+            ...addBadge,
+            earnedAt: new Date().toISOString(),
+          },
+        ];
+      }
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      await profileRef.update(updateData);
+      functions.logger.info("Profile updated by admin", {
+        adminUid: callerUid,
+        targetUserId,
+        updates: Object.keys(updateData),
+      });
+    }
+
+    return { success: true, updated: Object.keys(updateData) };
+  }
+);
+

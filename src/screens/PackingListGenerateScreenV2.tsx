@@ -30,6 +30,8 @@ import {
 import {
   generatePackingList,
   getUserTemplates,
+  getTripsWithPackingLists,
+  copyPackingListFromTrip,
 } from "../services/packingServiceV2";
 import { PACKING_TEMPLATES, getRecommendedTemplates } from "../data/packingTemplates";
 import { useTrips } from "../state/tripsStore";
@@ -109,24 +111,30 @@ export default function PackingListGenerateScreen() {
     hasBearBox: false,
   });
   const [userTemplates, setUserTemplates] = useState<PackingTemplate[]>([]);
+  const [pastTripsWithLists, setPastTripsWithLists] = useState<Array<{ tripId: string; itemCount: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [copying, setCopying] = useState(false);
 
-  // Load user templates
+  // Load user templates and past trips
   useEffect(() => {
-    async function loadTemplates() {
+    async function loadData() {
       if (!user?.id) return;
       try {
-        const templates = await getUserTemplates(user.id);
+        const [templates, pastTrips] = await Promise.all([
+          getUserTemplates(user.id),
+          getTripsWithPackingLists(user.id, tripId),
+        ]);
         setUserTemplates(templates);
+        setPastTripsWithLists(pastTrips);
       } catch (error) {
-        console.error("[PackingListGenerate] Error loading templates:", error);
+        console.error("[PackingListGenerate] Error loading data:", error);
       } finally {
         setLoading(false);
       }
     }
-    loadTemplates();
-  }, [user?.id]);
+    loadData();
+  }, [user?.id, tripId]);
 
   // Auto-select recommended template based on trip type and season
   useEffect(() => {
@@ -173,6 +181,58 @@ export default function PackingListGenerateScreen() {
     Haptics.selectionAsync();
   };
 
+  // Copy from previous trip
+  const handleCopyFromTrip = async (sourceTripId: string) => {
+    if (!user?.id) return;
+
+    const sourceTrip = trips.find((t) => t.id === sourceTripId);
+    const tripName = sourceTrip?.name || "previous trip";
+
+    Alert.alert(
+      "Copy Packing List",
+      `Copy all items from "${tripName}" to this trip?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Copy",
+          onPress: async () => {
+            setCopying(true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+            try {
+              const { copiedCount, linkedCount } = await copyPackingListFromTrip(
+                user.id,
+                sourceTripId,
+                tripId
+              );
+
+              // Track analytics
+              trackPackingListGenerated(tripId);
+              trackCoreAction(user.id, "packing_list_generated");
+
+              // Show success and navigate
+              Alert.alert(
+                "List Copied!",
+                `${copiedCount} items copied${linkedCount > 0 ? `, ${linkedCount} linked to your gear closet` : ""}`,
+                [
+                  {
+                    text: "View List",
+                    onPress: () => navigation.replace("PackingList", { tripId }),
+                  },
+                ]
+              );
+            } catch (error) {
+              console.error("[PackingListGenerate] Error copying list:", error);
+              Alert.alert("Error", "Failed to copy packing list. Please try again.");
+            } finally {
+              setCopying(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Generate list
   const handleGenerate = async () => {
     if (!user?.id || !selectedTemplate) return;
@@ -206,6 +266,12 @@ export default function PackingListGenerateScreen() {
     } finally {
       setGenerating(false);
     }
+  };
+
+  // Get past trip info for display
+  const getPastTripInfo = (pastTripId: string) => {
+    const pastTrip = trips.find((t) => t.id === pastTripId);
+    return pastTrip;
   };
 
   // ============================================================================
@@ -274,6 +340,89 @@ export default function PackingListGenerateScreen() {
         className="flex-1"
         contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
       >
+        {/* Copy from Previous Trip */}
+        {pastTripsWithLists.length > 0 && (
+          <View className="mb-6">
+            <Text
+              style={{
+                fontFamily: "SourceSans3_600SemiBold",
+                fontSize: 13,
+                color: TEXT_SECONDARY,
+                marginBottom: 8,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
+              Copy from Previous Trip
+            </Text>
+            <View style={{ gap: 8 }}>
+              {pastTripsWithLists.slice(0, 3).map(({ tripId: pastTripId, itemCount }) => {
+                const pastTrip = getPastTripInfo(pastTripId);
+                if (!pastTrip) return null;
+
+                return (
+                  <Pressable
+                    key={pastTripId}
+                    onPress={() => handleCopyFromTrip(pastTripId)}
+                    disabled={copying}
+                    className="flex-row items-center p-4 rounded-xl border"
+                    style={{
+                      borderColor: BORDER_SOFT,
+                      backgroundColor: PARCHMENT,
+                    }}
+                  >
+                    <View
+                      className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                      style={{ backgroundColor: CARD_BACKGROUND_LIGHT }}
+                    >
+                      <Ionicons name="copy-outline" size={20} color={EARTH_GREEN} />
+                    </View>
+                    <View className="flex-1">
+                      <Text
+                        style={{
+                          fontFamily: "SourceSans3_600SemiBold",
+                          fontSize: 15,
+                          color: DEEP_FOREST,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {pastTrip.name}
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: "SourceSans3_400Regular",
+                          fontSize: 12,
+                          color: TEXT_SECONDARY,
+                          marginTop: 2,
+                        }}
+                      >
+                        {itemCount} items
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={EARTH_GREEN} />
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Divider */}
+            <View className="flex-row items-center my-4">
+              <View className="flex-1 h-px" style={{ backgroundColor: BORDER_SOFT }} />
+              <Text
+                style={{
+                  fontFamily: "SourceSans3_400Regular",
+                  fontSize: 12,
+                  color: TEXT_SECONDARY,
+                  marginHorizontal: 12,
+                }}
+              >
+                or generate a new list
+              </Text>
+              <View className="flex-1 h-px" style={{ backgroundColor: BORDER_SOFT }} />
+            </View>
+          </View>
+        )}
+
         {/* Trip Style */}
         <View className="mb-6">
           <Text

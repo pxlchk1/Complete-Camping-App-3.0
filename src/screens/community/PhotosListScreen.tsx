@@ -8,7 +8,7 @@ import { View, Text, Pressable, FlatList, Image, ActivityIndicator, Dimensions, 
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { getPhotoPosts, getHelpfulStatuses, toggleHelpful } from "../../services/photoPostsService";
+import { getPhotoPosts, getHelpfulStatuses, toggleHelpful, getUserVotes, vote, VoteDirection } from "../../services/photoPostsService";
 import { getStories } from "../../services/storiesService";
 import { Story } from "../../types/community";
 import {
@@ -91,6 +91,9 @@ export default function PhotosListScreen() {
 
   // Helpful status tracking
   const [helpfulStatuses, setHelpfulStatuses] = useState<Record<string, boolean>>({});
+  
+  // Reddit-style vote tracking
+  const [userVotes, setUserVotes] = useState<Record<string, VoteDirection>>({});
 
   // Gating modal state
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -148,13 +151,14 @@ export default function PhotosListScreen() {
       setLastDoc(result.lastDoc);
       setHasMore(result.posts.length === 30);
 
-      // Load helpful statuses
+      // Load helpful statuses and vote statuses
       if (currentUser?.id && visiblePosts.length > 0) {
-        const statuses = await getHelpfulStatuses(
-          visiblePosts.map(p => p.id),
-          currentUser.id
-        );
+        const [statuses, votes] = await Promise.all([
+          getHelpfulStatuses(visiblePosts.map(p => p.id), currentUser.id),
+          getUserVotes(visiblePosts.map(p => p.id), currentUser.id),
+        ]);
         setHelpfulStatuses(prev => ({ ...prev, ...statuses }));
+        setUserVotes(prev => ({ ...prev, ...votes }));
       }
     } catch (err: any) {
       console.error("Error loading photo posts:", err);
@@ -245,6 +249,49 @@ export default function PhotosListScreen() {
       setHelpfulStatuses(prev => ({ ...prev, [postId]: wasHelpful }));
       setPhotoPosts(prev => 
         prev.map(p => p.id === postId ? { ...p, helpfulCount: p.helpfulCount + (wasHelpful ? 1 : -1) } : p)
+      );
+    }
+  };
+
+  // Reddit-style vote handler
+  const handleVote = async (postId: string, direction: "up" | "down") => {
+    if (!currentUser?.id) {
+      setShowAccountModal(true);
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    const currentVote = userVotes[postId];
+    
+    // Calculate optimistic update
+    let delta = 0;
+    let newVote: VoteDirection = direction;
+    
+    if (currentVote === null || currentVote === undefined) {
+      delta = direction === "up" ? 1 : -1;
+    } else if (currentVote === direction) {
+      // Removing vote
+      delta = direction === "up" ? -1 : 1;
+      newVote = null;
+    } else {
+      // Switching vote
+      delta = direction === "up" ? 2 : -2;
+    }
+    
+    // Optimistic update
+    setUserVotes(prev => ({ ...prev, [postId]: newVote }));
+    setPhotoPosts(prev => 
+      prev.map(p => p.id === postId ? { ...p, voteCount: (p.voteCount || 0) + delta } : p)
+    );
+
+    try {
+      await vote(postId, currentUser.id, direction);
+    } catch {
+      // Rollback on error
+      setUserVotes(prev => ({ ...prev, [postId]: currentVote }));
+      setPhotoPosts(prev => 
+        prev.map(p => p.id === postId ? { ...p, voteCount: (p.voteCount || 0) - delta } : p)
       );
     }
   };
@@ -430,6 +477,8 @@ export default function PhotosListScreen() {
     const caption = isPhotoPost ? (item as PhotoPost).caption : (item as Story).caption;
     const isHelpful = isPhotoPost ? helpfulStatuses[item.id] : false;
     const helpfulCount = isPhotoPost ? (item as PhotoPost).helpfulCount : 0;
+    const currentVote = isPhotoPost ? userVotes[item.id] : null;
+    const voteCount = isPhotoPost ? ((item as PhotoPost).voteCount || 0) : 0;
 
     return (
       <Pressable
@@ -503,38 +552,60 @@ export default function PhotosListScreen() {
                 )}
                 
                 {isPhotoPost && (
-                  <Pressable
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleToggleHelpful(item.id);
-                    }}
+                  <View
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
+                      backgroundColor: "rgba(255,255,255,0.15)",
                       borderRadius: 8,
-                      backgroundColor: isHelpful ? "#16a34a30" : "rgba(255,255,255,0.15)",
+                      paddingHorizontal: 2,
                     }}
                   >
-                    <Ionicons
-                      name={isHelpful ? "thumbs-up" : "thumbs-up-outline"}
-                      size={12}
-                      color={isHelpful ? "#16a34a" : "#fff"}
-                    />
-                    {helpfulCount > 0 && (
-                      <Text
-                        style={{
-                          fontFamily: "SourceSans3_600SemiBold",
-                          fontSize: 10,
-                          color: isHelpful ? "#16a34a" : "#fff",
-                          marginLeft: 3,
-                        }}
-                      >
-                        {helpfulCount}
-                      </Text>
-                    )}
-                  </Pressable>
+                    {/* Upvote button */}
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleVote(item.id, "up");
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons
+                        name={currentVote === "up" ? "arrow-up" : "arrow-up-outline"}
+                        size={14}
+                        color={currentVote === "up" ? "#f97316" : "#fff"}
+                      />
+                    </Pressable>
+                    
+                    {/* Vote count */}
+                    <Text
+                      style={{
+                        fontFamily: "SourceSans3_600SemiBold",
+                        fontSize: 11,
+                        color: currentVote === "up" ? "#f97316" : currentVote === "down" ? "#8b5cf6" : "#fff",
+                        minWidth: 16,
+                        textAlign: "center",
+                      }}
+                    >
+                      {voteCount}
+                    </Text>
+                    
+                    {/* Downvote button */}
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleVote(item.id, "down");
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons
+                        name={currentVote === "down" ? "arrow-down" : "arrow-down-outline"}
+                        size={14}
+                        color={currentVote === "down" ? "#8b5cf6" : "#fff"}
+                      />
+                    </Pressable>
+                  </View>
                 )}
               </View>
             </View>

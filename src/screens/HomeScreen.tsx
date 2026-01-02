@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo } from "react";
-import { View, Text, ScrollView, Pressable, ImageBackground, Image } from "react-native";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { View, Text, ScrollView, Pressable, ImageBackground, Image, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -11,6 +11,12 @@ import * as Haptics from "expo-haptics";
 import AccountButtonHeader from "../components/AccountButtonHeader";
 import { SectionTitle, BodyText, BodyTextMedium } from "../components/Typography";
 import PushPermissionPrompt from "../components/PushPermissionPrompt";
+import HandleLink from "../components/HandleLink";
+
+// Services
+import { getPhotoPosts } from "../services/photoPostsService";
+import { getUser } from "../services/userService";
+import { PhotoPost } from "../types/photoPost";
 
 // State
 import { useTripsStore } from "../state/tripsStore";
@@ -71,6 +77,50 @@ export default function HomeScreen() {
   const setCurrentUser = useUserStore((s) => s.setCurrentUser);
   const currentUser = useUserStore((s) => s.currentUser);
   const setActivePlanTab = usePlanTabStore((s) => s.setActiveTab);
+
+  // Featured Community Photo state
+  const [featuredPhoto, setFeaturedPhoto] = useState<PhotoPost | null>(null);
+  const [featuredPhotoHandle, setFeaturedPhotoHandle] = useState<string | null>(null);
+  const [photoLoading, setPhotoLoading] = useState(true);
+
+  // Fetch a random featured photo on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      const fetchRandomPhoto = async () => {
+        try {
+          setPhotoLoading(true);
+          // Fetch recent photos (limit 50 to get a good pool)
+          const result = await getPhotoPosts(undefined, 50);
+          if (result.posts.length > 0) {
+            // Pick a random photo from the pool
+            const randomIndex = Math.floor(Math.random() * result.posts.length);
+            const selectedPhoto = result.posts[randomIndex];
+            setFeaturedPhoto(selectedPhoto);
+            
+            // Fetch author's handle if not stored on the photo
+            if (!selectedPhoto.userHandle && selectedPhoto.userId) {
+              try {
+                const author = await getUser(selectedPhoto.userId);
+                if (author?.handle) {
+                  setFeaturedPhotoHandle(author.handle);
+                }
+              } catch (err) {
+                console.log("Could not fetch featured photo author handle:", err);
+              }
+            } else {
+              setFeaturedPhotoHandle(null);
+            }
+          }
+        } catch (error) {
+          console.error("[HomeScreen] Failed to fetch featured photo:", error);
+        } finally {
+          setPhotoLoading(false);
+        }
+      };
+
+      fetchRandomPhoto();
+    }, [])
+  );
 
   /**
    * IMPORTANT: this was previously running in production too.
@@ -249,12 +299,12 @@ export default function HomeScreen() {
         >
           {/* Quick Actions */}
           <View className="mb-6">
-            <SectionTitle className="mb-4" color={DEEP_FOREST}>
+            <SectionTitle className="mb-4" color={DEEP_FOREST} style={{ fontSize: 18 }}>
               Quick Actions
             </SectionTitle>
 
             <View className="space-y-3">
-              {/* Plan Trip */}
+              {/* Trip Plans */}
               <Pressable
                 className="rounded-xl active:scale-95"
                 style={{ backgroundColor: "#59625C", paddingVertical: 14, borderRadius: 10 }}
@@ -263,12 +313,12 @@ export default function HomeScreen() {
                   setActivePlanTab("trips");
                   navigation.navigate("Plan");
                 }}
-                accessibilityLabel="Plan Trip"
+                accessibilityLabel="Trip Plans"
                 accessibilityRole="button"
               >
                 <View className="flex-row items-center justify-between px-4">
                   <View className="flex-row items-center">
-                    <Ionicons name="add-circle-outline" size={24} color="#FFFFFF" />
+                    <Ionicons name="calendar-outline" size={24} color="#FFFFFF" />
                     <Text
                       className="ml-3"
                       style={{
@@ -280,73 +330,7 @@ export default function HomeScreen() {
                         color: "#FFFFFF",
                       }}
                     >
-                      Plan Trip
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-                </View>
-              </Pressable>
-
-              {/* Packing List */}
-              <Pressable
-                className="rounded-xl active:scale-95"
-                style={{ backgroundColor: "#8A8165", paddingVertical: 14, borderRadius: 10 }}
-                onPress={() => {
-                  safeHaptic();
-                  setActivePlanTab("packing");
-                  navigation.navigate("Plan");
-                }}
-                accessibilityLabel="Packing List"
-                accessibilityRole="button"
-              >
-                <View className="flex-row items-center justify-between px-4">
-                  <View className="flex-row items-center">
-                    <Ionicons name="list" size={24} color="#FFFFFF" />
-                    <Text
-                      className="ml-3"
-                      style={{
-                        fontFamily: "SourceSans3_600SemiBold",
-                        fontSize: 15,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.08,
-                        textAlign: "center",
-                        color: "#FFFFFF",
-                      }}
-                    >
-                      Packing List
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-                </View>
-              </Pressable>
-
-              {/* Meal Plans */}
-              <Pressable
-                className="rounded-xl active:scale-95"
-                style={{ backgroundColor: "#8B8577", paddingVertical: 14, borderRadius: 10 }}
-                onPress={() => {
-                  safeHaptic();
-                  setActivePlanTab("meals");
-                  navigation.navigate("Plan");
-                }}
-                accessibilityLabel="Meal Plans"
-                accessibilityRole="button"
-              >
-                <View className="flex-row items-center justify-between px-4">
-                  <View className="flex-row items-center">
-                    <Ionicons name="restaurant-outline" size={24} color="#FFFFFF" />
-                    <Text
-                      className="ml-3"
-                      style={{
-                        fontFamily: "SourceSans3_600SemiBold",
-                        fontSize: 15,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.08,
-                        textAlign: "center",
-                        color: "#FFFFFF",
-                      }}
-                    >
-                      Meal Plans
+                      Trip Plans
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
@@ -417,7 +401,177 @@ export default function HomeScreen() {
                   <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
                 </View>
               </Pressable>
+
+              {/* My Gear Closet */}
+              <Pressable
+                className="rounded-xl active:scale-95"
+                style={{ backgroundColor: "#6B5B4F", paddingVertical: 14, borderRadius: 10 }}
+                onPress={() => {
+                  safeHaptic();
+                  navigation.navigate("MyGearCloset");
+                }}
+                accessibilityLabel="My Gear Closet"
+                accessibilityRole="button"
+              >
+                <View className="flex-row items-center justify-between px-4">
+                  <View className="flex-row items-center">
+                    <Ionicons name="cube-outline" size={24} color="#FFFFFF" />
+                    <Text
+                      className="ml-3"
+                      style={{
+                        fontFamily: "SourceSans3_600SemiBold",
+                        fontSize: 15,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.08,
+                        textAlign: "center",
+                        color: "#FFFFFF",
+                      }}
+                    >
+                      My Gear Closet
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                </View>
+              </Pressable>
+
+              {/* My Campground */}
+              <Pressable
+                className="rounded-xl active:scale-95"
+                style={{ backgroundColor: "#4A6B5D", paddingVertical: 14, borderRadius: 10 }}
+                onPress={() => {
+                  safeHaptic();
+                  navigation.navigate("MyCampsite");
+                }}
+                accessibilityLabel="My Campground"
+                accessibilityRole="button"
+              >
+                <View className="flex-row items-center justify-between px-4">
+                  <View className="flex-row items-center">
+                    <Ionicons name="bonfire-outline" size={24} color="#FFFFFF" />
+                    <Text
+                      className="ml-3"
+                      style={{
+                        fontFamily: "SourceSans3_600SemiBold",
+                        fontSize: 15,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.08,
+                        textAlign: "center",
+                        color: "#FFFFFF",
+                      }}
+                    >
+                      My Campground
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                </View>
+              </Pressable>
             </View>
+          </View>
+
+          {/* Featured Community Photo */}
+          <View className="mb-6">
+            <SectionTitle className="mb-4" color={DEEP_FOREST} style={{ fontSize: 18 }}>
+              Featured Community Photo
+            </SectionTitle>
+
+            <Pressable
+              onPress={() => {
+                if (featuredPhoto) {
+                  safeHaptic();
+                  navigation.navigate("PhotoDetail", { photoId: featuredPhoto.id });
+                }
+              }}
+              className="rounded-xl overflow-hidden active:opacity-90"
+              style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderWidth: 1, borderColor: BORDER_SOFT }}
+              disabled={!featuredPhoto}
+            >
+              {photoLoading ? (
+                <View className="h-48 items-center justify-center">
+                  <ActivityIndicator size="small" color={EARTH_GREEN} />
+                </View>
+              ) : featuredPhoto && featuredPhoto.photoUrls?.[0] ? (
+                <View>
+                  <Image
+                    source={{ uri: featuredPhoto.photoUrls[0] }}
+                    style={{ width: "100%", height: 200 }}
+                    resizeMode="cover"
+                  />
+                  <View className="p-3">
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-1">
+                        {featuredPhoto.caption && (
+                          <Text
+                            numberOfLines={2}
+                            style={{
+                              fontFamily: "SourceSans3_400Regular",
+                              fontSize: 14,
+                              color: TEXT_PRIMARY_STRONG,
+                            }}
+                          >
+                            {featuredPhoto.caption}
+                          </Text>
+                        )}
+                        <View className="flex-row items-center mt-1">
+                          <Text
+                            style={{
+                              fontFamily: "SourceSans3_500Medium",
+                              fontSize: 12,
+                              color: TEXT_SECONDARY,
+                            }}
+                          >
+                            by{" "}
+                          </Text>
+                          {featuredPhoto.userId && (featuredPhoto.userHandle || featuredPhotoHandle) ? (
+                            <HandleLink 
+                              handle={featuredPhoto.userHandle || featuredPhotoHandle || ""}
+                              userId={featuredPhoto.userId}
+                              style={{ fontFamily: "SourceSans3_500Medium", fontSize: 12 }}
+                            />
+                          ) : (
+                            <Text
+                              style={{
+                                fontFamily: "SourceSans3_500Medium",
+                                fontSize: 12,
+                                color: TEXT_SECONDARY,
+                              }}
+                            >
+                              @{featuredPhoto.userHandle || featuredPhotoHandle || featuredPhoto.displayName || "Anonymous"}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      <View className="flex-row items-center ml-3">
+                        <Ionicons name="camera-outline" size={16} color={EARTH_GREEN} />
+                        <Text
+                          className="ml-1"
+                          style={{
+                            fontFamily: "SourceSans3_600SemiBold",
+                            fontSize: 12,
+                            color: EARTH_GREEN,
+                          }}
+                        >
+                          View
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <View className="h-48 items-center justify-center p-4">
+                  <Ionicons name="images-outline" size={40} color={TEXT_SECONDARY} />
+                  <Text
+                    className="mt-2 text-center"
+                    style={{
+                      fontFamily: "SourceSans3_400Regular",
+                      fontSize: 14,
+                      color: TEXT_SECONDARY,
+                    }}
+                  >
+                    No photos yet. Be the first to share!
+                  </Text>
+                </View>
+              )}
+            </Pressable>
           </View>
 
           {/* Daily Tip Banner */}

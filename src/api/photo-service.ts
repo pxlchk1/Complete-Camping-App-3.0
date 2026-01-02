@@ -44,7 +44,7 @@ export async function uploadPhoto(
       authorId: userId,
       ownerUid: userId, // Consistent owner field for rules
       authorHandle: userHandle,
-      authorName: userName || userHandle,
+      authorName: userHandle ? `@${userHandle}` : (userName || "Anonymous"),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       upvotes: 0,

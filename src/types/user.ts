@@ -19,6 +19,7 @@ export interface User {
   role: UserRole;
   membershipTier: MembershipTier;
   membershipExpiresAt?: string; // ISO string, undefined for lifetime or free
+  isProfileContentPublic?: boolean; // Whether profile content (below header) is visible to others. Default true.
   isBanned: boolean;
   bannedAt?: string;
   bannedBy?: string; // Admin user ID

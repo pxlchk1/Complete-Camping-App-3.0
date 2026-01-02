@@ -33,6 +33,8 @@ import {
   getTemperatureProfile,
 } from "../types/packingV2";
 import { PACKING_TEMPLATES, getRecommendedTemplates, generateTemplateId } from "../data/packingTemplates";
+import { getUserGear } from "./gearClosetService";
+import { GearItem, GearCategory } from "../types/gear";
 
 // ============================================================================
 // CONSTANTS
@@ -243,6 +245,132 @@ async function updatePackingListTotals(
 }
 
 // ============================================================================
+// SMART GEAR MATCHING
+// ============================================================================
+
+// Map gear categories to packing categories
+const GEAR_TO_PACKING_CATEGORY: Record<GearCategory, PackingCategory> = {
+  shelter: "shelter",
+  sleep: "sleep",
+  kitchen: "kitchen",
+  water: "water",
+  lighting: "lighting",
+  tools: "tools_repairs",
+  safety: "navigation_safety",
+  clothing: "clothing",
+  camp_comfort: "camp_comfort",
+  electronics: "electronics",
+  hygiene: "hygiene",
+  documents_essentials: "documents_essentials",
+  optional_extras: "optional_extras",
+  seating: "camp_comfort",
+};
+
+/**
+ * Find matching gear from user's gear closet for a packing item
+ * Uses fuzzy name matching and category matching
+ */
+function findMatchingGear(
+  packingItem: PackingItemV2,
+  userGear: GearItem[]
+): GearItem | null {
+  const normalizeString = (str: string) =>
+    str.toLowerCase().trim().replace(/[^\w\s]/g, "").replace(/\s+/g, " ");
+
+  const packingName = normalizeString(packingItem.name);
+  const packingWords = packingName.split(" ");
+
+  // First try: exact match on name
+  const exactMatch = userGear.find(
+    (gear) => normalizeString(gear.name) === packingName
+  );
+  if (exactMatch) return exactMatch;
+
+  // Second try: find gear in matching category with similar name
+  const categoryMatches = userGear.filter((gear) => {
+    const gearPackingCategory = GEAR_TO_PACKING_CATEGORY[gear.category];
+    return gearPackingCategory === packingItem.category;
+  });
+
+  for (const gear of categoryMatches) {
+    const gearName = normalizeString(gear.name);
+    const gearWords = gearName.split(" ");
+
+    // Check if significant words match (ignoring articles, sizes, etc.)
+    const significantPackingWords = packingWords.filter(
+      (w) => w.length > 2 && !["the", "for", "and", "with"].includes(w)
+    );
+    const significantGearWords = gearWords.filter(
+      (w) => w.length > 2 && !["the", "for", "and", "with"].includes(w)
+    );
+
+    // Count matching words
+    const matchingWords = significantPackingWords.filter((pw) =>
+      significantGearWords.some(
+        (gw) => gw.includes(pw) || pw.includes(gw)
+      )
+    );
+
+    // If more than half the significant words match, it's a match
+    if (
+      matchingWords.length >= Math.ceil(significantPackingWords.length / 2) &&
+      matchingWords.length >= 1
+    ) {
+      return gear;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Link packing items to user's gear closet items
+ * Returns the number of items that were linked
+ */
+async function linkItemsToGearCloset(
+  userId: string,
+  packingItems: PackingItemV2[]
+): Promise<{ linkedCount: number }> {
+  try {
+    const userGear = await getUserGear(userId);
+    if (userGear.length === 0) return { linkedCount: 0 };
+
+    let linkedCount = 0;
+    const usedGearIds = new Set<string>();
+
+    for (const item of packingItems) {
+      // Skip if already linked
+      if (item.isFromGearCloset) continue;
+
+      const matchingGear = findMatchingGear(
+        item,
+        userGear.filter((g) => !usedGearIds.has(g.id))
+      );
+
+      if (matchingGear) {
+        // Update item with gear closet info
+        item.isFromGearCloset = true;
+        item.gearClosetId = matchingGear.id;
+        // Add brand/model as notes if available
+        const gearInfo = [matchingGear.brand, matchingGear.model]
+          .filter(Boolean)
+          .join(" ");
+        if (gearInfo && !item.notes) {
+          item.notes = gearInfo;
+        }
+        usedGearIds.add(matchingGear.id);
+        linkedCount++;
+      }
+    }
+
+    return { linkedCount };
+  } catch (error) {
+    console.log("[PackingService] Error linking to gear closet:", error);
+    return { linkedCount: 0 };
+  }
+}
+
+// ============================================================================
 // LIST GENERATION
 // ============================================================================
 
@@ -325,6 +453,10 @@ export async function generatePackingList(
   // Apply amenity-based adjustments
   applyAmenityAdjustments(packingItems, request.amenities);
 
+  // Smart gear matching - link items to user's gear closet
+  const { linkedCount } = await linkItemsToGearCloset(userId, packingItems);
+  console.log(`[PackingService] Linked ${linkedCount} items to gear closet`);
+
   try {
     const batch = writeBatch(db);
 
@@ -376,6 +508,138 @@ export async function generatePackingList(
   } catch (error) {
     console.log("[PackingService] Firebase error, saving locally:", error);
     await saveLocalPackingList(tripId, packingItems);
+  }
+}
+
+/**
+ * Copy packing list from one trip to another
+ * Returns the number of items copied
+ */
+export async function copyPackingListFromTrip(
+  userId: string,
+  sourceTripId: string,
+  targetTripId: string
+): Promise<{ copiedCount: number; linkedCount: number }> {
+  const now = new Date().toISOString();
+
+  try {
+    // Get source items
+    const sourceItems = await getTripPackingItems(userId, sourceTripId);
+    
+    if (sourceItems.length === 0) {
+      return { copiedCount: 0, linkedCount: 0 };
+    }
+
+    // Create new items for target trip (reset packed status)
+    const newItems: PackingItemV2[] = sourceItems.map((item) => ({
+      ...item,
+      id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      isPacked: false,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    // Smart gear matching - ensure items are linked to current gear
+    const { linkedCount } = await linkItemsToGearCloset(userId, newItems);
+
+    const batch = writeBatch(db);
+
+    // Create packing list document
+    const listRef = doc(
+      db,
+      "users",
+      userId,
+      "trips",
+      targetTripId,
+      PACKING_LISTS_COLLECTION,
+      "main"
+    );
+    const listData: TripPackingList = {
+      id: "main",
+      tripId: targetTripId,
+      userId,
+      generatedFrom: {
+        templateId: `copied_from_${sourceTripId}`,
+        tripType: "car_camping" as TripType,
+        season: "summer" as Season,
+        nights: 2,
+        partySize: 2,
+        amenities: DEFAULT_AMENITIES,
+      },
+      totalItems: newItems.length,
+      packedItems: 0,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    };
+    batch.set(listRef, listData);
+
+    // Create all items
+    for (const item of newItems) {
+      const itemRef = doc(
+        db,
+        "users",
+        userId,
+        "trips",
+        targetTripId,
+        PACKING_ITEMS_COLLECTION,
+        item.id
+      );
+      batch.set(itemRef, item);
+    }
+
+    await batch.commit();
+    return { copiedCount: newItems.length, linkedCount };
+  } catch (error) {
+    console.error("[PackingService] Error copying packing list:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get trips that have packing lists
+ */
+export async function getTripsWithPackingLists(
+  userId: string,
+  excludeTripId?: string
+): Promise<Array<{ tripId: string; itemCount: number }>> {
+  try {
+    // Get all trips for user (we'll check each one for packing lists)
+    const tripsRef = collection(db, "users", userId, "trips");
+    const tripsSnapshot = await getDocs(tripsRef);
+    
+    const results: Array<{ tripId: string; itemCount: number }> = [];
+    
+    for (const tripDoc of tripsSnapshot.docs) {
+      if (tripDoc.id === excludeTripId) continue;
+      
+      // Check if this trip has a packing list
+      const listRef = doc(
+        db,
+        "users",
+        userId,
+        "trips",
+        tripDoc.id,
+        PACKING_LISTS_COLLECTION,
+        "main"
+      );
+      const listSnap = await getDoc(listRef);
+      
+      if (listSnap.exists()) {
+        const listData = listSnap.data() as TripPackingList;
+        if (listData.totalItems > 0) {
+          results.push({
+            tripId: tripDoc.id,
+            itemCount: listData.totalItems,
+          });
+        }
+      }
+    }
+    
+    return results;
+  } catch (error) {
+    console.log("[PackingService] Error getting trips with packing lists:", error);
+    return [];
   }
 }
 

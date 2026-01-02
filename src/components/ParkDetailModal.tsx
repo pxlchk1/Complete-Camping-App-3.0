@@ -24,9 +24,21 @@ interface ParkDetailModalProps {
   onClose: () => void;
   onAddToTrip: (park: Park, tripId?: string) => void;
   onRequireAccount?: () => void;
+  /** When set, modal is opened from a trip context - show "Set as destination" instead of "Add to trip" */
+  tripIdForDestination?: string;
+  /** Called when user taps "Set as trip destination" - parent handles save + navigation */
+  onSetAsDestination?: (park: Park, tripId: string) => void;
 }
 
-export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, onRequireAccount }: ParkDetailModalProps) {
+export default function ParkDetailModal({ 
+  visible, 
+  park, 
+  onClose, 
+  onAddToTrip, 
+  onRequireAccount,
+  tripIdForDestination,
+  onSetAsDestination,
+}: ParkDetailModalProps) {
   const mapRef = useRef<MapView>(null);
   const navigation = useNavigation();
   const { isGuest } = useUserStatus();
@@ -39,6 +51,7 @@ export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, o
   // Add to trip confirmation state
   const [addedToTripId, setAddedToTripId] = useState<string | null>(null);
   const [addedToNewTrip, setAddedToNewTrip] = useState(false);
+  const [destinationSet, setDestinationSet] = useState(false);
   const successScale = useRef(new Animated.Value(1)).current;
 
   // Get the most recent trip that is planning, upcoming, or active
@@ -53,6 +66,7 @@ export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, o
       setTimeout(() => {
         setAddedToTripId(null);
         setAddedToNewTrip(false);
+        setDestinationSet(false);
         successScale.setValue(1);
       }, 300);
     }
@@ -65,6 +79,7 @@ export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, o
       // Reset add state when opening for a new park
       setAddedToTripId(null);
       setAddedToNewTrip(false);
+      setDestinationSet(false);
     }
   }, [visible, park]);
 
@@ -106,6 +121,41 @@ export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, o
       }),
     ]).start();
   }, [isGuest, park, onAddToTrip, onClose, navigation, successScale]);
+
+  // Handler for setting park as trip destination (when opened from trip context)
+  const handleSetAsDestination = useCallback(() => {
+    if (isGuest) {
+      onClose();
+      navigation.navigate("Auth" as never);
+      return;
+    }
+    
+    if (!park || !tripIdForDestination || !onSetAsDestination) return;
+    
+    // Show success state
+    setDestinationSet(true);
+    
+    // Haptic feedback
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    // Animate the button
+    Animated.sequence([
+      Animated.timing(successScale, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(successScale, {
+        toValue: 1,
+        friction: 3,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Call parent handler to save destination and navigate back
+    onSetAsDestination(park, tripIdForDestination);
+  }, [isGuest, park, tripIdForDestination, onSetAsDestination, onClose, navigation, successScale]);
 
   const checkFavoriteStatus = async () => {
     const user = auth.currentUser;
@@ -261,10 +311,43 @@ export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, o
 
           {/* Action Buttons */}
           <View style={{ width: "100%", marginBottom: 24, gap: 12 }}>
-            {/* Add to Current Trip or Create New Trip */}
-            {activeTrip ? (
-              <>
-                {/* Add to Current Trip */}
+            {/* TRIP DESTINATION CONTEXT: Show "Set as trip destination" when opened from TripDetail */}
+            {tripIdForDestination ? (
+              <Animated.View style={{ transform: [{ scale: destinationSet ? successScale : 1 }] }}>
+                <Pressable
+                  onPress={handleSetAsDestination}
+                  disabled={destinationSet}
+                  style={{
+                    backgroundColor: destinationSet ? SUCCESS_GREEN : DEEP_FOREST,
+                    borderRadius: 16,
+                    paddingVertical: 14,
+                    paddingHorizontal: 20,
+                    borderWidth: 0,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons 
+                    name={destinationSet ? "checkmark-circle" : "location"} 
+                    size={20} 
+                    color={PARCHMENT} 
+                  />
+                  <Text
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      fontSize: 16,
+                      color: PARCHMENT,
+                      marginLeft: 8,
+                    }}
+                  >
+                    {destinationSet ? "Destination set!" : "Set as trip destination"}
+                  </Text>
+                </Pressable>
+              </Animated.View>
+            ) : (
+              /* GENERAL BROWSE CONTEXT: Show "Add to {TripName}" when there's an active trip */
+              activeTrip && (
                 <Animated.View style={{ transform: [{ scale: addedToTripId === activeTrip.id ? successScale : 1 }] }}>
                   <Pressable
                     onPress={() => handleAddToTripWithConfirmation(activeTrip.id)}
@@ -299,77 +382,7 @@ export default function ParkDetailModal({ visible, park, onClose, onAddToTrip, o
                     </Text>
                   </Pressable>
                 </Animated.View>
-
-                {/* Add to New Trip */}
-                <Animated.View style={{ transform: [{ scale: addedToNewTrip ? successScale : 1 }] }}>
-                  <Pressable
-                    onPress={() => handleAddToTripWithConfirmation()}
-                    disabled={addedToNewTrip}
-                    style={{
-                      backgroundColor: addedToNewTrip ? SUCCESS_GREEN : PARCHMENT,
-                      borderRadius: 16,
-                      paddingVertical: 10,
-                      paddingHorizontal: 20,
-                      borderWidth: 1,
-                      borderColor: addedToNewTrip ? SUCCESS_GREEN : BORDER_SOFT,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Ionicons 
-                      name={addedToNewTrip ? "checkmark-circle" : "calendar-outline"} 
-                      size={20} 
-                      color={addedToNewTrip ? PARCHMENT : DEEP_FOREST} 
-                    />
-                    <Text
-                      style={{
-                        fontFamily: "SourceSans3_600SemiBold",
-                        fontSize: 16,
-                        color: addedToNewTrip ? PARCHMENT : DEEP_FOREST,
-                        marginLeft: 8,
-                      }}
-                    >
-                      {addedToNewTrip ? "Creating new trip..." : "Add to new trip"}
-                    </Text>
-                  </Pressable>
-                </Animated.View>
-              </>
-            ) : (
-              /* No active trip - just show create new trip */
-              <Animated.View style={{ transform: [{ scale: addedToNewTrip ? successScale : 1 }] }}>
-                <Pressable
-                  onPress={() => handleAddToTripWithConfirmation()}
-                  disabled={addedToNewTrip}
-                  style={{
-                    backgroundColor: addedToNewTrip ? SUCCESS_GREEN : PARCHMENT,
-                    borderRadius: 16,
-                    paddingVertical: 10,
-                    paddingHorizontal: 20,
-                    borderWidth: 1,
-                    borderColor: addedToNewTrip ? SUCCESS_GREEN : BORDER_SOFT,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Ionicons 
-                    name={addedToNewTrip ? "checkmark-circle" : "add-circle"} 
-                    size={20} 
-                    color={addedToNewTrip ? PARCHMENT : DEEP_FOREST} 
-                  />
-                  <Text
-                    style={{
-                      fontFamily: "SourceSans3_600SemiBold",
-                      fontSize: 16,
-                      color: addedToNewTrip ? PARCHMENT : DEEP_FOREST,
-                      marginLeft: 8,
-                    }}
-                  >
-                    {addedToNewTrip ? "Creating new trip..." : "Add to trip"}
-                  </Text>
-                </Pressable>
-              </Animated.View>
+              )
             )}
 
             {/* Reserve a Site */}

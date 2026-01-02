@@ -22,22 +22,46 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn()
-        && exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
         && (
-          get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.isAdmin == true ||
-          get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == "admin" ||
-          get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == "administrator" ||
-          get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.membershipTier == "isAdmin"
+          // Check profiles collection
+          (exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
+            && (
+              get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.isAdmin == true ||
+              get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == "admin" ||
+              get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == "administrator" ||
+              get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.membershipTier == "isAdmin"
+            )
+          ) ||
+          // Check users collection
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && (
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "administrator" ||
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.membershipTier == "isAdmin"
+            )
+          )
         );
     }
 
     // Check if user is a moderator (can moderate content but not full admin)
     function isModerator() {
       return isSignedIn()
-        && exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
         && (
-          get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.isModerator == true ||
-          get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == "moderator"
+          // Check profiles collection
+          (exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
+            && (
+              get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.isModerator == true ||
+              get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == "moderator"
+            )
+          ) ||
+          // Check users collection
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && (
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isModerator == true ||
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "moderator"
+            )
+          )
         );
     }
 
@@ -59,6 +83,12 @@ service cloud.firestore {
       allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isSignedIn() && request.auth.uid == userId;
 
+      // Daily Usage subcollection (for photo limits, etc.)
+      match /dailyUsage/{dateId} {
+        allow read: if isSignedIn() && request.auth.uid == userId;
+        allow create, update: if isSignedIn() && request.auth.uid == userId;
+      }
+
       // Favorite Parks subcollection
       match /favoriteParks/{parkId} {
         allow read: if isSignedIn() && request.auth.uid == userId;
@@ -75,6 +105,16 @@ service cloud.firestore {
       match /trips/{tripId} {
         allow read: if isSignedIn() && request.auth.uid == userId;
         allow create, update, delete: if isSignedIn() && request.auth.uid == userId;
+        
+        // Packing list subcollection for trips under users
+        match /packingList/{itemId} {
+          allow read, write: if isSignedIn() && request.auth.uid == userId;
+        }
+        
+        // Meals subcollection for trips under users
+        match /meals/{mealId} {
+          allow read, write: if isSignedIn() && request.auth.uid == userId;
+        }
       }
     }
 
@@ -255,12 +295,26 @@ service cloud.firestore {
         allow delete: if isSignedIn() && request.auth.uid == helpfulUserId;
       }
       
+      // Reddit-style votes subcollection
+      match /votes/{voteUserId} {
+        allow read: if true;
+        allow create, update: if isSignedIn() && request.auth.uid == voteUserId;
+        allow delete: if isSignedIn() && request.auth.uid == voteUserId;
+      }
+      
       // Comments subcollection (for future use)
       match /comments/{commentId} {
         allow read: if true;
         allow create: if isSignedIn();
         // Owner, admin, or moderator can update/delete
-        allow update, delete: if isOwner() || canModerateContent();
+        allow update, delete: if isSignedIn() && (request.auth.uid == resource.data.userId || canModerateContent());
+        
+        // Votes on comments (Reddit-style upvote/downvote)
+        match /votes/{voteUserId} {
+          allow read: if true;
+          allow create, update: if isSignedIn() && request.auth.uid == voteUserId;
+          allow delete: if isSignedIn() && request.auth.uid == voteUserId;
+        }
       }
     }
 

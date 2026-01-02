@@ -2,6 +2,22 @@ import { NativeStackScreenProps, NativeStackNavigationProp } from "@react-naviga
 import { RouteProp } from "@react-navigation/native";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 
+/**
+ * PrefillLocation - Used when creating a trip from a saved place
+ * Allows pre-populating the destination from Favorites or Saved Places
+ */
+export interface PrefillLocation {
+  source: "favorites" | "saved_places";
+  placeType: "park" | "campground" | "custom";
+  placeId: string | null;
+  name: string;
+  subtitle: string | null; // e.g., "State Park • Indiana" or address
+  state: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
 export type RootStackParamList = {
   HomeTabs: undefined;
   Home: undefined;
@@ -10,16 +26,16 @@ export type RootStackParamList = {
   Connect: undefined;
   FirstAid: undefined;
   MyTrips: undefined;
-  CreateTrip: undefined;
-  TripDetail: { tripId: string; showItineraryPrompt?: boolean };
+  CreateTrip: { prefillLocation?: PrefillLocation } | undefined;
+  TripDetail: { tripId: string; showItineraryPrompt?: boolean; destinationJustSet?: boolean };
   Parks: undefined;
-  ParksBrowse: { selectedParkId?: string } | undefined;
-  ParkDetail: { parkId: string };
+  ParksBrowse: { selectedParkId?: string; tripId?: string; returnTo?: string } | undefined;
+  ParkDetail: { parkId: string; tripId?: string; returnTo?: string };
   GearLists: undefined;
   GearListDetail: { listId: string };
   CreateGearList: { tripId?: string };
   Account: undefined;
-  MyCampsite: undefined;
+  MyCampsite: { userId?: string; viewAsPublic?: boolean } | undefined;
   MyCampground: undefined;
   AddCamper: undefined;
   EditCamper: { contactId: string };

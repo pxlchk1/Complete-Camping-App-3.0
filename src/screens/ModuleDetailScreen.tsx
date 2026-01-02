@@ -309,8 +309,6 @@ export default function ModuleDetailScreen() {
           paddingBottom: 16,
           paddingHorizontal: 16,
           backgroundColor: DEEP_FOREST,
-          borderBottomLeftRadius: 20,
-          borderBottomRightRadius: 20,
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center" }}>

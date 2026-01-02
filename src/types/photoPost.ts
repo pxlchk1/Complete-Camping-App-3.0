@@ -58,6 +58,7 @@ export type TripStyle =
   | "car-camping"
   | "tent-camping"
   | "backpacking"
+  | "hiking"
   | "rv-trailer"
   | "group-camping"
   | "solo-camping"
@@ -68,6 +69,7 @@ export const TRIP_STYLE_LABELS: Record<TripStyle, string> = {
   "car-camping": "Car camping",
   "tent-camping": "Tent camping",
   "backpacking": "Backpacking",
+  "hiking": "Hiking",
   "rv-trailer": "RV or trailer",
   "group-camping": "Group camping",
   "solo-camping": "Solo camping",
@@ -151,6 +153,7 @@ export interface PhotoPost {
   id: string;
   userId: string;
   displayName?: string;
+  userHandle?: string;
   photoUrls: string[];
   storagePaths?: string[];
   postType: PhotoPostType;
@@ -172,6 +175,7 @@ export interface PhotoPost {
 
   // Engagement
   helpfulCount: number;
+  voteCount?: number; // Reddit-style upvote/downvote score
   saveCount?: number;
   commentCount?: number;
 

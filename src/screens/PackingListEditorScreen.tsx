@@ -352,32 +352,6 @@ export default function PackingListEditorScreen() {
     Alert.alert("Copied!", "Packing list copied to clipboard");
   }, [list, progress]);
 
-  // Handle save as template
-  const handleSaveAsTemplate = useCallback(() => {
-    if (!list) return;
-    
-    Alert.prompt(
-      "Save as Template",
-      "Enter a name for your template:",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Save",
-          onPress: (name: string | undefined) => {
-            const templateName = name?.trim() || `${list.name} Template`;
-            const templateId = saveAsTemplate(listId, templateName);
-            if (templateId) {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert("Template Saved!", `"${templateName}" has been saved to your templates.`);
-            }
-          },
-        },
-      ],
-      "plain-text",
-      `${list.name} Template`
-    );
-  }, [list, listId, saveAsTemplate]);
-
   // Handle use as template (copy to new list)
   const handleUseAsNewList = useCallback(() => {
     if (!list) return;
@@ -414,9 +388,6 @@ export default function PackingListEditorScreen() {
     if (isTemplate) {
       // Template-specific options
       options.push({ text: "Create List from Template", onPress: handleUseAsNewList });
-    } else {
-      // Regular list options
-      options.push({ text: "Save as Template", onPress: handleSaveAsTemplate });
     }
     
     options.push({ text: "Cancel", style: "cancel" });
@@ -426,7 +397,7 @@ export default function PackingListEditorScreen() {
       undefined,
       options
     );
-  }, [list, handleResetList, handleShare, handleSaveAsTemplate, handleUseAsNewList]);
+  }, [list, handleResetList, handleShare, handleUseAsNewList]);
 
   if (!list) {
     return (

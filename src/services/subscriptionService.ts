@@ -14,7 +14,7 @@ import { SUBSCRIPTIONS_ENABLED } from "../config/subscriptions";
 /**
  * Safely fetch offerings with proper error handling
  * Returns null if offerings are unavailable or misconfigured
- * Products: cca_monthly_sub_399, cca_annual_sub_2499
+ * Products: cca_monthly_sub ($6.99), cca_annual_sub ($39.99)
  * Entitlement: "Pro" (case-sensitive)
  */
 export async function fetchOfferingsSafe() {

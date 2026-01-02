@@ -99,6 +99,11 @@ export default function EditProfileScreen() {
   const [deleting, setDeleting] = useState(false);
   const [optOutNewsletter, setOptOutNewsletter] = useState(currentUser?.emailSubscribed === false);
   const [optOutNotifications, setOptOutNotifications] = useState(currentUser?.notificationsEnabled === false);
+  
+  // Privacy state - default to public (true)
+  const [isProfileContentPublic, setIsProfileContentPublic] = useState(
+    currentUser?.isProfileContentPublic !== false
+  );
 
   const handleSave = async () => {
     const user = auth.currentUser;
@@ -319,6 +324,39 @@ export default function EditProfileScreen() {
       console.error("[EditProfile] Error updating notifications preference:", error);
       setOptOutNotifications(!value); // Revert on error
     }
+  };
+
+  const handleToggleProfilePrivacy = async (isPublic: boolean) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setIsProfileContentPublic(isPublic);
+    
+    try {
+      await updateDoc(doc(db, "profiles", user.uid), {
+        isProfileContentPublic: isPublic,
+        updatedAt: serverTimestamp(),
+      });
+      
+      // Also update local store
+      updateCurrentUser({
+        isProfileContentPublic: isPublic,
+      });
+      
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.error("[EditProfile] Error updating profile privacy:", error);
+      setIsProfileContentPublic(!isPublic); // Revert on error
+    }
+  };
+
+  const handleViewPublicProfile = () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Navigate to MyCampsite with the user's own ID to see the "public view"
+    (navigation as any).navigate("MyCampsite", { userId: user.uid, viewAsPublic: true });
   };
 
   return (
@@ -570,6 +608,62 @@ export default function EditProfileScreen() {
                   />
                 </View>
               ))}
+            </View>
+
+            {/* Privacy Settings */}
+            <View className="mt-8 mb-2">
+              <Text
+                className="text-lg mb-3"
+                style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
+              >
+                Privacy Settings
+              </Text>
+
+              <View
+                className="p-4 rounded-xl border"
+                style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
+              >
+                {/* Profile Content Visibility */}
+                <View className="flex-row items-center justify-between mb-4">
+                  <View className="flex-1 mr-3">
+                    <Text
+                      style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                    >
+                      Public profile content
+                    </Text>
+                    <Text
+                      className="text-sm"
+                      style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                    >
+                      Show your activity, favorites, and saved places to others
+                    </Text>
+                  </View>
+                  <Switch
+                    value={isProfileContentPublic}
+                    onValueChange={handleToggleProfilePrivacy}
+                    trackColor={{ false: BORDER_SOFT, true: EARTH_GREEN }}
+                    thumbColor={PARCHMENT}
+                  />
+                </View>
+
+                {/* View Public Profile Button */}
+                <Pressable
+                  onPress={handleViewPublicProfile}
+                  className="py-3 px-4 rounded-xl border flex-row items-center justify-between active:opacity-70"
+                  style={{ backgroundColor: PARCHMENT, borderColor: BORDER_SOFT }}
+                >
+                  <View className="flex-row items-center">
+                    <Ionicons name="eye-outline" size={20} color={EARTH_GREEN} />
+                    <Text
+                      className="ml-3"
+                      style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                    >
+                      View my public profile
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={TEXT_SECONDARY} />
+                </Pressable>
+              </View>
             </View>
 
             {/* Danger Zone */}

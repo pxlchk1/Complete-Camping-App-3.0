@@ -6,11 +6,12 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, Pressable, FlatList, ActivityIndicator, TextInput } from "react-native";
+import { View, Text, Pressable, FlatList, ActivityIndicator, TextInput, Alert } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { getQuestions } from "../../services/questionsService";
+import { deleteQuestion } from "../../services/connectDeletionService";
 import { Question } from "../../types/community";
 import { useCurrentUser } from "../../state/userStore";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
@@ -32,6 +33,7 @@ import {
   TEXT_SECONDARY,
   TEXT_MUTED,
 } from "../../constants/colors";
+import HandleLink from "../../components/HandleLink";
 import { DocumentSnapshot } from "firebase/firestore";
 
 type FilterOption = "all" | "unanswered" | "answered" | "popular";
@@ -189,10 +191,20 @@ export default function QuestionsListScreen() {
             navigation.navigate("QuestionDetail", { questionId: item.id });
           }}
           onRequestDelete={async () => {
-            setQuestions(prev => prev.filter(q => q.id !== item.id));
+            const result = await deleteQuestion(item.id);
+            if (result.success) {
+              setQuestions(prev => prev.filter(q => q.id !== item.id));
+            } else {
+              Alert.alert("Error", result.error?.message || "Failed to delete question");
+            }
           }}
           onRequestRemove={async () => {
-            setQuestions(prev => prev.filter(q => q.id !== item.id));
+            const result = await deleteQuestion(item.id);
+            if (result.success) {
+              setQuestions(prev => prev.filter(q => q.id !== item.id));
+            } else {
+              Alert.alert("Error", result.error?.message || "Failed to remove question");
+            }
           }}
           layout="cardHeader"
           iconSize={18}
@@ -224,9 +236,17 @@ export default function QuestionsListScreen() {
 
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
-          <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
-            @{item.authorHandle}
-          </Text>
+          {item.authorId && item.authorHandle ? (
+            <HandleLink 
+              handle={item.authorHandle}
+              userId={item.authorId}
+              style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12 }}
+            />
+          ) : (
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
+              @{item.authorHandle}
+            </Text>
+          )}
           <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
           <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
             {formatTimeAgo(item.createdAt)}

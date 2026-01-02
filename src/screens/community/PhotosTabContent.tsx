@@ -13,6 +13,7 @@ import AccountRequiredModal from "../../components/AccountRequiredModal";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
+import HandleLink from "../../components/HandleLink";
 
 // Component to handle individual photo rendering with error state
 function PhotoCard({ item, onVote }: { item: any; onVote: (id: string, type: "up" | "down") => void }) {
@@ -38,7 +39,18 @@ function PhotoCard({ item, onVote }: { item: any; onVote: (id: string, type: "up
           <Text className="text-sm mb-1" numberOfLines={1} style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
             {item.title}
           </Text>
-          <Text className="text-xs mb-2" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>by @{item.authorHandle}</Text>
+          <View className="flex-row items-center mb-2">
+            <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>by </Text>
+            {item.authorId && item.authorHandle ? (
+              <HandleLink 
+                handle={item.authorHandle} 
+                userId={item.authorId}
+                style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12 }}
+              />
+            ) : (
+              <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>@{item.authorHandle}</Text>
+            )}
+          </View>
 
           {/* Voting */}
           <View className="flex-row items-center justify-between">

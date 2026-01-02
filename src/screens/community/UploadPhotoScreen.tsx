@@ -127,6 +127,7 @@ export default function UploadPhotoScreen() {
         tags,
         userId: currentUser.id,
         displayName: currentUser.displayName || "Anonymous User",
+        userHandle: currentUser.handle,
         locationName: locationLabel.trim() || null,
         createdAt: serverTimestamp(),
         // Moderation fields

@@ -17,6 +17,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { useLocationStore } from "../state/locationStore";
+import { usePlanTabStore } from "../state/planTabStore";
 import { requirePro } from "../utils/gating";
 import AccountRequiredModal from "../components/AccountRequiredModal";
 import { RootStackParamList } from "../navigation/types";
@@ -34,7 +35,7 @@ import {
 } from "../constants/colors";
 
 interface WeatherScreenProps {
-  onTabChange?: (tab: "trips" | "parks" | "weather" | "packing" | "meals") => void;
+  onTabChange?: (tab: "trips" | "parks" | "weather") => void;
 }
 
 type LocationLike = {
@@ -84,6 +85,9 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
   const navigation = useNavigation<WeatherScreenNavigationProp>();
 
   const { selectedLocation, userLocation, setUserLocation, setSelectedLocation } = useLocationStore();
+  const weatherPickerTripId = usePlanTabStore((s) => s.weatherPickerTripId);
+  const setWeatherPickerTripId = usePlanTabStore((s) => s.setWeatherPickerTripId);
+  const setActivePlanTab = usePlanTabStore((s) => s.setActiveTab);
   const tripsRaw = useTrips() as unknown as TripLike[];
   const trips = tripsRaw || [];
 
@@ -638,7 +642,7 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
               </Pressable>
 
               <Pressable
-                onPress={() => onTabChange?.("parks")}
+                onPress={() => setActivePlanTab("parks")}
                 style={{
                   backgroundColor: colors.parchment,
                   borderRadius: radius.md,
@@ -960,7 +964,7 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
                       openPaywallModal: () => navigation.navigate("Paywall"),
                     });
                     if (canProceed) {
-                      onTabChange?.("trips");
+                      setActivePlanTab("trips");
                     }
                   }}
                   style={{
@@ -1201,12 +1205,18 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
                         updatedAt: new Date().toISOString(),
                       };
 
+                      // Build weather data to save (if available)
+                      const weatherToSave = weatherData ? {
+                        forecast: weatherData.forecast,
+                        lastUpdated: new Date().toISOString(),
+                      } : undefined;
+
                       try {
-                        await updateTrip(trip.id, { weatherDestination });
+                        await updateTrip(trip.id, { 
+                          weatherDestination,
+                          ...(weatherToSave && { weather: weatherToSave }),
+                        });
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        setToastMessage(`Weather location added to "${trip.name}"`);
-                        // Auto-dismiss toast after 3 seconds
-                        setTimeout(() => setToastMessage(null), 3000);
                       } catch (err) {
                         if (__DEV__) {
                           // eslint-disable-next-line no-console
@@ -1214,9 +1224,25 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
                         }
                         setToastMessage("Failed to add weather location. Please try again.");
                         setTimeout(() => setToastMessage(null), 3000);
+                        setShowAddToTripModal(false);
+                        return;
                       }
 
                       setShowAddToTripModal(false);
+                      
+                      // If we came from TripDetail, navigate back to that trip
+                      if (weatherPickerTripId && trip.id === weatherPickerTripId) {
+                        setWeatherPickerTripId(null);
+                        navigation.navigate("TripDetail", { tripId: trip.id });
+                      } else if (weatherPickerTripId) {
+                        // User chose a different trip - still clear context and go to that trip's details
+                        setWeatherPickerTripId(null);
+                        navigation.navigate("TripDetail", { tripId: trip.id });
+                      } else {
+                        // No trip context - just show toast
+                        setToastMessage(`Weather location added to "${trip.name}"`);
+                        setTimeout(() => setToastMessage(null), 3000);
+                      }
                     }}
                     style={{
                       backgroundColor: CARD_BACKGROUND_LIGHT,
@@ -1299,10 +1325,10 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
       {/* Account Required Modal */}
       <AccountRequiredModal
         visible={showAccountModal}
-        onClose={() => setShowAccountModal(false)}
-        onLogin={() => {
+        onMaybeLater={() => setShowAccountModal(false)}
+        onCreateAccount={() => {
           setShowAccountModal(false);
-          navigation.navigate("Auth");
+          navigation.navigate("Auth" as never);
         }}
       />
     </View>

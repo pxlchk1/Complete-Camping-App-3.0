@@ -94,8 +94,9 @@ export default function MealPlanningScreen() {
   const [customMealIngredients, setCustomMealIngredients] = useState("");
   const [customMealInstructions, setCustomMealInstructions] = useState("");
 
-  // MealSlotSheet state (legacy, for Choose Recipe)
+  // MealSlotSheet state
   const [showMealSheet, setShowMealSheet] = useState(false);
+  const [mealSheetInitialTab, setMealSheetInitialTab] = useState<"suggest" | "recipes" | "custom">("suggest");
   const [autoFilling, setAutoFilling] = useState(false);
 
   // NEW: View toggle state (Plan vs Recipes)
@@ -337,26 +338,27 @@ export default function MealPlanningScreen() {
     }
   };
 
-  // Handler: Open MealSlotSheet for a category
-  const handleOpenMealSheet = (category: MealCategory) => {
+  // Handler: Open MealSlotSheet for a category with specific tab
+  const handleOpenMealSheet = (category: MealCategory, tab: "suggest" | "recipes" | "custom" = "suggest") => {
+    // Gate: PRO required for suggestions
+    if (tab === "suggest") {
+      if (!requirePro({
+        openAccountModal: () => setShowAccountModal(true),
+        openPaywallModal: () => navigation.navigate("Paywall"),
+      })) {
+        return;
+      }
+    }
+    
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedCategory(category);
+    setMealSheetInitialTab(tab);
     setShowMealSheet(true);
   };
 
-  // NEW: Handler: Open SuggestionPickerSheet for a category (replaces old quick suggest)
+  // Legacy: Handler kept for backwards compatibility
   const handleOpenSuggestionPicker = (category: MealCategory) => {
-    // Gate: PRO required
-    if (!requirePro({
-      openAccountModal: () => setShowAccountModal(true),
-      openPaywallModal: () => navigation.navigate("Paywall"),
-    })) {
-      return;
-    }
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedCategory(category);
-    setShowSuggestionPicker(true);
+    handleOpenMealSheet(category, "suggest");
   };
 
   // NEW: Handler: Add suggestion from picker (user explicitly chose)
@@ -518,7 +520,7 @@ export default function MealPlanningScreen() {
   };
 
   // Handler: MealSlotSheet custom meal
-  const handleSheetCustomMeal = async (name: string, ingredients?: string[], notes?: string) => {
+  const handleSheetCustomMeal = async (name: string, ingredients?: string[], notes?: string, saveToLibrary?: boolean) => {
     // Gate: PRO required
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
@@ -553,6 +555,22 @@ export default function MealPlanningScreen() {
           } else {
             throw fbError;
           }
+        }
+      }
+
+      // Save to user's recipe library if requested
+      if (saveToLibrary && userId && !useLocalStorage) {
+        try {
+          await MealService.saveToUserMeals(userId, {
+            name,
+            category: selectedCategory,
+            prepType: "noCook" as PrepType,
+            ingredients: ingredients || [],
+            instructions: notes,
+          });
+        } catch (libraryError) {
+          console.error("Failed to save to user library:", libraryError);
+          // Don't fail the whole operation if library save fails
         }
       }
 
@@ -772,18 +790,7 @@ export default function MealPlanningScreen() {
               Meal Planning
             </Text>
           </View>
-          <View className="flex-row items-center" style={{ gap: 8 }}>
-            <Pressable
-              onPress={() => navigation.navigate("ShoppingList", { tripId })}
-              className="bg-forest rounded-full px-4 py-2 flex-row items-center active:opacity-90"
-            >
-              <Ionicons name="cart" size={18} color={PARCHMENT} />
-              <Text className="text-white ml-1.5 text-sm" style={{ fontFamily: "SourceSans3_600SemiBold" }}>
-                Shopping
-              </Text>
-            </Pressable>
-            <AccountButton />
-          </View>
+          <AccountButton />
         </View>
         <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}>
           For: {trip.name}
@@ -897,9 +904,9 @@ export default function MealPlanningScreen() {
                           No {category.label.toLowerCase()} planned
                         </Text>
                         {/* Action buttons for empty slot */}
-                        <View className="flex-row justify-center" style={{ gap: 10 }}>
+                        <View className="flex-row justify-center flex-wrap" style={{ gap: 8 }}>
                           <Pressable
-                            onPress={() => handleOpenSuggestionPicker(category.key)}
+                            onPress={() => handleOpenMealSheet(category.key, "suggest")}
                             className="flex-row items-center px-3 py-2 rounded-lg active:opacity-80"
                             style={{ backgroundColor: "rgba(26, 76, 57, 0.1)" }}
                           >
@@ -912,7 +919,7 @@ export default function MealPlanningScreen() {
                             </Text>
                           </Pressable>
                           <Pressable
-                            onPress={() => handleOpenMealSheet(category.key)}
+                            onPress={() => handleOpenMealSheet(category.key, "recipes")}
                             className="flex-row items-center px-3 py-2 rounded-lg active:opacity-80"
                             style={{ backgroundColor: DEEP_FOREST }}
                           >
@@ -921,7 +928,20 @@ export default function MealPlanningScreen() {
                               className="ml-1.5"
                               style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: PARCHMENT }}
                             >
-                              Choose recipe
+                              Recipes
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => handleOpenMealSheet(category.key, "custom")}
+                            className="flex-row items-center px-3 py-2 rounded-lg active:opacity-80"
+                            style={{ backgroundColor: "rgba(26, 76, 57, 0.1)" }}
+                          >
+                            <Ionicons name="create-outline" size={14} color={EARTH_GREEN} />
+                            <Text
+                              className="ml-1.5"
+                              style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: EARTH_GREEN }}
+                            >
+                              Custom
                             </Text>
                           </Pressable>
                         </View>
@@ -957,9 +977,9 @@ export default function MealPlanningScreen() {
                             </View>
                             
                             {/* Footer actions for filled slot */}
-                            <View className="flex-row mt-3 pt-3 border-t" style={{ borderColor: BORDER_SOFT, gap: 10 }}>
+                            <View className="flex-row mt-3 pt-3 border-t flex-wrap" style={{ borderColor: BORDER_SOFT, gap: 8 }}>
                               <Pressable
-                                onPress={() => handleOpenSuggestionPicker(category.key)}
+                                onPress={() => handleOpenMealSheet(category.key, "suggest")}
                                 className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-80"
                                 style={{ backgroundColor: "rgba(26, 76, 57, 0.1)" }}
                               >
@@ -972,7 +992,7 @@ export default function MealPlanningScreen() {
                                 </Text>
                               </Pressable>
                               <Pressable
-                                onPress={() => handleOpenMealSheet(category.key)}
+                                onPress={() => handleOpenMealSheet(category.key, "recipes")}
                                 className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-80"
                                 style={{ backgroundColor: "rgba(26, 76, 57, 0.1)" }}
                               >
@@ -981,7 +1001,20 @@ export default function MealPlanningScreen() {
                                   className="ml-1"
                                   style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: EARTH_GREEN }}
                                 >
-                                  Choose recipe
+                                  Recipes
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                onPress={() => handleOpenMealSheet(category.key, "custom")}
+                                className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-80"
+                                style={{ backgroundColor: "rgba(26, 76, 57, 0.1)" }}
+                              >
+                                <Ionicons name="create-outline" size={12} color={EARTH_GREEN} />
+                                <Text
+                                  className="ml-1"
+                                  style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: EARTH_GREEN }}
+                                >
+                                  Custom
                                 </Text>
                               </Pressable>
                             </View>
@@ -1401,6 +1434,7 @@ export default function MealPlanningScreen() {
         category={selectedCategory}
         dayIndex={selectedDay}
         context={suggestionContext}
+        initialTab={mealSheetInitialTab}
         onSelectRecipe={handleSelectRecipe}
         onSelectSuggestion={handleSelectSuggestion}
         onAddCustomMeal={handleSheetCustomMeal}
@@ -1442,42 +1476,20 @@ export default function MealPlanningScreen() {
             paddingBottom: 34, // Safe area for home indicator
           }}
         >
-          <View className="flex-row px-4 py-3" style={{ gap: 10 }}>
+          <View className="px-4 py-3">
             {/* Shopping List */}
             <Pressable
               onPress={() => navigation.navigate("ShoppingList", { tripId })}
-              className="flex-1 flex-row items-center justify-center py-3 rounded-xl border active:opacity-80"
-              style={{ borderColor: BORDER_SOFT, backgroundColor: "white" }}
+              className="flex-row items-center justify-center py-3 rounded-xl active:opacity-90"
+              style={{ backgroundColor: DEEP_FOREST }}
             >
-              <Ionicons name="cart-outline" size={18} color={DEEP_FOREST} />
+              <Ionicons name="cart-outline" size={18} color={PARCHMENT} />
               <Text
                 className="ml-2"
-                style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 14, color: DEEP_FOREST }}
+                style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 14, color: PARCHMENT }}
               >
                 Shopping List
               </Text>
-            </Pressable>
-
-            {/* Auto-fill Day - Now opens preview sheet */}
-            <Pressable
-              onPress={handleOpenAutoFillPreview}
-              disabled={autoFilling}
-              className="flex-1 flex-row items-center justify-center py-3 rounded-xl active:opacity-90"
-              style={{ backgroundColor: autoFilling ? CARD_BACKGROUND_LIGHT : DEEP_FOREST }}
-            >
-              {autoFilling ? (
-                <ActivityIndicator size="small" color={DEEP_FOREST} />
-              ) : (
-                <>
-                  <Ionicons name="flash" size={18} color={PARCHMENT} />
-                  <Text
-                    className="ml-2"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 14, color: PARCHMENT }}
-                  >
-                    Auto-fill Day
-                  </Text>
-                </>
-              )}
             </Pressable>
           </View>
         </View>

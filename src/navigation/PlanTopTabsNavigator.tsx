@@ -16,8 +16,6 @@ import AccountButtonHeader from "../components/AccountButtonHeader";
 
 import MyTripsScreen from "../screens/MyTripsScreen";
 import ParksBrowseScreen from "../screens/ParksBrowseScreen";
-import MealsScreen from "../screens/MealsScreen";
-import PackingTabScreenNew from "../screens/PackingTabScreenNew";
 import WeatherScreen from "../screens/WeatherScreen";
 import PlanSafeScreen from "../screens/PlanSafeScreen";
 
@@ -33,10 +31,6 @@ const getHeroImage = (routeName: string) => {
       return HERO_IMAGES.PLAN_TRIP;
     case "Parks":
       return HERO_IMAGES.HEADER;
-    case "Meals":
-      return HERO_IMAGES.MEALS;
-    case "Pack":
-      return HERO_IMAGES.PACKING;
     case "Weather":
       return HERO_IMAGES.WEATHER;
     default:
@@ -51,10 +45,6 @@ const getHeroContent = (routeName: string) => {
       return { title: "Plan your trip", description: "Organize trips, explore parks, and prepare for adventure" };
     case "Parks":
       return { title: "Find a park", description: "Search thousands of National Park, National Forest, and State Park campgrounds across all US states & territories." };
-    case "Meals":
-      return { title: "Meal planner", description: "Plan delicious meals for your camping adventure" };
-    case "Pack":
-      return { title: "Packing list", description: "Build and organize your gear list for every trip" };
     case "Weather":
       return { title: "Weather", description: "Check conditions for your camping destination" };
     default:
@@ -147,16 +137,12 @@ export default function PlanTopTabsNavigator() {
   const tabKeyToRoute: Record<string, string> = {
     trips: "Plan",
     parks: "Parks",
-    meals: "Meals",
-    packing: "Pack",
     weather: "Weather",
   };
 
   const routeToTabKey: Record<string, string> = {
     Plan: "trips",
     Parks: "parks",
-    Meals: "meals",
-    Pack: "packing",
     Weather: "weather",
   };
 
@@ -286,8 +272,6 @@ export default function PlanTopTabsNavigator() {
       >
         <Tab.Screen name="Plan" component={MyTripsScreen} />
         <Tab.Screen name="Parks" component={ParksBrowseScreen} />
-        <Tab.Screen name="Meals" component={MealsScreen} />
-        <Tab.Screen name="Pack" component={PackingTabScreenNew} />
         <Tab.Screen name="Weather" component={WeatherScreen} />
       </Tab.Navigator>
     </View>

@@ -17,6 +17,7 @@ interface TripsState {
   updateTripMeals: (id: string, meals: Trip["meals"]) => void;
   updateTripNotes: (id: string, notes: string) => void;
   updateTripWeather: (id: string, weather: Trip["weather"]) => void;
+  setTripDestination: (id: string, destination: Trip["tripDestination"], parkId?: string) => void;
   clearTrips: () => void;
 }
 
@@ -117,6 +118,21 @@ export const useTripsStore = create<TripsState>()(
           trips: state.trips.map((trip) =>
             trip.id === id
               ? { ...trip, weather, updatedAt: new Date().toISOString() }
+              : trip
+          ),
+        }));
+      },
+
+      setTripDestination: (id, destination, parkId) => {
+        set((state) => ({
+          trips: state.trips.map((trip) =>
+            trip.id === id
+              ? { 
+                  ...trip, 
+                  tripDestination: destination, 
+                  parkId: parkId || destination?.placeId || undefined,
+                  updatedAt: new Date().toISOString() 
+                }
               : trip
           ),
         }));

@@ -191,6 +191,7 @@ export default function RootNavigator() {
       <Stack.Screen name="MealPlanning" component={MealPlanningScreen} />
       <Stack.Screen name="ShoppingList" component={ShoppingListScreen} />
       <Stack.Screen name="MealPlan" component={MyCampsiteScreen} />
+      <Stack.Screen name="ParksBrowse" component={ParksBrowseScreen} />
 
       {/* New Packing List screens (local-first) */}
       <Stack.Screen name="PackingListCreate" component={PackingListCreateScreen} />

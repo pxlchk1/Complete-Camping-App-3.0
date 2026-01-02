@@ -22,6 +22,7 @@ import {
   upvoteAnswer,
   incrementQuestionViews,
 } from "../../services/questionsService";
+import { deleteQuestion } from "../../services/connectDeletionService";
 import { getUser, isAdmin, isModerator, canModerateContent } from "../../services/userService";
 import { Question, Answer } from "../../types/community";
 import { User } from "../../types/user";
@@ -37,6 +38,7 @@ import {
   TEXT_MUTED,
   EARTH_GREEN,
 } from "../../constants/colors";
+import HandleLink from "../../components/HandleLink";
 
 type RouteParams = RootStackScreenProps<"QuestionDetail">;
 
@@ -67,11 +69,57 @@ export default function QuestionDetailScreen() {
 
   // Content action handlers
   const handleDeleteQuestion = async () => {
-    navigation.goBack();
+    Alert.alert(
+      "Delete Question",
+      "Are you sure you want to delete this question? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const result = await deleteQuestion(questionId);
+            if (result.success) {
+              Alert.alert("Success", "Question deleted successfully");
+              navigation.goBack();
+            } else {
+              console.error("[QuestionDetail] Delete failed:", result.error);
+              Alert.alert(
+                "Error",
+                result.error?.message || "Failed to delete question"
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleRemoveQuestion = async () => {
-    navigation.goBack();
+    Alert.alert(
+      "Remove Question",
+      "Are you sure you want to remove this question? This moderation action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            const result = await deleteQuestion(questionId);
+            if (result.success) {
+              Alert.alert("Success", "Question removed successfully");
+              navigation.goBack();
+            } else {
+              console.error("[QuestionDetail] Remove failed:", result.error);
+              Alert.alert(
+                "Error",
+                result.error?.message || "Failed to remove question"
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   useEffect(() => {
@@ -302,9 +350,22 @@ export default function QuestionDetailScreen() {
 
             <View className="flex-row items-center justify-between pt-4 border-t" style={{ borderColor: BORDER_SOFT }}>
               <View>
-                <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                  Asked by @{question.authorHandle}
-                </Text>
+                <View className="flex-row items-center">
+                  <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                    Asked by{" "}
+                  </Text>
+                  {question.authorId && question.authorHandle ? (
+                    <HandleLink 
+                      handle={question.authorHandle}
+                      userId={question.authorId}
+                      style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12 }}
+                    />
+                  ) : (
+                    <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                      @{question.authorHandle}
+                    </Text>
+                  )}
+                </View>
                 <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
                   {formatTimeAgo(question.createdAt)}
                 </Text>
@@ -374,9 +435,22 @@ export default function QuestionDetailScreen() {
                     </Text>
 
                     <View className="flex-row items-center justify-between pt-3 border-t" style={{ borderColor: BORDER_SOFT }}>
-                      <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                        @{answer.authorHandle} • {formatTimeAgo(answer.createdAt)}
-                      </Text>
+                      <View className="flex-row items-center">
+                        {answer.authorId && answer.authorHandle ? (
+                          <HandleLink 
+                            handle={answer.authorHandle}
+                            userId={answer.authorId}
+                            style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12 }}
+                          />
+                        ) : (
+                          <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                            @{answer.authorHandle}
+                          </Text>
+                        )}
+                        <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
+                          {" "}• {formatTimeAgo(answer.createdAt)}
+                        </Text>
+                      </View>
 
                       <Pressable
                         onPress={() => handleUpvoteAnswer(answer.id)}

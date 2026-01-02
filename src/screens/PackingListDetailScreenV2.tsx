@@ -201,13 +201,25 @@ export default function PackingListDetailScreen() {
     );
   };
 
+  // Save as template
+  const handleSaveAsTemplate = () => {
+    if (items.length === 0) {
+      Alert.alert("No Items", "Add items to your packing list before saving as a template.");
+      return;
+    }
+    setShowSaveTemplate(true);
+  };
+
   // More menu
   const handleMoreMenu = () => {
     Alert.alert(
       "Packing List Options",
       undefined,
       [
-        { text: "Save as Template", onPress: () => setShowSaveTemplate(true) },
+        { 
+          text: "Save as Template", 
+          onPress: handleSaveAsTemplate,
+        },
         { text: "Reset to Unpacked", onPress: handleResetList },
         { text: "Cancel", style: "cancel" },
       ]
@@ -625,7 +637,10 @@ export default function PackingListDetailScreen() {
         tripId={tripId}
         onSaved={() => {
           setShowSaveTemplate(false);
-          Alert.alert("Saved!", "Your packing list has been saved as a template.");
+          Alert.alert(
+            "Template Saved!",
+            "You can now use this template to generate packing lists for future trips."
+          );
         }}
       />
     </View>

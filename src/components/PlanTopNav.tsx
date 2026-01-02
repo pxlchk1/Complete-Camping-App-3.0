@@ -10,7 +10,7 @@ import { DEEP_FOREST } from "../constants/colors";
 
 type PlanTopNavNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-type NavItem = "trips" | "parks" | "weather" | "packing" | "meals";
+type NavItem = "trips" | "parks" | "weather";
 
 interface PlanTopNavProps {
   activeTab: NavItem;
@@ -32,8 +32,6 @@ export default function PlanTopNav({ activeTab, onTabChange }: PlanTopNavProps) 
     { id: "trips", icon: "calendar", label: "Plan" },
     { id: "parks", icon: "earth", label: "Parks" },
     { id: "weather", icon: "cloud", label: "Weather" },
-    { id: "packing", icon: "bag", label: "Pack" },
-    { id: "meals", icon: "restaurant", label: "Meals" },
   ];
 
   return (

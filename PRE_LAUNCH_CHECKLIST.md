@@ -207,8 +207,8 @@
 
 ### App Store Connect
 - [ ] Verify In-App Purchase products created
-  - Monthly subscription ($4.99/month)
-  - Annual subscription ($24.99/year)
+  - Monthly subscription ($6.99/month)
+  - Annual subscription ($39.99/year)
 - [ ] Products linked to RevenueCat dashboard
 - [ ] App metadata updated with subscription info
 

@@ -5,6 +5,7 @@
  * - Badge display section
  * - Track selection
  * - Module cards with progress
+ * - Gating: Leave No Trace free for all; others require Pro
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -17,12 +18,23 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Components
 import AccountButtonHeader from "../components/AccountButtonHeader";
+import AccountRequiredModal from "../components/AccountRequiredModal";
 
 // Services
 import {
   getTracksWithProgress,
   getUserLearningProgress,
 } from "../services/learningService";
+
+// Auth & Gating
+import { useUserStatus } from "../utils/authHelper";
+import {
+  canOpenLearningModule,
+  getLearningModuleLockReason,
+  getModuleBadgeType,
+  getLockedModuleHelperText,
+  LockReason,
+} from "../utils/learningGating";
 
 // Types
 import {
@@ -54,6 +66,13 @@ export default function LearnScreen() {
   const navigation = useNavigation<LearnScreenNavigationProp>();
   const insets = useSafeAreaInsets();
   const bottomSpacer = 50 + Math.max(insets.bottom, 18) + 12;
+
+  // Auth & Subscription state
+  const { isLoggedIn, isPro, isGuest } = useUserStatus();
+  const isAuthenticated = isLoggedIn;
+
+  // Modal state
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   // State
   const [loading, setLoading] = useState(true);
@@ -97,15 +116,38 @@ export default function LearnScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData(true);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks-deps
     }, [])
   );
 
+  /**
+   * Handle module press with gating logic
+   * - Anonymous: Show AccountRequiredModal
+   * - Free user + non-free module: Show Paywall
+   * - Free user + free module (Leave No Trace): Open module
+   * - Pro user: Open module
+   */
   const handleModulePress = (moduleId: string) => {
-    navigation.navigate("ModuleDetail", { moduleId });
+    // Check if user can open this module
+    if (canOpenLearningModule(moduleId, isAuthenticated, isPro)) {
+      navigation.navigate("ModuleDetail", { moduleId });
+      return;
+    }
+
+    // Get the lock reason to determine which modal to show
+    const lockReason = getLearningModuleLockReason(moduleId, isAuthenticated, isPro);
+    
+    if (lockReason === "account_required") {
+      // State A: Anonymous - show account required modal
+      setShowAccountModal(true);
+    } else if (lockReason === "pro_required") {
+      // State B: Free user trying to access Pro content - show paywall
+      navigation.navigate("Paywall");
+    }
   };
 
-  const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
+  // Select the current track - fall back to first track if no selection yet
+  const selectedTrack = tracks.find((t) => t.id === selectedTrackId) || (tracks.length > 0 ? tracks[0] : null);
 
   // Loading state
   if (loading && tracks.length === 0) {
@@ -175,15 +217,15 @@ export default function LearnScreen() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: bottomSpacer }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: bottomSpacer }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />
         }
       >
         {/* Your Progress Section */}
         {tracks.length > 0 && (
-          <View style={{ marginBottom: 24 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+          <View style={{ marginBottom: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
               <Ionicons name="ribbon" size={20} color={GRANITE_GOLD} />
               <Text
                 style={{
@@ -199,8 +241,10 @@ export default function LearnScreen() {
 
             {/* Track Badge Grid */}
             <View style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}>
-              {tracks.map((track) => {
-                const isSelected = selectedTrackId === track.id;
+              {tracks.map((track, index) => {
+                // Fall back to first track if no selection
+                const effectiveSelectedId = selectedTrackId || (tracks.length > 0 ? tracks[0].id : null);
+                const isSelected = effectiveSelectedId === track.id;
                 const isCompleted = track.hasBadge;
                 // Find the badge for this track
                 const badgeEntry = Object.values(LEARNING_BADGES).find(b => b.trackId === track.id);
@@ -213,15 +257,15 @@ export default function LearnScreen() {
                     style={{
                       width: "25%",
                       paddingHorizontal: 6,
-                      marginBottom: 16,
+                      marginBottom: 8,
                       alignItems: "center",
                     }}
                   >
                     <View
                       style={{
-                        width: 56,
-                        height: 56,
-                        borderRadius: 28,
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
                         backgroundColor: isCompleted ? badgeColor : CARD_BACKGROUND_LIGHT,
                         borderWidth: isCompleted ? 0 : isSelected ? 2 : 2,
                         borderColor: isSelected ? DEEP_FOREST : BORDER_SOFT,
@@ -233,7 +277,7 @@ export default function LearnScreen() {
                     >
                       <Ionicons
                         name={track.icon as any}
-                        size={26}
+                        size={22}
                         color={isCompleted ? PARCHMENT : TEXT_MUTED}
                       />
                     </View>
@@ -272,15 +316,21 @@ export default function LearnScreen() {
           <View
             style={{
               backgroundColor: CARD_BACKGROUND_LIGHT,
-              borderRadius: 16,
-              padding: 16,
-              marginBottom: 20,
+              borderRadius: 12,
+              padding: 12,
+              marginBottom: 10,
               borderWidth: 1,
               borderColor: BORDER_SOFT,
             }}
           >
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 16, color: TEXT_PRIMARY_STRONG }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+              <Ionicons name="stats-chart" size={14} color={TEXT_MUTED} style={{ marginRight: 6 }} />
+              <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Track Progress
+              </Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: TEXT_PRIMARY_STRONG }}>
                 {selectedTrack.title}
               </Text>
               <View
@@ -304,21 +354,31 @@ export default function LearnScreen() {
             </View>
 
             {/* Progress Bar */}
-            <View style={{ backgroundColor: "rgba(0,0,0,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
+            <View style={{ backgroundColor: "rgba(0,0,0,0.08)", borderRadius: 4, height: 8, overflow: "hidden" }}>
               <View
                 style={{
                   width: `${selectedTrack.userProgress}%`,
                   height: "100%",
                   backgroundColor: selectedTrack.hasBadge ? EARTH_GREEN : GRANITE_GOLD,
-                  borderRadius: 6,
+                  borderRadius: 4,
                 }}
               />
             </View>
 
-            <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 13, color: TEXT_SECONDARY, marginTop: 10, textAlign: "center" }}>
+            <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_SECONDARY, marginTop: 6, textAlign: "center" }}>
               {selectedTrack.modules.filter((m) => 
                 userProgress?.moduleProgress[m.id]?.passed
               ).length} of {selectedTrack.modules.length} modules completed
+            </Text>
+          </View>
+        )}
+
+        {/* Lessons Section Header */}
+        {selectedTrack && selectedTrack.modules.length > 0 && (
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+            <Ionicons name="book" size={16} color={DEEP_FOREST} />
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: TEXT_PRIMARY_STRONG, marginLeft: 8 }}>
+              Tap a lesson to begin
             </Text>
           </View>
         )}
@@ -328,6 +388,12 @@ export default function LearnScreen() {
           const moduleProgress = userProgress?.moduleProgress[module.id];
           const isCompleted = moduleProgress?.passed || false;
           const hasStarted = moduleProgress?.hasRead || false;
+          
+          // Gating logic
+          const isLocked = !canOpenLearningModule(module.id, isAuthenticated, isPro);
+          const lockReason = getLearningModuleLockReason(module.id, isAuthenticated, isPro);
+          const badgeType = getModuleBadgeType(module.id);
+          const lockedHelperText = lockReason ? getLockedModuleHelperText(lockReason) : "";
 
           return (
             <Pressable
@@ -340,8 +406,28 @@ export default function LearnScreen() {
                 marginBottom: 12,
                 borderWidth: 1,
                 borderColor: isCompleted ? EARTH_GREEN : BORDER_SOFT,
+                opacity: isLocked ? 0.85 : 1,
               }}
             >
+              {/* Lock Icon Overlay - top right */}
+              {isLocked && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: 12,
+                    right: 12,
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: "rgba(0,0,0,0.08)",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Ionicons name="lock-closed" size={14} color={TEXT_MUTED} />
+                </View>
+              )}
+
               <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
                 {/* Icon */}
                 <View
@@ -349,7 +435,7 @@ export default function LearnScreen() {
                     width: 48,
                     height: 48,
                     borderRadius: 24,
-                    backgroundColor: isCompleted ? EARTH_GREEN : "rgba(42, 83, 55, 0.1)",
+                    backgroundColor: isCompleted ? EARTH_GREEN : isLocked ? "rgba(0,0,0,0.06)" : "rgba(42, 83, 55, 0.1)",
                     justifyContent: "center",
                     alignItems: "center",
                     marginRight: 14,
@@ -358,18 +444,18 @@ export default function LearnScreen() {
                   <Ionicons
                     name={module.icon as any}
                     size={24}
-                    color={isCompleted ? PARCHMENT : DEEP_FOREST}
+                    color={isCompleted ? PARCHMENT : isLocked ? TEXT_MUTED : DEEP_FOREST}
                   />
                 </View>
 
                 {/* Content */}
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={{ flex: 1, paddingRight: isLocked ? 24 : 0 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                     <Text
                       style={{
                         fontFamily: "SourceSans3_600SemiBold",
                         fontSize: 16,
-                        color: TEXT_PRIMARY_STRONG,
+                        color: isLocked ? TEXT_SECONDARY : TEXT_PRIMARY_STRONG,
                         flex: 1,
                       }}
                       numberOfLines={2}
@@ -377,7 +463,7 @@ export default function LearnScreen() {
                       {module.title}
                     </Text>
                     {isCompleted && (
-                      <Ionicons name="checkmark-circle" size={20} color={EARTH_GREEN} style={{ marginLeft: 8 }} />
+                      <Ionicons name="checkmark-circle" size={20} color={EARTH_GREEN} />
                     )}
                   </View>
 
@@ -408,50 +494,71 @@ export default function LearnScreen() {
                     </Text>
                   </View>
 
-                  {/* Status Badge */}
-                  <View style={{ marginTop: 10 }}>
-                    {isCompleted ? (
-                      <View
+                  {/* Status/Access Badges Row */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10, gap: 8 }}>
+                    {/* Free/Pro Badge - always show */}
+                    <View
+                      style={{
+                        backgroundColor: badgeType === "Free" ? "rgba(34, 197, 94, 0.15)" : "rgba(139, 92, 246, 0.12)",
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        borderRadius: 10,
+                      }}
+                    >
+                      <Text
                         style={{
-                          alignSelf: "flex-start",
-                          backgroundColor: "rgba(34, 197, 94, 0.15)",
-                          paddingHorizontal: 10,
-                          paddingVertical: 4,
-                          borderRadius: 10,
+                          fontFamily: "SourceSans3_600SemiBold",
+                          fontSize: 12,
+                          color: badgeType === "Free" ? EARTH_GREEN : "#7C3AED",
                         }}
                       >
-                        <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: EARTH_GREEN }}>
-                          ✓ Completed
-                        </Text>
-                      </View>
-                    ) : hasStarted ? (
-                      <View
+                        {badgeType}
+                      </Text>
+                    </View>
+
+                    {/* Status Badge - only for unlocked modules */}
+                    {!isLocked && (
+                      isCompleted ? (
+                        <View
+                          style={{
+                            backgroundColor: "rgba(34, 197, 94, 0.15)",
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            borderRadius: 10,
+                          }}
+                        >
+                          <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: EARTH_GREEN }}>
+                            ✓ Completed
+                          </Text>
+                        </View>
+                      ) : hasStarted ? (
+                        <View
+                          style={{
+                            backgroundColor: "rgba(212, 175, 55, 0.15)",
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            borderRadius: 10,
+                          }}
+                        >
+                          <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: GRANITE_GOLD }}>
+                            In Progress
+                          </Text>
+                        </View>
+                      ) : null
+                    )}
+
+                    {/* Locked Helper Text */}
+                    {isLocked && lockedHelperText && (
+                      <Text
                         style={{
-                          alignSelf: "flex-start",
-                          backgroundColor: "rgba(212, 175, 55, 0.15)",
-                          paddingHorizontal: 10,
-                          paddingVertical: 4,
-                          borderRadius: 10,
+                          fontFamily: "SourceSans3_400Regular",
+                          fontSize: 12,
+                          color: TEXT_MUTED,
+                          fontStyle: "italic",
                         }}
                       >
-                        <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: GRANITE_GOLD }}>
-                          In Progress
-                        </Text>
-                      </View>
-                    ) : (
-                      <View
-                        style={{
-                          alignSelf: "flex-start",
-                          backgroundColor: "rgba(0,0,0,0.05)",
-                          paddingHorizontal: 10,
-                          paddingVertical: 4,
-                          borderRadius: 10,
-                        }}
-                      >
-                        <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_SECONDARY }}>
-                          Not Started
-                        </Text>
-                      </View>
+                        {lockedHelperText}
+                      </Text>
                     )}
                   </View>
                 </View>
@@ -473,6 +580,16 @@ export default function LearnScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Account Required Modal - shown for anonymous users */}
+      <AccountRequiredModal
+        visible={showAccountModal}
+        onCreateAccount={() => {
+          setShowAccountModal(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowAccountModal(false)}
+      />
     </View>
   );
 }

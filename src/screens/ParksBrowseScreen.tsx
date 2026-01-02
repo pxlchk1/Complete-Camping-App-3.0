@@ -20,7 +20,7 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
@@ -31,12 +31,14 @@ import {
   limit as firestoreLimit,
   serverTimestamp,
   setDoc,
+  updateDoc,
   query,
 } from "firebase/firestore";
 
-import { db } from "../config/firebase";
+import { db, auth } from "../config/firebase";
 import { useTripsStore } from "../state/tripsStore";
 import { useUserStore } from "../state/userStore";
+import { usePlanTabStore } from "../state/planTabStore";
 
 // Components
 import ParksMap from "../components/ParksMap";
@@ -64,28 +66,45 @@ import {
 } from "../constants/colors";
 
 type ParksBrowseScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type ParksBrowseScreenRouteProp = RouteProp<RootStackParamList, "ParksBrowse">;
 
 interface ParksBrowseScreenProps {
-  onTabChange?: (tab: "trips" | "parks" | "weather" | "packing" | "meals") => void;
+  onTabChange?: (tab: "trips" | "parks" | "weather") => void;
   selectedParkId?: string;
   onParkDetailClosed?: () => void;
 }
 
 type LatLng = { latitude: number; longitude: number };
 
-export default function ParksBrowseScreen({ onTabChange, selectedParkId, onParkDetailClosed }: ParksBrowseScreenProps) {
+export default function ParksBrowseScreen({ onTabChange, selectedParkId: selectedParkIdProp, onParkDetailClosed }: ParksBrowseScreenProps) {
   console.log("[PLAN_TRACE] Enter ParksBrowseScreen");
+
+  // Get route params for trip context (when opened from TripDetailScreen)
+  const route = useRoute<ParksBrowseScreenRouteProp>();
+  const tripIdFromRoute = route.params?.tripId;
+  const returnTo = route.params?.returnTo;
+  const selectedParkIdFromRoute = route.params?.selectedParkId;
+  
+  // Use selectedParkId from either route params or props
+  const selectedParkIdToOpen = selectedParkIdFromRoute || selectedParkIdProp;
+  
+  // Get destination picker trip context from store (when navigated via Plan tab)
+  const destinationPickerTripId = usePlanTabStore((s) => s.destinationPickerTripId);
+  const setDestinationPickerTripId = usePlanTabStore((s) => s.setDestinationPickerTripId);
+  
+  // Use trip context from either route params or store
+  const tripContextId = tripIdFromRoute || destinationPickerTripId;
 
   useEffect(() => {
     console.log("[PLAN_TRACE] ParksBrowseScreen mounted");
   }, []);
 
-  // Handle selectedParkId prop - fetch and open park detail
+  // Handle selectedParkId - fetch and open park detail (from route params or prop)
   useEffect(() => {
-    if (selectedParkId) {
-      fetchParkById(selectedParkId);
+    if (selectedParkIdToOpen) {
+      fetchParkById(selectedParkIdToOpen);
     }
-  }, [selectedParkId]);
+  }, [selectedParkIdToOpen]);
 
   const fetchParkById = async (parkId: string) => {
     try {
@@ -138,6 +157,7 @@ export default function ParksBrowseScreen({ onTabChange, selectedParkId, onParkD
 
   const trips = useTripsStore((s) => s.trips);
   const updateTrip = useTripsStore((s) => s.updateTrip);
+  const setTripDestination = useTripsStore((s) => s.setTripDestination);
   const currentUser = useUserStore((s) => s.currentUser);
 
   /**
@@ -1021,6 +1041,53 @@ export default function ParksBrowseScreen({ onTabChange, selectedParkId, onParkD
           onClose={() => {
             setSelectedPark(null);
             onParkDetailClosed?.();
+          }}
+          tripIdForDestination={tripContextId}
+          onSetAsDestination={async (park, tripId) => {
+            // DESTINATION PICKER FLOW: Save park as trip destination and return to TripDetail
+            console.log("[ParksBrowse] Setting destination for trip:", tripId, "Park:", park.name);
+            
+            const userId = auth.currentUser?.uid;
+            if (!userId) {
+              Alert.alert("Error", "You must be logged in to set a destination.");
+              return;
+            }
+            
+            try {
+              // 1. Build the destination object
+              const tripDestination = createTripDestinationFromPark(park);
+              
+              // 2. Update Firestore (use setDoc with merge to handle trips not yet synced)
+              const tripRef = doc(db, "users", userId, "trips", tripId);
+              await setDoc(tripRef, {
+                tripDestination,
+                parkId: park.id, // Keep for legacy compatibility
+                updatedAt: serverTimestamp(),
+              }, { merge: true });
+              
+              // 3. Update local store for instant UI update
+              setTripDestination(tripId, tripDestination, park.id);
+              
+              console.log("[ParksBrowse] Destination saved successfully");
+              
+              // 4. Close modal
+              setSelectedPark(null);
+              onParkDetailClosed?.();
+              
+              // 5. Clear destination picker context and navigate back to TripDetail
+              if (destinationPickerTripId) {
+                setDestinationPickerTripId(null);
+                navigation.navigate("TripDetail", { tripId, destinationJustSet: true });
+              } else if (returnTo === "TripDetail") {
+                navigation.goBack();
+              }
+            } catch (error: any) {
+              console.error("[ParksBrowse] Failed to set destination:", error);
+              Alert.alert(
+                "Error Setting Destination",
+                `Failed to save destination: ${error.code || "Unknown error"}\n${error.message || ""}`
+              );
+            }
           }}
           onAddToTrip={(park, tripId) => {
             if (tripId) {

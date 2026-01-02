@@ -30,6 +30,7 @@ const CONTENT_COLLECTIONS = [
   { type: "feedback", collection: "feedbackPosts", label: "Feedback" },
   { type: "review", collection: "gearReviews", label: "Gear Reviews" },
   { type: "photo", collection: "stories", label: "Photos" },
+  { type: "photoPost", collection: "photoPosts", label: "Photo Posts" },
 ];
 
 interface FlaggedContent {
@@ -42,6 +43,7 @@ interface FlaggedContent {
   hiddenReason?: string;
   hiddenAt?: any;
   createdAt?: any;
+  parentId?: string; // For comments, the parent post ID
 }
 
 export default function AdminContentScreen() {
@@ -93,6 +95,44 @@ export default function AdminContentScreen() {
         }
       }
 
+      // Also query for flagged comments in photoPosts
+      try {
+        const photoPostsRef = collection(db, "photoPosts");
+        const photoPostsSnapshot = await getDocs(query(photoPostsRef, limit(100)));
+        
+        for (const postDoc of photoPostsSnapshot.docs) {
+          const commentsRef = collection(db, "photoPosts", postDoc.id, "comments");
+          const flaggedCommentsQuery = query(
+            commentsRef,
+            where("needsReview", "==", true),
+            limit(20)
+          );
+          
+          try {
+            const commentsSnapshot = await getDocs(flaggedCommentsQuery);
+            commentsSnapshot.docs.forEach((commentDoc) => {
+              const data = commentDoc.data();
+              allFlagged.push({
+                id: commentDoc.id,
+                type: "comment",
+                collection: `photoPosts/${postDoc.id}/comments`,
+                title: `Comment by @${data.userHandle || data.username || "Unknown"}`,
+                preview: data.text?.slice(0, 100) || "",
+                authorId: data.userId || "Unknown",
+                hiddenReason: data.hiddenReason,
+                hiddenAt: data.hiddenAt,
+                createdAt: data.createdAt,
+                parentId: postDoc.id,
+              });
+            });
+          } catch (commentError) {
+            // Skip if no index or other issue
+          }
+        }
+      } catch (photoPostsError: any) {
+        console.log(`[AdminContent] Error querying photo comments:`, photoPostsError?.message?.slice(0, 50));
+      }
+
       // Sort by hiddenAt (most recent first)
       allFlagged.sort((a, b) => {
         const aTime = a.hiddenAt?.toMillis?.() || 0;
@@ -126,7 +166,10 @@ export default function AdminContentScreen() {
       case "review":
         return data.productName || data.title || "Untitled Review";
       case "photo":
+      case "photoPost":
         return data.caption?.slice(0, 50) || "Photo";
+      case "comment":
+        return `Comment by @${data.userHandle || data.username || "Unknown"}`;
       default:
         return "Content";
     }
@@ -144,7 +187,10 @@ export default function AdminContentScreen() {
       case "review":
         return data.review?.slice(0, 100) || data.content?.slice(0, 100) || "";
       case "photo":
+      case "photoPost":
         return data.caption || "";
+      case "comment":
+        return data.text?.slice(0, 100) || "";
       default:
         return "";
     }
@@ -174,7 +220,10 @@ export default function AdminContentScreen() {
       case "review":
         return "star-outline";
       case "photo":
+      case "photoPost":
         return "image-outline";
+      case "comment":
+        return "chatbubble-outline";
       default:
         return "document-outline";
     }

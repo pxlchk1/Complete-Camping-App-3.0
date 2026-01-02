@@ -13,8 +13,6 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
-  TouchableWithoutFeedback,
-  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -162,32 +160,31 @@ export default function SuggestionPickerSheet({
       transparent={true}
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={{ flex: 1, justifyContent: "flex-end" }}>
-          {/* Backdrop */}
-          <Pressable
-            style={{ 
-              position: "absolute", 
-              top: 0, 
-              left: 0, 
-              right: 0, 
-              bottom: 0, 
-              backgroundColor: "rgba(0,0,0,0.5)" 
-            }}
-            onPress={onClose}
-          />
+      <View style={{ flex: 1, justifyContent: "flex-end" }}>
+        {/* Backdrop */}
+        <Pressable
+          style={{ 
+            position: "absolute", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            backgroundColor: "rgba(0,0,0,0.5)" 
+          }}
+          onPress={onClose}
+        />
 
-          {/* Sheet Content */}
-          <View
-            style={{ 
-              backgroundColor: PARCHMENT, 
-              maxHeight: "85%",
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              overflow: "hidden",
-            }}
-          >
-            <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
+        {/* Sheet Content */}
+        <View
+          style={{ 
+            backgroundColor: PARCHMENT, 
+            height: "92%",
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            overflow: "hidden",
+          }}
+        >
+          <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
               {/* Header */}
               <View
                 className="px-5 pt-6 pb-4"
@@ -539,7 +536,6 @@ export default function SuggestionPickerSheet({
             </SafeAreaView>
           </View>
         </View>
-      </TouchableWithoutFeedback>
     </Modal>
   );
 }

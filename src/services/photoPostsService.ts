@@ -40,6 +40,7 @@ const COLLECTION = "photoPosts";
 export interface CreatePhotoPostData {
   userId: string;
   displayName?: string;
+  userHandle?: string;
   photoUrls: string[];
   storagePaths?: string[];
   postType: PhotoPostType;
@@ -61,6 +62,7 @@ export async function createPhotoPost(data: CreatePhotoPostData): Promise<string
   const docData: Partial<PhotoPost> = {
     userId: data.userId,
     displayName: data.displayName || "Anonymous",
+    userHandle: data.userHandle,
     photoUrls: data.photoUrls,
     storagePaths: data.storagePaths || [],
     postType: data.postType,
@@ -290,6 +292,83 @@ export async function getHelpfulStatuses(
   return statuses;
 }
 
+// ==================== Reddit-Style Voting ====================
+
+export type VoteDirection = "up" | "down" | null;
+
+export async function vote(
+  postId: string,
+  userId: string,
+  direction: "up" | "down"
+): Promise<{ userVote: VoteDirection; newCount: number }> {
+  const voteRef = doc(db, COLLECTION, postId, "votes", userId);
+  const postRef = doc(db, COLLECTION, postId);
+
+  const voteSnap = await getDoc(voteRef);
+  const currentVote = voteSnap.exists() ? voteSnap.data()?.direction : null;
+
+  // Calculate the delta based on current vote and new direction
+  let delta = 0;
+  let newVoteDirection: VoteDirection = direction;
+
+  if (currentVote === null) {
+    // No previous vote
+    delta = direction === "up" ? 1 : -1;
+  } else if (currentVote === direction) {
+    // Same direction - remove vote
+    delta = direction === "up" ? -1 : 1;
+    newVoteDirection = null;
+  } else {
+    // Opposite direction - swing vote (2 point swing)
+    delta = direction === "up" ? 2 : -2;
+  }
+
+  // Update or remove the vote record
+  if (newVoteDirection === null) {
+    await deleteDoc(voteRef);
+  } else {
+    await setDoc(voteRef, {
+      direction: newVoteDirection,
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  // Update the vote count
+  await updateDoc(postRef, {
+    voteCount: increment(delta),
+  });
+
+  const postSnap = await getDoc(postRef);
+  const newCount = (postSnap.data()?.voteCount || 0) as number;
+
+  return { userVote: newVoteDirection, newCount };
+}
+
+export async function getUserVote(
+  postId: string,
+  userId: string
+): Promise<VoteDirection> {
+  const voteRef = doc(db, COLLECTION, postId, "votes", userId);
+  const voteSnap = await getDoc(voteRef);
+  if (!voteSnap.exists()) return null;
+  return voteSnap.data()?.direction || null;
+}
+
+export async function getUserVotes(
+  postIds: string[],
+  userId: string
+): Promise<Record<string, VoteDirection>> {
+  const votes: Record<string, VoteDirection> = {};
+
+  await Promise.all(
+    postIds.map(async (postId) => {
+      votes[postId] = await getUserVote(postId, userId);
+    })
+  );
+
+  return votes;
+}
+
 // ==================== Migration Helper ====================
 
 /**
@@ -324,4 +403,188 @@ export function getPostTypeLabel(post: PhotoPost): string {
   };
 
   return labels[postType] || "Photo";
+}
+
+// ==================== Photo Comments ====================
+
+// Threshold for auto-flagging comments for review
+const COMMENT_DOWNVOTE_THRESHOLD = 3;
+
+export interface PhotoComment {
+  id: string;
+  postId: string;
+  text: string;
+  userId: string;
+  username: string;
+  userHandle?: string;
+  createdAt: any;
+  upvotes: number;
+  downvotes: number;
+  score: number;
+  userVote?: "up" | "down" | null;
+  isHidden?: boolean;
+  needsReview?: boolean;
+  hiddenReason?: string;
+}
+
+export async function addPhotoComment(data: {
+  postId: string;
+  text: string;
+  userId: string;
+  username: string;
+  userHandle?: string;
+}): Promise<string> {
+  const commentsRef = collection(db, COLLECTION, data.postId, "comments");
+
+  const docRef = await addDoc(commentsRef, {
+    postId: data.postId,
+    text: data.text,
+    userId: data.userId,
+    username: data.username,
+    userHandle: data.userHandle || null,
+    createdAt: serverTimestamp(),
+    upvotes: 0,
+    downvotes: 0,
+    score: 0,
+    isHidden: false,
+    needsReview: false,
+  });
+
+  // Increment comment count on post
+  const postRef = doc(db, COLLECTION, data.postId);
+  await updateDoc(postRef, {
+    commentCount: increment(1),
+  });
+
+  return docRef.id;
+}
+
+export async function getPhotoComments(postId: string, currentUserId?: string): Promise<PhotoComment[]> {
+  const commentsRef = collection(db, COLLECTION, postId, "comments");
+  const q = query(commentsRef, orderBy("createdAt", "asc"));
+  const snapshot = await getDocs(q);
+
+  const comments = await Promise.all(
+    snapshot.docs.map(async (docSnap) => {
+      const data = docSnap.data();
+      let userVote: "up" | "down" | null = null;
+
+      // Get user's vote if logged in
+      if (currentUserId) {
+        const voteRef = doc(db, COLLECTION, postId, "comments", docSnap.id, "votes", currentUserId);
+        const voteSnap = await getDoc(voteRef);
+        if (voteSnap.exists()) {
+          userVote = voteSnap.data()?.direction || null;
+        }
+      }
+
+      return {
+        id: docSnap.id,
+        postId: data.postId,
+        text: data.text,
+        userId: data.userId,
+        username: data.username,
+        userHandle: data.userHandle,
+        createdAt: data.createdAt,
+        upvotes: data.upvotes || 0,
+        downvotes: data.downvotes || 0,
+        score: data.score || 0,
+        userVote,
+        isHidden: data.isHidden || false,
+        needsReview: data.needsReview || false,
+        hiddenReason: data.hiddenReason,
+      } as PhotoComment;
+    })
+  );
+
+  return comments;
+}
+
+// Vote on a photo comment
+export async function voteOnPhotoComment(
+  postId: string,
+  commentId: string,
+  userId: string,
+  direction: "up" | "down"
+): Promise<{ userVote: "up" | "down" | null; newScore: number; flaggedForReview: boolean }> {
+  const commentRef = doc(db, COLLECTION, postId, "comments", commentId);
+  const voteRef = doc(db, COLLECTION, postId, "comments", commentId, "votes", userId);
+
+  const voteSnap = await getDoc(voteRef);
+  const currentVote = voteSnap.exists() ? voteSnap.data()?.direction : null;
+
+  // Calculate deltas
+  let upvoteDelta = 0;
+  let downvoteDelta = 0;
+  let newVoteDirection: "up" | "down" | null = direction;
+
+  if (currentVote === null) {
+    // No previous vote
+    if (direction === "up") upvoteDelta = 1;
+    else downvoteDelta = 1;
+  } else if (currentVote === direction) {
+    // Same direction - remove vote
+    if (direction === "up") upvoteDelta = -1;
+    else downvoteDelta = -1;
+    newVoteDirection = null;
+  } else {
+    // Opposite direction - swing vote
+    if (direction === "up") {
+      upvoteDelta = 1;
+      downvoteDelta = -1;
+    } else {
+      upvoteDelta = -1;
+      downvoteDelta = 1;
+    }
+  }
+
+  // Update or remove the vote record
+  if (newVoteDirection === null) {
+    await deleteDoc(voteRef);
+  } else {
+    await setDoc(voteRef, {
+      direction: newVoteDirection,
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  // Update the comment vote counts
+  await updateDoc(commentRef, {
+    upvotes: increment(upvoteDelta),
+    downvotes: increment(downvoteDelta),
+    score: increment(upvoteDelta - downvoteDelta),
+  });
+
+  // Check if comment should be flagged for review
+  const commentSnap = await getDoc(commentRef);
+  const commentData = commentSnap.data();
+  const newDownvotes = (commentData?.downvotes || 0);
+  const newScore = (commentData?.score || 0);
+  let flaggedForReview = false;
+
+  // Flag for review if downvotes reach threshold and not already flagged
+  if (newDownvotes >= COMMENT_DOWNVOTE_THRESHOLD && !commentData?.needsReview) {
+    await updateDoc(commentRef, {
+      needsReview: true,
+      isHidden: true,
+      hiddenReason: "AUTO_DOWNVOTE_THRESHOLD",
+      hiddenAt: serverTimestamp(),
+    });
+    flaggedForReview = true;
+    console.log(`[CommentModeration] Flagged comment ${commentId} for review - ${newDownvotes} downvotes`);
+  }
+
+  return { userVote: newVoteDirection, newScore, flaggedForReview };
+}
+
+// Get user's vote on a specific comment
+export async function getCommentUserVote(
+  postId: string,
+  commentId: string,
+  userId: string
+): Promise<"up" | "down" | null> {
+  const voteRef = doc(db, COLLECTION, postId, "comments", commentId, "votes", userId);
+  const voteSnap = await getDoc(voteRef);
+  if (!voteSnap.exists()) return null;
+  return voteSnap.data()?.direction || null;
 }

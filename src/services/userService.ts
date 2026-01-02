@@ -384,6 +384,8 @@ export async function createUserProfile(data: {
 
 export function isAdmin(user: User): boolean {
   return user.membershipTier === "isAdmin" || 
+         user.role === "administrator" ||
+         user.role === "admin" ||
          user.email?.toLowerCase() === "alana@tentandlantern.com" ||
          user.handle?.toLowerCase() === "tentandlantern";
 }

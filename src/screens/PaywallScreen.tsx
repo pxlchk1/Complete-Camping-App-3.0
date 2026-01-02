@@ -89,15 +89,15 @@ export default function PaywallScreen() {
       const pkgs = offering.availablePackages;
 
       // Find monthly and annual packages
-      // Products: cca_monthly_sub_399, cca_annual_sub_2499
+      // Products: cca_monthly_sub, cca_annual_sub
       const monthly = pkgs.find((p) => 
-        p.product.identifier === "cca_monthly_sub_399" ||
+        p.product.identifier === "cca_monthly_sub" ||
         p.identifier.toLowerCase().includes("monthly") ||
         p.packageType === PACKAGE_TYPE.MONTHLY
       );
       
       const annual = pkgs.find((p) => 
-        p.product.identifier === "cca_annual_sub_2499" ||
+        p.product.identifier === "cca_annual_sub" ||
         p.identifier.toLowerCase().includes("annual") || 
         p.identifier.toLowerCase().includes("yearly") ||
         p.packageType === PACKAGE_TYPE.ANNUAL

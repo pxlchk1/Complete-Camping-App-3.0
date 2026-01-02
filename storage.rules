@@ -8,14 +8,28 @@ service firebase.storage {
     }
     
     // Helper function to check if user is admin
-    // Reads from Firestore users collection
+    // Reads from Firestore profiles or users collection
     function isAdmin() {
       return isSignedIn() 
-        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
         && (
-          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
-          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == "admin" ||
-          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == "administrator"
+          // Check profiles collection
+          (firestore.exists(/databases/(default)/documents/profiles/$(request.auth.uid))
+            && (
+              firestore.get(/databases/(default)/documents/profiles/$(request.auth.uid)).data.isAdmin == true ||
+              firestore.get(/databases/(default)/documents/profiles/$(request.auth.uid)).data.role == "admin" ||
+              firestore.get(/databases/(default)/documents/profiles/$(request.auth.uid)).data.role == "administrator" ||
+              firestore.get(/databases/(default)/documents/profiles/$(request.auth.uid)).data.membershipTier == "isAdmin"
+            )
+          ) ||
+          // Check users collection
+          (firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+            && (
+              firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+              firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+              firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == "administrator" ||
+              firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.membershipTier == "isAdmin"
+            )
+          )
         );
     }
     
@@ -30,6 +44,16 @@ service firebase.storage {
     
     // Alternative: stories without nested photoId folder
     match /stories/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow create, write: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+    
+    // Photo Posts - Community photo uploads: photoPosts/{userId}/{fileName}
+    // Owner can read/write/delete their own photos
+    // Admin can read/delete any photo
+    // All signed-in users can read (for community feed)
+    match /photoPosts/{userId}/{fileName} {
       allow read: if isSignedIn();
       allow create, write: if isSignedIn() && request.auth.uid == userId;
       allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());

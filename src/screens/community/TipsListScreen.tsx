@@ -6,11 +6,12 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, Pressable, FlatList, ActivityIndicator, TextInput } from "react-native";
+import { View, Text, Pressable, FlatList, ActivityIndicator, TextInput, Alert } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { tipsService, TipPost } from "../../services/firestore/tipsService";
+import { deleteTip } from "../../services/connectDeletionService";
 import { tipVotesService } from "../../services/firestore/tipVotesService";
 import { auth } from "../../config/firebase";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
@@ -210,10 +211,20 @@ export default function TipsListScreen() {
             navigation.navigate("TipDetail", { tipId: item.id });
           }}
           onRequestDelete={async () => {
-            setTips(prev => prev.filter(t => t.id !== item.id));
+            const result = await deleteTip(item.id);
+            if (result.success) {
+              setTips(prev => prev.filter(t => t.id !== item.id));
+            } else {
+              Alert.alert("Error", result.error?.message || "Failed to delete tip");
+            }
           }}
           onRequestRemove={async () => {
-            setTips(prev => prev.filter(t => t.id !== item.id));
+            const result = await deleteTip(item.id);
+            if (result.success) {
+              setTips(prev => prev.filter(t => t.id !== item.id));
+            } else {
+              Alert.alert("Error", result.error?.message || "Failed to remove tip");
+            }
           }}
           layout="cardHeader"
           iconSize={18}
