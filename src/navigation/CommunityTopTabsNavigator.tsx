@@ -3,13 +3,13 @@
  * Material top tabs for Tips, Gear, Ask, Photos, Feedback
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { View, ImageBackground } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Text } from "react-native";
-import { useNavigationState } from "@react-navigation/native";
+import { useNavigationState, useNavigation } from "@react-navigation/native";
 import TipsListScreen from "../screens/community/TipsListScreen";
 import GearReviewsListScreen from "../screens/community/GearReviewsListScreen";
 import QuestionsListScreen from "../screens/community/QuestionsListScreen";
@@ -122,10 +122,23 @@ interface CommunityTopTabsNavigatorProps {
 }
 
 export default function CommunityTopTabsNavigator({ initialRouteName }: CommunityTopTabsNavigatorProps = {}) {
+  const navigation = useNavigation<any>();
+  
   // Use navigation state to track active tab
   const activeTabIndex = useNavigationState(state => state?.index ?? 0);
   const tabNames = ["Tips", "Gear", "Ask", "Photos", "Feedback"];
   const activeTab = tabNames[activeTabIndex] || "Tips";
+
+  // Navigate to the requested tab when initialRouteName is provided
+  useEffect(() => {
+    if (initialRouteName && tabNames.includes(initialRouteName)) {
+      // Small delay to ensure navigator is ready
+      const timer = setTimeout(() => {
+        navigation.navigate(initialRouteName);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [initialRouteName]);
 
   return (
     <View className="flex-1 bg-parchment">

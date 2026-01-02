@@ -13,7 +13,6 @@ import { SectionTitle, BodyText, BodyTextMedium } from "../components/Typography
 import PushPermissionPrompt from "../components/PushPermissionPrompt";
 import HandleLink from "../components/HandleLink";
 import AccountRequiredModal from "../components/AccountRequiredModal";
-import MyCampgroundInfoModal from "../components/MyCampgroundInfoModal";
 
 // Services
 import { getPhotoPosts } from "../services/photoPostsService";
@@ -30,9 +29,6 @@ import { useSubscriptionStore } from "../state/subscriptionStore";
 // Utils
 import { getWelcomeTitle, getWelcomeSubtext } from "../utils/welcomeCopy";
 import { useUserStatus } from "../utils/authHelper";
-
-// Services
-import { checkAndSetMyCampgroundInfoSeen, hasSeenMyCampgroundInfo } from "../services/userFlagsService";
 
 // Constants
 import {
@@ -95,8 +91,6 @@ export default function HomeScreen() {
   // Gating modals state
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [accountModalTriggerKey, setAccountModalTriggerKey] = useState<string>("default");
-  const [showCampgroundInfoModal, setShowCampgroundInfoModal] = useState(false);
-  const [pendingCampgroundNavigation, setPendingCampgroundNavigation] = useState(false);
 
   // Fetch a random featured photo on screen focus
   useFocusEffect(
@@ -202,23 +196,8 @@ export default function HomeScreen() {
    * - Fall back to QuestionsListScreen if that’s the route your navigator uses.
    */
   const navigateToAsk = () => {
-    const nav: any = navigation as any;
-    const state = nav?.getState?.();
-    const routeNames: string[] = state?.routeNames ?? [];
-
-    if (routeNames.includes("HomeTabs")) {
-      nav.navigate("HomeTabs", { screen: "Connect", params: { screen: "Ask" } });
-      return;
-    }
-
-    if (routeNames.includes("QuestionsListScreen")) {
-      nav.navigate("QuestionsListScreen");
-      return;
-    }
-
-    // Last resort: try the most likely direct routes without crashing.
-    // These won’t throw; RN will warn if missing.
-    nav.navigate("Connect");
+    // Navigate to Connect tab with Ask sub-tab
+    (navigation as any).navigate("Connect", { screen: "Ask" });
   };
 
   return (
@@ -473,16 +452,8 @@ export default function HomeScreen() {
                     setShowAccountModal(true);
                     return;
                   }
-                  // First-time info modal for FREE users only (Pro skips)
-                  if (!isPro) {
-                    const hasSeen = await userFlagsService.hasSeenMyCampgroundInfo();
-                    if (!hasSeen) {
-                      setPendingCampgroundNavigation(true);
-                      setShowCampgroundInfoModal(true);
-                      return;
-                    }
-                  }
-                  navigation.navigate("MyCampsite");
+                  // Logged-in users go directly to MyCampground
+                  navigation.navigate("MyCampground");
                 }}
                 accessibilityLabel="My Campground"
                 accessibilityRole="button"
@@ -637,24 +608,12 @@ export default function HomeScreen() {
       <AccountRequiredModal
         visible={showAccountModal}
         onClose={() => setShowAccountModal(false)}
+        onCreateAccount={() => {
+          setShowAccountModal(false);
+          navigation.navigate("Auth");
+        }}
+        onMaybeLater={() => setShowAccountModal(false)}
         triggerKey={accountModalTriggerKey}
-      />
-
-      {/* My Campground Info Modal for first-time FREE users */}
-      <MyCampgroundInfoModal
-        visible={showCampgroundInfoModal}
-        onClose={async () => {
-          setShowCampgroundInfoModal(false);
-          await userFlagsService.setMyCampgroundInfoSeen();
-          if (pendingCampgroundNavigation) {
-            setPendingCampgroundNavigation(false);
-            navigation.navigate("MyCampsite");
-          }
-        }}
-        onUpgrade={() => {
-          setShowCampgroundInfoModal(false);
-          navigation.navigate("Paywall", { triggerKey: "my_campground_quick_action" });
-        }}
       />
     </View>
   );

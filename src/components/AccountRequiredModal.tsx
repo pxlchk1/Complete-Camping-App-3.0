@@ -80,29 +80,35 @@ const ACCOUNT_MODAL_CONTENT: Record<string, { title: string; body: string }> = {
 
 interface AccountRequiredModalProps {
   visible: boolean;
-  onCreateAccount: () => void;
-  onMaybeLater: () => void;
+  onClose: () => void;
+  onCreateAccount?: () => void;
+  onMaybeLater?: () => void;
   /** Optional trigger key for dynamic content */
   triggerKey?: string;
 }
 
 export default function AccountRequiredModal({
   visible,
+  onClose,
   onCreateAccount,
   onMaybeLater,
   triggerKey = "default",
 }: AccountRequiredModalProps) {
   const content = ACCOUNT_MODAL_CONTENT[triggerKey] || ACCOUNT_MODAL_CONTENT.default;
   
+  // Use onClose for dismiss actions if specific handlers not provided
+  const handleCreateAccount = onCreateAccount || onClose;
+  const handleMaybeLater = onMaybeLater || onClose;
+  
   return (
     <Modal
       visible={visible}
       animationType="slide"
       transparent={true}
-      onRequestClose={onMaybeLater}
+      onRequestClose={handleMaybeLater}
     >
       <View style={styles.backdrop}>
-        <Pressable style={styles.backdropTouchable} onPress={onMaybeLater} />
+        <Pressable style={styles.backdropTouchable} onPress={handleMaybeLater} />
         
         <View style={styles.modalContainer}>
           <View style={styles.handle} />
@@ -120,15 +126,15 @@ export default function AccountRequiredModal({
 
           {/* Buttons */}
           <View style={styles.buttonContainer}>
-            <Pressable style={styles.primaryButton} onPress={onCreateAccount}>
+            <Pressable style={styles.primaryButton} onPress={handleCreateAccount}>
               <Text style={styles.primaryButtonText}>Create account</Text>
             </Pressable>
             
-            <Pressable style={styles.loginButton} onPress={onCreateAccount}>
+            <Pressable style={styles.loginButton} onPress={handleCreateAccount}>
               <Text style={styles.loginButtonText}>Log in</Text>
             </Pressable>
 
-            <Pressable style={styles.secondaryButton} onPress={onMaybeLater}>
+            <Pressable style={styles.secondaryButton} onPress={handleMaybeLater}>
               <Text style={styles.secondaryButtonText}>Not now</Text>
             </Pressable>
           </View>
