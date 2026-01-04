@@ -159,6 +159,32 @@ export const GATING_REGISTRY: GateDefinition[] = [
     accountModalTriggerKey: null,
     notes: "Guests redirected to Auth (not modal)",
   },
+  {
+    gateKey: "view_shared_trip",
+    title: "View Shared Trip",
+    level: "account_required",
+    freeLimit: null,
+    countsTowardProAttempt: false,
+    screens: ["TripDetailScreen", "MyCampgroundScreen"],
+    actions: ["viewSharedTrip"],
+    triggerModal: "AccountRequiredModal",
+    paywallTriggerKey: null,
+    accountModalTriggerKey: "view_shared_trip",
+    notes: "Guests need account to view trips shared by Campground friends (read-only access)",
+  },
+  {
+    gateKey: "shared_trip_edit_blocked",
+    title: "Shared Trip Edit Blocked",
+    level: "account_required",
+    freeLimit: null,
+    countsTowardProAttempt: false,
+    screens: ["TripDetailScreen"],
+    actions: ["editSharedTrip"],
+    triggerModal: "AccountRequiredModal",
+    paywallTriggerKey: null,
+    accountModalTriggerKey: null,
+    notes: "Recipients cannot edit shared trips - read-only access only",
+  },
 
   // ============================================
   // FREE LIMIT GATES

@@ -337,7 +337,7 @@ export default function AdminDashboardScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-      <ModalHeader title="Admin dashboard" showTitle />
+      <ModalHeader title="Admin Dashboard" showTitle />
 
       <ScrollView className="flex-1">
         <View className="px-5 pt-5 pb-8">

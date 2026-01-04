@@ -171,6 +171,12 @@ export default function PhotoDetailScreen() {
   }, [postId]);
 
   const loadPhotoData = async () => {
+    if (!postId) {
+      setError("Missing photo id");
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
       setError(null);

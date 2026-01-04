@@ -13,6 +13,7 @@ export interface CampgroundContact {
   contactUserId?: string | null;
   contactName: string;
   contactEmail?: string | null;
+  contactPhone?: string | null;
   contactNote?: string | null;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
@@ -28,12 +29,14 @@ export interface TripParticipant {
 export interface CreateContactData {
   contactName: string;
   contactEmail?: string;
+  contactPhone?: string;
   contactNote?: string;
 }
 
 export interface UpdateContactData {
   contactName?: string;
   contactEmail?: string | null;
+  contactPhone?: string | null;
   contactNote?: string | null;
 }
 

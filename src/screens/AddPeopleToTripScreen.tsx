@@ -136,7 +136,7 @@ export default function AddPeopleToTripScreen() {
   if (loading) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="Add people" showTitle />
+        <ModalHeader title="Add People" showTitle />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={DEEP_FOREST} />
           <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
@@ -150,7 +150,7 @@ export default function AddPeopleToTripScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="Add people"
+        title="Add People"
         showTitle
         rightAction={{
           icon: "add",

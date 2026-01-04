@@ -28,8 +28,6 @@ import AddCamperScreen from "../screens/AddCamperScreen";
 import EditCamperScreen from "../screens/EditCamperScreen";
 import AddPeopleToTripScreen from "../screens/AddPeopleToTripScreen";
 import AuthLanding from "../screens/AuthLanding";
-import PackingListScreen from "../screens/PackingListScreen";
-import PackingListGenerateScreenV2 from "../screens/PackingListGenerateScreenV2";
 import PackingListCreateScreen from "../screens/PackingListCreateScreen";
 import PackingListEditorScreen from "../screens/PackingListEditorScreen";
 import MealPlanningScreen from "../screens/MealPlanningScreen";
@@ -51,6 +49,7 @@ import CreateTipScreen from "../screens/community/CreateTipScreen";
 import GearReviewsListScreen from "../screens/community/GearReviewsListScreen";
 import GearReviewDetailScreen from "../screens/community/GearReviewDetailScreen";
 import CreateGearReviewScreen from "../screens/community/CreateGearReviewScreen";
+import EditGearReviewScreen from "../screens/community/EditGearReviewScreen";
 import QuestionsListScreen from "../screens/community/QuestionsListScreen";
 import QuestionDetailScreen from "../screens/community/QuestionDetailScreen";
 import CreateQuestionScreen from "../screens/community/CreateQuestionScreen";
@@ -188,7 +187,6 @@ export default function RootNavigator() {
       )}
 
       {/* Trip Planning screens */}
-      <Stack.Screen name="PackingList" component={PackingListScreen} />
       <Stack.Screen name="MealPlanning" component={MealPlanningScreen} />
       <Stack.Screen name="ShoppingList" component={ShoppingListScreen} />
       <Stack.Screen name="MealPlan" component={MyCampsiteScreen} />
@@ -211,6 +209,7 @@ export default function RootNavigator() {
       <Stack.Screen name="GearReviewsListScreen" component={GearReviewsListScreen} />
       <Stack.Screen name="GearReviewDetail" component={GearReviewDetailScreen} />
       <Stack.Screen name="CreateGearReview" component={CreateGearReviewScreen} />
+      <Stack.Screen name="EditGearReview" component={EditGearReviewScreen} />
       <Stack.Screen name="SubmitGearReview" component={CreateGearReviewScreen} />
 
       {/* Questions/Ask */}

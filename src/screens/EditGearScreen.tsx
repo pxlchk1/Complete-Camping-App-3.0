@@ -45,7 +45,7 @@ export default function EditGearScreen() {
 
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<GearCategory>("misc");
+  const [category, setCategory] = useState<GearCategory>("optional_extras");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [weight, setWeight] = useState("");
@@ -217,7 +217,7 @@ export default function EditGearScreen() {
   if (loading) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="Edit gear" showTitle />
+        <ModalHeader title="Edit Gear" showTitle />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={DEEP_FOREST} />
           <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
@@ -233,7 +233,7 @@ export default function EditGearScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="Edit gear"
+        title="Edit Gear"
         showTitle
         rightAction={{
           icon: "checkmark",

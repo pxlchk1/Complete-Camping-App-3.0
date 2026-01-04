@@ -80,7 +80,7 @@ export const gearReviewsService = {
         summary: data.summary || data.title || '',
         rating: data.rating || data.overallRating || 0,
       };
-    }) as GearReview[];
+    }) as unknown as GearReview[];
   },
 
   // Get review by ID

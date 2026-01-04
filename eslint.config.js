@@ -13,6 +13,9 @@ module.exports = defineConfig([
       "patches/*",
       "bun.lock",
       "eslint.config.js",
+      "**/src/screens/_archive/**",
+      "**/scripts/**",
+      "**/src/scripts/**",
     ],
     settings: {
       "import/resolver": {

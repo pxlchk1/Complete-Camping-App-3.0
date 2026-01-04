@@ -1,6 +1,8 @@
 // Meal planning types for Firebase-based data model
 
-export type MealCategory = "breakfast" | "lunch" | "dinner" | "snack";
+export type MealCategory = "breakfast" | "lunch" | "dinner" | "snack" | "beverages";
+// Meal categories that have recipes/suggestions (excludes beverages which is a checklist)
+export type SuggestibleMealCategory = "breakfast" | "lunch" | "dinner" | "snack";
 export type PrepType = "cold" | "campStove" | "campfire" | "noCook";
 export type Difficulty = "easy" | "moderate";
 
@@ -22,7 +24,14 @@ export interface Meal {
 export interface MealLibraryItem {
   id: string;
   name: string;
+  /** @deprecated Use mealTypes instead. Kept for backward compat. */
   category: MealCategory;
+  /** 
+   * Array of meal types this recipe is suitable for.
+   * Most recipes have 1, some can have 2.
+   * Legacy recipes will have this inferred from category.
+   */
+  mealTypes?: ("breakfast" | "lunch" | "dinner" | "snacks")[];
   prepType: PrepType;
   difficulty: Difficulty;
   suitableFor?: string[]; // Array of camping styles

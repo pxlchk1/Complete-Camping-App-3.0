@@ -176,7 +176,7 @@ export default function PackingTabScreenNew({ onTabChange }: PackingTabScreenPro
         <View className="flex-1 bg-parchment">
           <EmptyState
             iconName="bag"
-            title="No packing lists yet"
+            title="No Packing Lists Yet"
             message="Create your first packing list to get organized for your next adventure."
             ctaLabel="Create Packing List"
             onPress={handleCreateList}
@@ -447,6 +447,7 @@ export default function PackingTabScreenNew({ onTabChange }: PackingTabScreenPro
       {/* Gating Modals */}
       <AccountRequiredModal
         visible={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
         onCreateAccount={() => {
           setShowAccountModal(false);
           navigation.navigate("Auth" as never);

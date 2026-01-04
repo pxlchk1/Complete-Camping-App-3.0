@@ -45,6 +45,7 @@ export interface TripDestination {
   lng: number | null;              // Longitude for Weather
   formattedAddress: string | null; // Full formatted address for display
   parkType: "State Park" | "National Park" | "National Forest" | "Other" | null;
+  url?: string | null;             // Reservation URL for "Reserve a Site" button
   updatedAt?: string;              // ISO timestamp when destination was set
 }
 
@@ -90,6 +91,9 @@ export interface Trip {
   userId: string; // User ID for Firebase scoping (required)
   parkId?: string; // Reference to selected park
   
+  /** Member user IDs who can view this trip (for sharing via My Campground) */
+  memberIds?: string[];
+  
   /** @deprecated Use tripDestination.name instead */
   locationName?: string; // Custom location name
   /** @deprecated Use tripDestination.sourceType instead */
@@ -112,6 +116,35 @@ export interface Trip {
     lastUpdated: string;
   };
   weatherDestination?: WeatherDestination;
+  
+  /** User-selected packing season override. Takes priority over auto-detection. */
+  packingSeasonOverride?: "winter" | "spring" | "summer" | "fall";
+  
+  /** Explicit flag for winter camping (alternative to campingStyle === "winter") */
+  winterCamping?: boolean;
+  
+  /** Tags for trip categorization */
+  tags?: string[];
+  
+  /** Trip type for meal planning context */
+  tripType?: string;
+  
+  /** Number of campers for meal planning */
+  numCampers?: number;
+  
+  /** Free-form notes for trip details section */
+  detailsNotes?: string;
+  
+  /** Links added to trip details (external resources like AllTrails, OnX, etc.) */
+  detailsLinks?: Array<{
+    id: string;
+    title: string;
+    url: string;
+    source: string;
+  }>;
+  
+  /** Season for trip planning context */
+  season?: "spring" | "summer" | "fall" | "winter";
 }
 
 export interface Park {

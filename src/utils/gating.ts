@@ -280,6 +280,115 @@ export async function requireProAsync(callbacks: AccessGateCallbacks): Promise<b
 }
 
 // ============================================
+// RECIPIENT (CAMPGROUND MEMBER) ACCESS GATING
+// ============================================
+
+/**
+ * Recipient Access Level for Shared Trips
+ * 
+ * - 'owner': Full access (creator of the trip)
+ * - 'read_only': Can view, cannot edit (invited campground member)
+ * - 'none': No access to this trip
+ */
+export type RecipientAccessLevel = 'owner' | 'read_only' | 'none';
+
+/**
+ * Check the current user's access level for a trip
+ * 
+ * @param tripUserId - The userId of the trip owner
+ * @param tripMemberIds - Array of userIds with access to the trip
+ * @returns RecipientAccessLevel
+ */
+export function getTripAccessLevel(
+  tripUserId: string | undefined,
+  tripMemberIds: string[] = []
+): RecipientAccessLevel {
+  const currentUserId = auth.currentUser?.uid;
+  
+  if (!currentUserId) {
+    return 'none';
+  }
+  
+  // Owner has full access
+  if (tripUserId === currentUserId) {
+    return 'owner';
+  }
+  
+  // Member has read-only access
+  if (tripMemberIds.includes(currentUserId)) {
+    return 'read_only';
+  }
+  
+  return 'none';
+}
+
+/**
+ * Hook version for reactive access level
+ */
+export function useTripAccessLevel(
+  tripUserId: string | undefined,
+  tripMemberIds: string[] = []
+): RecipientAccessLevel {
+  const user = useAuthStore((s) => s.user);
+  
+  if (!user) {
+    return 'none';
+  }
+  
+  if (tripUserId === user.id) {
+    return 'owner';
+  }
+  
+  if (tripMemberIds.includes(user.id)) {
+    return 'read_only';
+  }
+  
+  return 'none';
+}
+
+/**
+ * Check if current user can edit a trip
+ * 
+ * Only owners can edit. Recipients (campground members) have read-only access.
+ * 
+ * @param tripUserId - The userId of the trip owner
+ * @returns true if user can edit, false otherwise
+ */
+export function canEditTrip(tripUserId: string | undefined): boolean {
+  const currentUserId = auth.currentUser?.uid;
+  return !!currentUserId && tripUserId === currentUserId;
+}
+
+/**
+ * Hook version for reactive edit permission
+ */
+export function useCanEditTrip(tripUserId: string | undefined): boolean {
+  const user = useAuthStore((s) => s.user);
+  return !!user && tripUserId === user.id;
+}
+
+/**
+ * Block edit attempt for read-only recipients
+ * 
+ * Use this to show a toast or alert when a recipient tries to edit.
+ * 
+ * @param tripUserId - The userId of the trip owner
+ * @param onBlocked - Callback when edit is blocked (show toast/alert)
+ * @returns true if user can edit, false if blocked
+ */
+export function requireTripEditAccess(
+  tripUserId: string | undefined,
+  onBlocked?: () => void
+): boolean {
+  if (canEditTrip(tripUserId)) {
+    return true;
+  }
+  
+  onBlocked?.();
+  return false;
+}
+
+// ============================================
 // LEGACY COMPATIBILITY (will be deprecated)
 // ============================================
 

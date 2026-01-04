@@ -153,7 +153,7 @@ export default function GearDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="Gear detail" showTitle />
+        <ModalHeader title="Gear Detail" showTitle />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={DEEP_FOREST} />
           <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
@@ -167,7 +167,7 @@ export default function GearDetailScreen() {
   if (error || !gear) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="Gear detail" showTitle />
+        <ModalHeader title="Gear Detail" showTitle />
         <View className="flex-1 items-center justify-center px-5">
           <Ionicons name="alert-circle-outline" size={64} color={TEXT_MUTED} />
           <Text
@@ -184,7 +184,7 @@ export default function GearDetailScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="Gear detail"
+        title="Gear Detail"
         showTitle
         rightAction={{
           icon: "pencil",

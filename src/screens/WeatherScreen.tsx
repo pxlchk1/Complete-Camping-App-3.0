@@ -985,7 +985,7 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
                       color: colors.parchment,
                     }}
                   >
-                    Plan a new trip
+                    Plan a New Trip
                   </Text>
                 </Pressable>
               </View>

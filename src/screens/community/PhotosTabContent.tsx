@@ -178,6 +178,9 @@ export default function PhotosTabContent() {
       return;
     }
 
+    // User is guaranteed to exist after requireAccount check
+    if (!user) return;
+
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: "images",
@@ -211,6 +214,9 @@ export default function PhotosTabContent() {
     })) {
       return;
     }
+
+    // User is guaranteed to exist after requireAccount check
+    if (!user) return;
 
     try {
       await voteImage(imageId, user.id, voteType);
@@ -309,7 +315,7 @@ export default function PhotosTabContent() {
             onPress={() => {}}
             className="bg-forest-800 rounded-xl px-6 py-3 mt-6 active:opacity-70"
           >
-            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>Sign in</Text>
+            <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>Sign In</Text>
           </Pressable>
         </View>
       ) : isLoading ? (

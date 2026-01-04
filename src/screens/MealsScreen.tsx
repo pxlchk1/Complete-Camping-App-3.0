@@ -27,6 +27,8 @@ import { useTrips } from "../state/tripsStore";
 import { useAuthStore } from "../state/authStore";
 import { RootStackParamList } from "../navigation/types";
 import { MealCategory, PrepType, MealLibraryItem } from "../types/meal";
+import { MealType, MEAL_TYPES } from "../constants/mealTypes";
+import { libraryItemMatchesMealType } from "../utils/recipeMealTypeUtils";
 import * as Haptics from "expo-haptics";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "../config/firebase";
@@ -47,6 +49,7 @@ const CATEGORY_LABELS: Record<MealCategory, string> = {
   lunch: "Lunch",
   dinner: "Dinner",
   snack: "Snacks",
+  beverages: "Beverages",
 };
 
 const PREP_TYPE_LABELS: Record<PrepType, string> = {
@@ -82,6 +85,9 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
   const [loadingRecipes, setLoadingRecipes] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilters, setSelectedFilters] = useState<string[]>(["All"]);
+  
+  // Meal type filter for recipes view (breakfast/lunch/dinner/snacks)
+  const [selectedMealTypeFilter, setSelectedMealTypeFilter] = useState<MealType | "all">("all");
 
   // Add to trip modal
   const [showAddToTrip, setShowAddToTrip] = useState(false);
@@ -163,6 +169,11 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
 
   // Filter recipes
   const filteredRecipes = recipes.filter((recipe) => {
+    // First, apply meal type filter
+    if (!libraryItemMatchesMealType(recipe, selectedMealTypeFilter)) {
+      return false;
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchesSearch =
@@ -174,15 +185,12 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
     }
 
     if (!selectedFilters.includes("All")) {
-      const categoryMatch = selectedFilters.some(
-        (f) => f.toLowerCase() === recipe.category.toLowerCase()
-      );
-
+      // Only apply prep type filters (not category, since we have dedicated meal type filter)
       const prepTypeMatch = selectedFilters.some(
         (f) => f.toLowerCase() === PREP_TYPE_LABELS[recipe.prepType].toLowerCase()
       );
 
-      if (!categoryMatch && !prepTypeMatch) return false;
+      if (!prepTypeMatch) return false;
     }
 
     return true;
@@ -421,9 +429,9 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
           <View style={{ flex: 1, backgroundColor: "#F4EBD0" }}>
             <EmptyState
               iconName="calendar"
-              title="No active trips."
+              title="No Active Trips"
               message="Your camp stove is so cold."
-              ctaLabel="Plan a new trip"
+              ctaLabel="Plan a New Trip"
               onPress={() => {
                 const canProceed = requirePro({
                   openAccountModal: () => setShowAccountModal(true),
@@ -541,6 +549,49 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
               </Pressable>
             </View>
 
+            {/* Meal Type Segmented Control */}
+            <View className="flex-row mb-3 rounded-xl overflow-hidden border border-stone-200">
+              <Pressable
+                onPress={async () => {
+                  try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                  setSelectedMealTypeFilter("all");
+                }}
+                className="flex-1 py-2.5 items-center"
+                style={{ backgroundColor: selectedMealTypeFilter === "all" ? DEEP_FOREST : "#FFFFFF" }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    fontSize: 13,
+                    color: selectedMealTypeFilter === "all" ? PARCHMENT : DEEP_FOREST,
+                  }}
+                >
+                  All
+                </Text>
+              </Pressable>
+              {MEAL_TYPES.map((mt) => (
+                <Pressable
+                  key={mt.key}
+                  onPress={async () => {
+                    try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                    setSelectedMealTypeFilter(mt.key);
+                  }}
+                  className="flex-1 py-2.5 items-center border-l border-stone-200"
+                  style={{ backgroundColor: selectedMealTypeFilter === mt.key ? DEEP_FOREST : "#FFFFFF" }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      fontSize: 13,
+                      color: selectedMealTypeFilter === mt.key ? PARCHMENT : DEEP_FOREST,
+                    }}
+                  >
+                    {mt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
             {/* Search */}
             <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-stone-200 mb-3">
               <Ionicons name="search" size={20} color={EARTH_GREEN} />
@@ -559,14 +610,10 @@ export default function MealsScreen({ onTabChange }: MealsScreenProps) {
               )}
             </View>
 
-            {/* Filter Chips */}
+            {/* Prep Type Filter Chips */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
               {[
                 "All",
-                "Breakfast",
-                "Lunch",
-                "Dinner",
-                "Snacks",
                 "No cook",
                 "Camp stove",
                 "Campfire",

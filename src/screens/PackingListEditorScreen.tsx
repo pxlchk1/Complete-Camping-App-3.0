@@ -44,6 +44,7 @@ import {
   PackingItem,
 } from "../state/packingStore";
 import { RootStackParamList } from "../navigation/types";
+import { isGearClosetItem } from "../utils/mergeGearIntoPacking";
 
 type PackingListEditorRouteProp = RouteProp<{ PackingListEditor: { listId: string } }, "PackingListEditor">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -156,6 +157,22 @@ function SwipeableItem({ item, listId, sectionId, onToggle, onDelete, onEdit }: 
                     }}
                   >
                     ESSENTIAL
+                  </Text>
+                </View>
+              )}
+              {isGearClosetItem(item) && (
+                <View
+                  className="ml-2 px-2 py-0.5 rounded"
+                  style={{ backgroundColor: "#E0F2F1" }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      fontSize: 10,
+                      color: "#00695C",
+                    }}
+                  >
+                    FROM GEAR CLOSET
                   </Text>
                 </View>
               )}

@@ -27,7 +27,7 @@ import { useTripsStore } from "../state/tripsStore";
 import { useMealLibrary, useMealStore } from "../state/mealStore";
 import AccountButton from "../components/AccountButton";
 import { RootStackParamList } from "../navigation/types";
-import { Meal, MealCategory, MealLibraryItem, PrepType } from "../types/meal";
+import { Meal, MealCategory, MealLibraryItem, PrepType, SuggestibleMealCategory } from "../types/meal";
 import * as MealService from "../services/mealsService";
 import * as LocalMealService from "../services/localMealService";
 import {
@@ -67,6 +67,19 @@ const MEAL_CATEGORIES: {
   { key: "lunch", label: "Lunch", icon: "restaurant" },
   { key: "dinner", label: "Dinner", icon: "moon" },
   { key: "snack", label: "Snacks", icon: "ice-cream" },
+  { key: "beverages", label: "Beverages", icon: "water" },
+];
+
+// Default beverages to auto-populate (alphabetized)
+const DEFAULT_BEVERAGES = [
+  "Adult Beverages",
+  "Coffee",
+  "Drinking Water",
+  "Hot Chocolate",
+  "Juice",
+  "Milk",
+  "Soda",
+  "Tea",
 ];
 
 type ViewMode = "plan" | "recipes";
@@ -85,7 +98,7 @@ export default function MealPlanningScreen() {
   const [useLocalStorage, setUseLocalStorage] = useState(false);
   const [selectedDay, setSelectedDay] = useState(1);
   const [showAddMeal, setShowAddMeal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<MealCategory>("breakfast");
+  const [selectedCategory, setSelectedCategory] = useState<SuggestibleMealCategory>("breakfast");
   const [searchQuery, setSearchQuery] = useState("");
   const [showCustomMealForm, setShowCustomMealForm] = useState(false);
 
@@ -119,6 +132,10 @@ export default function MealPlanningScreen() {
   const [recipesLoading, setRecipesLoading] = useState(false);
   const [recipeFilter, setRecipeFilter] = useState<MealCategory | "all">("all");
   const [recipeSearch, setRecipeSearch] = useState("");
+
+  // Beverages checklist state - tracks which beverages are selected per day
+  // Key format: "day_beverageName" e.g., "1_Coffee"
+  const [selectedBeverages, setSelectedBeverages] = useState<Set<string>>(new Set());
 
   // Gating modal state
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -339,7 +356,7 @@ export default function MealPlanningScreen() {
   };
 
   // Handler: Open MealSlotSheet for a category with specific tab
-  const handleOpenMealSheet = (category: MealCategory, tab: "suggest" | "recipes" | "custom" = "suggest") => {
+  const handleOpenMealSheet = (category: SuggestibleMealCategory, tab: "suggest" | "recipes" | "custom" = "suggest") => {
     // Gate: PRO required for suggestions
     if (tab === "suggest") {
       if (!requirePro({
@@ -357,7 +374,7 @@ export default function MealPlanningScreen() {
   };
 
   // Legacy: Handler kept for backwards compatibility
-  const handleOpenSuggestionPicker = (category: MealCategory) => {
+  const handleOpenSuggestionPicker = (category: SuggestibleMealCategory) => {
     handleOpenMealSheet(category, "suggest");
   };
 
@@ -595,8 +612,27 @@ export default function MealPlanningScreen() {
     setShowAutoFillPreview(true);
   };
 
+  // Handler: Toggle beverage checkbox for a day
+  const handleToggleBeverage = async (beverage: string) => {
+    const key = `${selectedDay}_${beverage}`;
+    setSelectedBeverages((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // ignore haptics failures
+    }
+  };
+
   // NEW: Handler: Confirm auto-fill from preview
-  const handleConfirmAutoFill = async (suggestions: Record<MealCategory, MealSuggestion | null>) => {
+  const handleConfirmAutoFill = async (suggestions: Record<SuggestibleMealCategory, MealSuggestion | null>) => {
     try {
       setAutoFilling(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -882,6 +918,65 @@ export default function MealPlanningScreen() {
               {MEAL_CATEGORIES.map((category) => {
                 const categoryMeals = dayMeals.filter((m) => m.category === category.key);
 
+                // Special rendering for Beverages category
+                if (category.key === "beverages") {
+                  return (
+                    <View key={category.key} className="px-5 mt-4">
+                      {/* Category Header */}
+                      <View className="flex-row items-center justify-between mb-2">
+                        <View className="flex-row items-center">
+                          <Ionicons name={category.icon} size={20} color={DEEP_FOREST} />
+                          <Text
+                            className="ml-2 text-base"
+                            style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
+                          >
+                            {category.label}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Beverages Checklist */}
+                      <View className="bg-white rounded-xl p-4 mb-2 border border-stone-200">
+                        <Text className="mb-3" style={{ fontFamily: "SourceSans3_400Regular", fontSize: 13, color: EARTH_GREEN }}>
+                          Check beverages needed for Day {selectedDay}
+                        </Text>
+                        <View style={{ gap: 8 }}>
+                          {DEFAULT_BEVERAGES.map((beverage) => {
+                            const key = `${selectedDay}_${beverage}`;
+                            const isSelected = selectedBeverages.has(key);
+                            return (
+                              <Pressable
+                                key={beverage}
+                                onPress={() => handleToggleBeverage(beverage)}
+                                className="flex-row items-center py-2 active:opacity-70"
+                              >
+                                <View
+                                  className={`w-6 h-6 rounded-md border-2 items-center justify-center mr-3 ${
+                                    isSelected ? "bg-forest border-forest" : "bg-white border-stone-400"
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <Ionicons name="checkmark" size={16} color={PARCHMENT} />
+                                  )}
+                                </View>
+                                <Text
+                                  style={{
+                                    fontFamily: "SourceSans3_400Regular",
+                                    fontSize: 15,
+                                    color: isSelected ? DEEP_FOREST : EARTH_GREEN,
+                                  }}
+                                >
+                                  {beverage}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    </View>
+                  );
+                }
+
                 return (
                   <View key={category.key} className="px-5 mt-4">
                     {/* Category Header */}
@@ -906,7 +1001,7 @@ export default function MealPlanningScreen() {
                         {/* Action buttons for empty slot */}
                         <View className="flex-row justify-center flex-wrap" style={{ gap: 8 }}>
                           <Pressable
-                            onPress={() => handleOpenMealSheet(category.key, "suggest")}
+                            onPress={() => handleOpenMealSheet(category.key as SuggestibleMealCategory, "suggest")}
                             className="flex-row items-center px-3 py-2 rounded-lg active:opacity-80"
                             style={{ backgroundColor: "rgba(26, 76, 57, 0.1)" }}
                           >
@@ -919,7 +1014,7 @@ export default function MealPlanningScreen() {
                             </Text>
                           </Pressable>
                           <Pressable
-                            onPress={() => handleOpenMealSheet(category.key, "recipes")}
+                            onPress={() => handleOpenMealSheet(category.key as SuggestibleMealCategory, "recipes")}
                             className="flex-row items-center px-3 py-2 rounded-lg active:opacity-80"
                             style={{ backgroundColor: DEEP_FOREST }}
                           >
@@ -932,7 +1027,7 @@ export default function MealPlanningScreen() {
                             </Text>
                           </Pressable>
                           <Pressable
-                            onPress={() => handleOpenMealSheet(category.key, "custom")}
+                            onPress={() => handleOpenMealSheet(category.key as SuggestibleMealCategory, "custom")}
                             className="flex-row items-center px-3 py-2 rounded-lg active:opacity-80"
                             style={{ backgroundColor: "rgba(26, 76, 57, 0.1)" }}
                           >
@@ -979,7 +1074,7 @@ export default function MealPlanningScreen() {
                             {/* Footer actions for filled slot */}
                             <View className="flex-row mt-3 pt-3 border-t flex-wrap" style={{ borderColor: BORDER_SOFT, gap: 8 }}>
                               <Pressable
-                                onPress={() => handleOpenMealSheet(category.key, "suggest")}
+                                onPress={() => handleOpenMealSheet(category.key as SuggestibleMealCategory, "suggest")}
                                 className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-80"
                                 style={{ backgroundColor: "rgba(26, 76, 57, 0.1)" }}
                               >
@@ -992,7 +1087,7 @@ export default function MealPlanningScreen() {
                                 </Text>
                               </Pressable>
                               <Pressable
-                                onPress={() => handleOpenMealSheet(category.key, "recipes")}
+                                onPress={() => handleOpenMealSheet(category.key as SuggestibleMealCategory, "recipes")}
                                 className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-80"
                                 style={{ backgroundColor: "rgba(26, 76, 57, 0.1)" }}
                               >
@@ -1005,7 +1100,7 @@ export default function MealPlanningScreen() {
                                 </Text>
                               </Pressable>
                               <Pressable
-                                onPress={() => handleOpenMealSheet(category.key, "custom")}
+                                onPress={() => handleOpenMealSheet(category.key as SuggestibleMealCategory, "custom")}
                                 className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-80"
                                 style={{ backgroundColor: "rgba(26, 76, 57, 0.1)" }}
                               >
@@ -1023,7 +1118,7 @@ export default function MealPlanningScreen() {
                         {/* Add another button (show for snacks always, hide for others if meal exists) */}
                         {(category.key === "snack" || categoryMeals.length === 0) && (
                           <Pressable
-                            onPress={() => handleOpenMealSheet(category.key)}
+                            onPress={() => handleOpenMealSheet(category.key as SuggestibleMealCategory)}
                             className="flex-row items-center justify-center py-2 mb-2 rounded-lg border border-dashed active:opacity-70"
                             style={{ borderColor: BORDER_SOFT }}
                           >

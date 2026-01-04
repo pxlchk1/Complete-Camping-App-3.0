@@ -4,11 +4,12 @@ import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
+import { doc, getDoc } from "firebase/firestore";
 import { Park } from "../types/camping";
 import { useTripsStore } from "../state/tripsStore";
 import { useUserStatus } from "../utils/authHelper";
 import { useSubscriptionStore } from "../state/subscriptionStore";
-import { auth } from "../config/firebase";
+import { auth, db } from "../config/firebase";
 import { 
   isParkFavorited, 
   addFavoritePark, 
@@ -34,6 +35,8 @@ interface ParkDetailModalProps {
   tripIdForDestination?: string;
   /** Called when user taps "Set as trip destination" - parent handles save + navigation */
   onSetAsDestination?: (park: Park, tripId: string) => void;
+  /** Called when user taps "Check Weather" */
+  onCheckWeather?: (park: Park) => void;
 }
 
 export default function ParkDetailModal({ 
@@ -45,6 +48,7 @@ export default function ParkDetailModal({
   onRequirePro,
   tripIdForDestination,
   onSetAsDestination,
+  onCheckWeather,
 }: ParkDetailModalProps) {
   const mapRef = useRef<MapView>(null);
   const navigation = useNavigation();
@@ -55,6 +59,9 @@ export default function ParkDetailModal({
   // Favorites state
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+
+  // Reservation URL state - fetched from Firebase if park.url is missing (legacy trips)
+  const [reservationUrl, setReservationUrl] = useState<string | null>(null);
 
   // Add to trip confirmation state
   const [addedToTripId, setAddedToTripId] = useState<string | null>(null);
@@ -88,7 +95,38 @@ export default function ParkDetailModal({
       setAddedToTripId(null);
       setAddedToNewTrip(false);
       setDestinationSet(false);
+      setReservationUrl(null);
     }
+  }, [visible, park]);
+
+  // Fetch reservation URL from Firebase if park.url is missing (legacy trips without URL stored)
+  useEffect(() => {
+    const fetchReservationUrl = async () => {
+      if (!visible || !park) return;
+      
+      // If park already has a URL, use it
+      if (park.url) {
+        setReservationUrl(park.url);
+        return;
+      }
+      
+      // No URL - try to fetch from parks collection using park.id
+      if (!park.id) return;
+      
+      try {
+        const parkDoc = await getDoc(doc(db, "parks", park.id));
+        if (parkDoc.exists()) {
+          const parkData = parkDoc.data();
+          if (parkData?.url) {
+            setReservationUrl(parkData.url);
+          }
+        }
+      } catch (error) {
+        console.warn("[ParkDetailModal] Failed to fetch reservation URL:", error);
+      }
+    };
+    
+    fetchReservationUrl();
   }, [visible, park]);
 
   // Handler for adding park to trip with confirmation
@@ -266,8 +304,9 @@ export default function ParkDetailModal({
   };
 
   const handleReserveSite = () => {
-    if (park.url) {
-      Linking.openURL(park.url);
+    // Use reservationUrl state which is set from park.url or fetched from Firebase
+    if (reservationUrl) {
+      Linking.openURL(reservationUrl);
     }
   };
 
@@ -411,33 +450,35 @@ export default function ParkDetailModal({
               )
             )}
 
-            {/* Reserve a Site */}
-            <Pressable
-              onPress={handleReserveSite}
-              style={{
-                backgroundColor: DEEP_FOREST,
-                borderRadius: 16,
-                paddingVertical: 14,
-                paddingHorizontal: 20,
-                borderWidth: 0,
-                marginTop: 4,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="calendar" size={20} color={PARCHMENT} />
-              <Text
+            {/* Reserve a Site - only show if park has a reservation URL (from prop or fetched from Firebase) */}
+            {reservationUrl ? (
+              <Pressable
+                onPress={handleReserveSite}
                 style={{
-                  fontFamily: "SourceSans3_600SemiBold",
-                  fontSize: 16,
-                  color: PARCHMENT,
-                  marginLeft: 8,
+                  backgroundColor: DEEP_FOREST,
+                  borderRadius: 16,
+                  paddingVertical: 14,
+                  paddingHorizontal: 20,
+                  borderWidth: 0,
+                  marginTop: 4,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                Reserve a Site
-              </Text>
-            </Pressable>
+                <Ionicons name="calendar" size={20} color={PARCHMENT} />
+                <Text
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    fontSize: 16,
+                    color: PARCHMENT,
+                    marginLeft: 8,
+                  }}
+                >
+                  Reserve a Site
+                </Text>
+              </Pressable>
+            ) : null}
 
             {/* Bottom row of utility buttons */}
             <View

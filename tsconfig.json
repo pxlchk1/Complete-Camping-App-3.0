@@ -20,6 +20,9 @@
     "backend/generated",
     ".expo",
     "**/node_modules/**",
-    "node_modules/react-native-maps/**"
+    "node_modules/react-native-maps/**",
+    "src/screens/_archive/**",
+    "scripts/**",
+    "src/scripts/**"
   ]
 }

@@ -68,6 +68,7 @@ export default function AddCamperScreen() {
       const contactId = await createCampgroundContact(user.uid, {
         contactName: displayName.trim(),
         contactEmail: email.trim() || undefined,
+        contactPhone: phone.trim() || undefined,
         contactNote: notes.trim() || undefined,
       });
 
@@ -77,6 +78,7 @@ export default function AddCamperScreen() {
         ownerId: user.uid,
         contactName: displayName.trim(),
         contactEmail: email.trim() || null,
+        contactPhone: phone.trim() || null,
         contactNote: notes.trim() || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -108,7 +110,7 @@ export default function AddCamperScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="Add camper"
+        title="Add Camper"
         showTitle
         rightAction={{
           icon: "checkmark",

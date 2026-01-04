@@ -6,7 +6,7 @@
 // App Store Links
 export const APP_STORE_ID = "6752673528";
 export const APP_STORE_SKU = "TLCAMP001";
-export const APP_STORE_LINK = `https://apps.apple.com/app/tent-lantern/id${APP_STORE_ID}`;
+export const APP_STORE_LINK = `https://apps.apple.com/app/id${APP_STORE_ID}`;
 
 // Google Play Links (for future Android support)
 export const PLAY_STORE_PACKAGE = "com.tentandlantern.completecampingapp";

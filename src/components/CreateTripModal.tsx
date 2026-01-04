@@ -54,7 +54,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
     return 'fall';
   }
 
-  const handleCreateTrip = () => {
+  const handleCreateTrip = async () => {
     if (!tripName.trim()) {
       return;
     }
@@ -75,7 +75,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       // NOTE: No destination set here - users set destination via Plan > Parks after trip creation
-      const tripId = createTrip({
+      const tripId = await createTrip({
         name: tripName.trim(),
         startDate: startDate.toISOString().split("T")[0],
         endDate: endDate.toISOString().split("T")[0],
@@ -139,7 +139,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
             }}
           >
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <Text style={{ fontFamily: "Raleway_700Bold", fontSize: 24, color: PARCHMENT, flex: 1, marginRight: 12 }}>Plan new trip</Text>
+              <Text style={{ fontFamily: "Raleway_700Bold", fontSize: 24, color: PARCHMENT, flex: 1, marginRight: 12 }}>Plan New Trip</Text>
               <Pressable
                 onPress={onClose}
                 style={{
@@ -269,7 +269,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
               onPress={handleCreateTrip}
               className="bg-[#AC9A6D] rounded-2xl px-4 py-4 items-center justify-center active:bg-[#9a8860]"
             >
-              <Text className="text-parchment font-semibold text-base" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Create trip</Text>
+              <Text className="text-parchment font-semibold text-base" style={{ fontFamily: "SourceSans3_600SemiBold" }}>Create Trip</Text>
             </Pressable>
           </View>
         </View>

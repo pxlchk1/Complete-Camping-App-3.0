@@ -218,7 +218,7 @@ export default function LearnScreen() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: bottomSpacer }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: bottomSpacer }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />
         }

@@ -81,6 +81,7 @@ export default function ShoppingListScreen() {
   const [ingredients, setIngredients] = useState<IngredientItem[]>([]);
   const [showStaples, setShowStaples] = useState(true);
   const [viewMode, setViewMode] = useState<"category" | "list">("category");
+  const [checkedStaples, setCheckedStaples] = useState<Set<string>>(new Set());
 
   // Calculate trip duration for staples calculation
   const tripDays = trip
@@ -265,6 +266,19 @@ export default function ShoppingListScreen() {
         i === index ? { ...item, checked: !item.checked } : item
       )
     );
+  };
+
+  const toggleStaple = async (stapleName: string) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setCheckedStaples((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(stapleName)) {
+        newSet.delete(stapleName);
+      } else {
+        newSet.add(stapleName);
+      }
+      return newSet;
+    });
   };
 
   const checkedCount = ingredients.filter((i) => i.checked).length;
@@ -503,7 +517,7 @@ export default function ShoppingListScreen() {
                             >
                               {ingredient.name.charAt(0).toUpperCase() + ingredient.name.slice(1)}
                             </Text>
-                            {ingredient.quantity && ingredient.quantity > 1 && (
+                            {ingredient.quantity && Number(ingredient.quantity) > 1 && (
                               <Text
                                 className="text-xs px-2 py-0.5 rounded-full"
                                 style={{ 
@@ -552,6 +566,12 @@ export default function ShoppingListScreen() {
                     >
                       Suggested Staples
                     </Text>
+                    <Text
+                      className="text-xs"
+                      style={{ fontFamily: "SourceSans3_400Regular", color: "#8B7355" }}
+                    >
+                      {checkedStaples.size}/{suggestedStaples.length}
+                    </Text>
                   </View>
                   <Text
                     className="text-xs mb-2 px-1"
@@ -559,20 +579,42 @@ export default function ShoppingListScreen() {
                   >
                     Common items for a {tripDays}-day trip with {numCampers} {numCampers === 1 ? "person" : "people"}
                   </Text>
-                  {suggestedStaples.map((staple) => (
-                    <View
-                      key={staple.item}
-                      className="flex-row items-center p-3 mb-2 rounded-xl border bg-amber-50/50 border-amber-200"
-                    >
-                      <Ionicons name="add-circle-outline" size={20} color="#8B7355" />
-                      <Text
-                        className="ml-3 text-sm"
-                        style={{ fontFamily: "SourceSans3_600SemiBold", color: "#8B7355" }}
+                  {suggestedStaples.map((staple) => {
+                    const isChecked = checkedStaples.has(staple.item);
+                    return (
+                      <Pressable
+                        key={staple.item}
+                        onPress={() => toggleStaple(staple.item)}
+                        className={`flex-row items-center p-3 mb-2 rounded-xl border active:opacity-70 ${
+                          isChecked
+                            ? "bg-stone-50 border-stone-300"
+                            : "bg-amber-50/50 border-amber-200"
+                        }`}
                       >
-                        {staple.item}
-                      </Text>
-                    </View>
-                  ))}
+                        {/* Checkbox */}
+                        <View
+                          className={`w-6 h-6 rounded-md border-2 items-center justify-center ${
+                            isChecked
+                              ? "bg-forest border-forest"
+                              : "bg-white border-stone-400"
+                          }`}
+                        >
+                          {isChecked && (
+                            <Ionicons name="checkmark" size={16} color={PARCHMENT} />
+                          )}
+                        </View>
+                        <Text
+                          className={`ml-3 text-sm ${isChecked ? "line-through" : ""}`}
+                          style={{ 
+                            fontFamily: "SourceSans3_600SemiBold", 
+                            color: isChecked ? EARTH_GREEN : "#8B7355" 
+                          }}
+                        >
+                          {staple.item}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               )}
             </>

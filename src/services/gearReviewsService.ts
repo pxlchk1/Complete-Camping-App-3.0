@@ -4,7 +4,6 @@
  */
 
 import {
-  getFirestore,
   collection,
   doc,
   getDoc,
@@ -20,10 +19,8 @@ import {
   increment,
   DocumentSnapshot,
 } from "firebase/firestore";
-import firebaseApp from "../config/firebase";
+import { db } from "../config/firebase";
 import { GearReview, GearCategory } from "../types/community";
-
-const db = getFirestore(firebaseApp);
 
 export async function getGearReviews(
   category?: GearCategory | "all",
@@ -79,7 +76,10 @@ export async function createGearReview(data: {
   pros?: string;
   cons?: string;
   tags: string[];
+  photoUrls?: string[];
+  productUrl?: string;
   authorId: string;
+  authorHandle: string;
 }): Promise<string> {
   const reviewsRef = collection(db, "gearReviews");
 
@@ -93,14 +93,51 @@ export async function createGearReview(data: {
     pros: data.pros || null,
     cons: data.cons || null,
     tags: data.tags,
+    photoUrls: data.photoUrls || [],
+    productUrl: data.productUrl || null,
     authorId: data.authorId,
+    authorHandle: data.authorHandle,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     upvoteCount: 0,
+    downvoteCount: 0,
+    score: 0,
     commentCount: 0,
   });
 
   return docRef.id;
+}
+
+export async function updateGearReview(
+  reviewId: string,
+  data: {
+    gearName?: string;
+    brand?: string | null;
+    category?: GearCategory;
+    rating?: number;
+    summary?: string;
+    body?: string;
+    pros?: string;
+    cons?: string;
+    tags?: string[];
+    photoUrls?: string[];
+    productUrl?: string | null;
+  }
+): Promise<void> {
+  const reviewRef = doc(db, "gearReviews", reviewId);
+  
+  // Filter out undefined values - Firestore doesn't handle them well
+  const cleanData: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      cleanData[key] = value;
+    }
+  }
+  
+  await updateDoc(reviewRef, {
+    ...cleanData,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function upvoteGearReview(reviewId: string): Promise<void> {

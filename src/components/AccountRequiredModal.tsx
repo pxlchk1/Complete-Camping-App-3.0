@@ -16,6 +16,7 @@ import {
   Modal,
   StyleSheet,
   Pressable,
+  TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -33,55 +34,62 @@ import {
 const ACCOUNT_MODAL_CONTENT: Record<string, { title: string; body: string }> = {
   // Default
   default: {
-    title: "Let's get you set up.",
+    title: "Let's Get You Set Up",
     body: "Create a free account so we can save your activity and keep the community running smoothly. It only takes a moment.",
   },
   // First trip
   create_first_trip: {
-    title: "Save your first trip",
+    title: "Save Your First Trip",
     body: "Create a free account to save your trip plan and access it later.",
   },
   // Favorites
   save_favorite: {
-    title: "Save favorites",
+    title: "Save Favorites",
     body: "Create a free account to save parks and campgrounds for later.",
   },
   // Packing
   packing_for_trip: {
-    title: "Save your packing progress",
+    title: "Save Your Packing Progress",
     body: "Create a free account to track your packing list for this trip.",
   },
   // My Campsite
   my_campsite: {
-    title: "Your campsite, saved",
+    title: "Your Campsite, Saved",
     body: "Create a free account to save trips, favorites, and your camping profile.",
   },
   // Trip Plans Quick Action
   trip_plans_quick_action: {
-    title: "Save your trips",
+    title: "Save Your Trips",
     body: "Create a free account to plan trips and keep everything in one place.",
   },
   // Gear Closet Quick Action
   gear_closet_quick_action: {
-    title: "Save your gear list",
+    title: "Save Your Gear List",
     body: "Create a free account to track your gear and reuse it for every trip.",
   },
   // My Campground Quick Action
   my_campground_quick_action: {
-    title: "Your camping people, saved",
+    title: "Your Camping People, Saved",
     body: "Create a free account to build your Campground and invite friends.",
   },
   // Ask a Camper Post
   ask_a_camper_post: {
-    title: "Join the community",
+    title: "Join the Community",
     body: "Create a free account to ask questions and help fellow campers.",
+  },
+  // View Shared Trip (Invited Campground Member)
+  view_shared_trip: {
+    title: "View Shared Trip",
+    body: "Create a free account to view trips shared by your Campground friends.",
   },
 };
 
 interface AccountRequiredModalProps {
   visible: boolean;
-  onClose: () => void;
+  /** Optional close handler - defaults to no-op if not provided */
+  onClose?: () => void;
   onCreateAccount?: () => void;
+  onLogIn?: () => void;
   onMaybeLater?: () => void;
   /** Optional trigger key for dynamic content */
   triggerKey?: string;
@@ -89,8 +97,9 @@ interface AccountRequiredModalProps {
 
 export default function AccountRequiredModal({
   visible,
-  onClose,
+  onClose = () => {},
   onCreateAccount,
+  onLogIn,
   onMaybeLater,
   triggerKey = "default",
 }: AccountRequiredModalProps) {
@@ -106,6 +115,7 @@ export default function AccountRequiredModal({
       animationType="slide"
       transparent={true}
       onRequestClose={handleMaybeLater}
+      statusBarTranslucent
     >
       <View style={styles.backdrop}>
         <Pressable style={styles.backdropTouchable} onPress={handleMaybeLater} />
@@ -126,17 +136,29 @@ export default function AccountRequiredModal({
 
           {/* Buttons */}
           <View style={styles.buttonContainer}>
-            <Pressable style={styles.primaryButton} onPress={handleCreateAccount}>
-              <Text style={styles.primaryButtonText}>Create account</Text>
-            </Pressable>
+            <TouchableOpacity 
+              style={styles.primaryButton} 
+              onPress={handleCreateAccount}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.primaryButtonText}>Create Account</Text>
+            </TouchableOpacity>
             
-            <Pressable style={styles.loginButton} onPress={handleCreateAccount}>
-              <Text style={styles.loginButtonText}>Log in</Text>
-            </Pressable>
+            <TouchableOpacity 
+              style={styles.loginButton} 
+              onPress={handleCreateAccount}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.loginButtonText}>Log In</Text>
+            </TouchableOpacity>
 
-            <Pressable style={styles.secondaryButton} onPress={handleMaybeLater}>
-              <Text style={styles.secondaryButtonText}>Not now</Text>
-            </Pressable>
+            <TouchableOpacity 
+              style={styles.secondaryButton} 
+              onPress={handleMaybeLater}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.secondaryButtonText}>Not Now</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>

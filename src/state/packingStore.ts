@@ -8,6 +8,8 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getTemplatesByKeys, DEFAULT_SECTIONS } from "../constants/packingTemplatesV2";
+import { GearItem } from "../types/gear";
+import { mergeGearIntoPacking } from "../utils/mergeGearIntoPacking";
 
 // ============================================================================
 // TYPES
@@ -35,12 +37,16 @@ export type PackingTemplateKey =
   | "pets"
   | "family";
 
+export type PackingItemSource = "template" | "gearCloset" | "custom";
+
 export interface PackingItem {
   id: string;
   name: string;
   checked: boolean;
   note?: string;
   essential?: boolean;
+  source?: PackingItemSource;
+  gearItemId?: string; // Link to Gear Closet item
 }
 
 export interface PackingSection {
@@ -79,7 +85,8 @@ interface PackingState {
     season: Season,
     templateKeys?: PackingTemplateKey[],
     tripId?: string,
-    isTemplate?: boolean
+    isTemplate?: boolean,
+    gearItems?: GearItem[]
   ) => string;
   deletePackingList: (listId: string) => void;
   getPackingListById: (listId: string) => PackingList | undefined;
@@ -136,7 +143,7 @@ export const usePackingStore = create<PackingState>()(
       // LIST CRUD
       // ========================================================================
 
-      createPackingList: (name, tripType, season, templateKeys, tripId, isTemplate) => {
+      createPackingList: (name, tripType, season, templateKeys, tripId, isTemplate, gearItems) => {
         const id = generateId();
         const now = new Date().toISOString();
 
@@ -167,6 +174,7 @@ export const usePackingStore = create<PackingState>()(
                   name: item.name,
                   checked: false,
                   essential: item.essential,
+                  source: "template",
                 });
               }
             });
@@ -187,6 +195,11 @@ export const usePackingStore = create<PackingState>()(
             items: [],
             collapsed: false,
           }));
+        }
+
+        // Merge gear closet items if provided
+        if (gearItems && gearItems.length > 0) {
+          sections = mergeGearIntoPacking(sections, gearItems);
         }
 
         const newList: PackingList = {

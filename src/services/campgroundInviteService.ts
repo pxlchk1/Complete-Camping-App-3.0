@@ -32,6 +32,18 @@ const redeemCampgroundInviteFunc = httpsCallable<{ token: string }, RedeemInvite
   "redeemCampgroundInvite"
 );
 
+interface CheckPendingInvitesResult {
+  processed: number;
+  expired?: number;
+  message: string;
+  inviterNames?: string[];
+}
+
+const checkPendingInvitesOnLoginFunc = httpsCallable<Record<string, never>, CheckPendingInvitesResult>(
+  functions,
+  "checkPendingInvitesOnLogin"
+);
+
 /**
  * Create a new campground invite
  * This creates the invite record in Firestore via Cloud Function
@@ -191,4 +203,21 @@ export function generateInviteMessage(inviterName: string, inviteToken: string):
   // Import inline to avoid circular dependency
   const { generateShareInviteMessage } = require("../constants/appLinks");
   return generateShareInviteMessage(firstName, inviteToken);
+}
+
+/**
+ * Check for pending invites on user login
+ * This handles the case where an invite was sent to an existing user
+ * Returns info about any invites that were automatically accepted
+ */
+export async function checkPendingInvitesOnLogin(): Promise<CheckPendingInvitesResult> {
+  try {
+    const result = await checkPendingInvitesOnLoginFunc({});
+    console.log("[CampgroundInvite] Check pending invites result:", result.data);
+    return result.data;
+  } catch (error: any) {
+    console.error("[CampgroundInvite] Error checking pending invites:", error);
+    // Don't throw - this is a non-critical background check
+    return { processed: 0, message: "Failed to check invites" };
+  }
 }

@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -10,13 +11,17 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { RootStackNavigationProp } from "../../navigation/types";
 import * as Haptics from "expo-haptics";
 
 import { auth } from "../../config/firebase";
 import { createGearReview } from "../../services/gearReviewsService";
+import { useCurrentUser } from "../../state/userStore";
 import { requireEmailVerification } from "../../utils/authHelper";
 import {
   BORDER_SOFT,
@@ -44,9 +49,11 @@ const CATEGORIES: readonly {
 ];
 
 const clampInt = (n: number, min: number, max: number) => Math.max(min, Math.min(max, Math.trunc(n)));
+const MAX_PHOTOS = 3;
 
 export default function CreateGearReviewScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
+  const currentUser = useCurrentUser();
 
   const [category, setCategory] = useState<GearCategory>("tent");
   const [gearName, setGearName] = useState("");
@@ -54,6 +61,9 @@ export default function CreateGearReviewScreen() {
   const [rating, setRating] = useState<number>(0);
   const [summary, setSummary] = useState("");
   const [body, setBody] = useState("");
+  const [productUrl, setProductUrl] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [tagsInput, setTagsInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -105,12 +115,75 @@ export default function CreateGearReviewScreen() {
     Haptics.selectionAsync().catch(() => {});
   }, []);
 
+  // Photo picker and upload
+  const pickPhoto = useCallback(async () => {
+    if (photos.length >= MAX_PHOTOS) {
+      Alert.alert("Limit reached", `You can add up to ${MAX_PHOTOS} photos.`);
+      return;
+    }
+
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert("Permission Required", "Please allow access to your photo library to add images.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setPhotos((prev) => [...prev, result.assets[0].uri]);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+    } catch {
+      Alert.alert("Error", "Failed to pick image");
+    }
+  }, [photos.length]);
+
+  const removePhoto = useCallback((index: number) => {
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
+    Haptics.selectionAsync().catch(() => {});
+  }, []);
+
+  const uploadPhotosToStorage = async (localUris: string[], userId: string): Promise<string[]> => {
+    const storage = getStorage();
+    const uploadedUrls: string[] = [];
+    
+    for (const uri of localUris) {
+      const photoId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const storagePath = `gearReviews/${userId}/${photoId}.jpg`;
+      const storageRef = ref(storage, storagePath);
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      await uploadBytes(storageRef, blob);
+      const downloadURL = await getDownloadURL(storageRef);
+      uploadedUrls.push(downloadURL);
+    }
+    
+    return uploadedUrls;
+  };
+
   const onSubmit = useCallback(async () => {
     if (!canSubmit) return;
 
     const user = auth.currentUser;
     if (!user?.uid) {
       Alert.alert("Sign in required", "Please sign in to post a gear review.");
+      return;
+    }
+
+    // Require a handle to post reviews (no anonymous)
+    const authorHandle = currentUser?.handle;
+    if (!authorHandle) {
+      Alert.alert(
+        "Profile Required",
+        "Please set up your profile with a @handle before posting a review."
+      );
       return;
     }
 
@@ -132,8 +205,20 @@ export default function CreateGearReviewScreen() {
       setSubmitting(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
+      // Upload photos if any
+      let photoUrls: string[] = [];
+      if (photos.length > 0) {
+        setUploadingPhotos(true);
+        try {
+          photoUrls = await uploadPhotosToStorage(photos, user.uid);
+        } finally {
+          setUploadingPhotos(false);
+        }
+      }
+
       await createGearReview({
         authorId: user.uid,
+        authorHandle,
         category,
         gearName: trimmedGearName,
         brand: trimmedBrand || undefined,
@@ -141,6 +226,14 @@ export default function CreateGearReviewScreen() {
         summary: trimmedSummary,
         body: trimmedBody,
         tags,
+        photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
+        // Normalize URL: add https:// if no scheme is present
+        productUrl: (() => {
+          const trimmedUrl = productUrl.trim();
+          if (!trimmedUrl) return undefined;
+          if (trimmedUrl.match(/^https?:\/\//i)) return trimmedUrl;
+          return `https://${trimmedUrl}`;
+        })(),
       });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -155,6 +248,7 @@ export default function CreateGearReviewScreen() {
     }
   }, [
     canSubmit,
+    currentUser?.handle,
     gearName,
     brand,
     rating,
@@ -162,22 +256,29 @@ export default function CreateGearReviewScreen() {
     body,
     tags,
     category,
+    photos,
+    productUrl,
     navigation,
   ]);
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, backgroundColor: PARCHMENT }}>
-      {/* Header */}
-      <View
-        style={{
-          paddingHorizontal: 18,
-          paddingVertical: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: BORDER_SOFT,
-          backgroundColor: PARCHMENT,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
+    <SafeAreaView style={{ flex: 1, backgroundColor: PARCHMENT }} edges={["top"]}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"} 
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
+        {/* Header */}
+        <View
+          style={{
+            paddingHorizontal: 18,
+            paddingVertical: 14,
+            borderBottomWidth: 1,
+            borderBottomColor: BORDER_SOFT,
+            backgroundColor: PARCHMENT,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
         }}
       >
         <Pressable onPress={handleClose} hitSlop={10} style={{ padding: 6 }}>
@@ -204,12 +305,17 @@ export default function CreateGearReviewScreen() {
         >
           {submitting ? <ActivityIndicator color={PARCHMENT} /> : null}
           <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
-            {submitting ? "Posting…" : "Post"}
+            {submitting ? (uploadingPhotos ? "Uploading…" : "Posting…") : "Post"}
           </Text>
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={{ padding: 18, paddingBottom: 100 }} 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+      >
         {/* Category */}
         <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG, marginBottom: 10 }}>
           Category
@@ -353,6 +459,83 @@ export default function CreateGearReviewScreen() {
           maxLength={2000}
         />
 
+        {/* Photos */}
+        <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG, marginTop: 14, marginBottom: 8 }}>
+          Photos (optional, up to {MAX_PHOTOS})
+        </Text>
+        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+          {photos.map((uri, index) => (
+            <View key={index} style={{ position: "relative" }}>
+              <Image
+                source={{ uri }}
+                style={{
+                  width: 90,
+                  height: 90,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: BORDER_SOFT,
+                }}
+              />
+              <Pressable
+                onPress={() => removePhoto(index)}
+                style={{
+                  position: "absolute",
+                  top: -8,
+                  right: -8,
+                  backgroundColor: PARCHMENT,
+                  borderRadius: 999,
+                }}
+              >
+                <Ionicons name="close-circle" size={24} color={TEXT_MUTED} />
+              </Pressable>
+            </View>
+          ))}
+          {photos.length < MAX_PHOTOS && (
+            <Pressable
+              onPress={pickPhoto}
+              style={{
+                width: 90,
+                height: 90,
+                borderRadius: 12,
+                borderWidth: 2,
+                borderColor: BORDER_SOFT,
+                borderStyle: "dashed",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: CARD_BACKGROUND_LIGHT,
+              }}
+            >
+              <Ionicons name="camera-outline" size={28} color={TEXT_MUTED} />
+              <Text style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED, fontSize: 11, marginTop: 4 }}>Add</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Product Link */}
+        <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG, marginTop: 14, marginBottom: 8 }}>
+          Product link (optional)
+        </Text>
+        <TextInput
+          value={productUrl}
+          onChangeText={setProductUrl}
+          placeholder="https://..."
+          placeholderTextColor={TEXT_MUTED}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          style={{
+            backgroundColor: CARD_BACKGROUND_LIGHT,
+            borderWidth: 1,
+            borderColor: BORDER_SOFT,
+            borderRadius: 14,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            fontFamily: "SourceSans3_400Regular",
+            color: TEXT_PRIMARY_STRONG,
+          }}
+          maxLength={500}
+        />
+
         {/* Tags */}
         <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG, marginTop: 14, marginBottom: 8 }}>
           Tags (optional)
@@ -410,7 +593,7 @@ export default function CreateGearReviewScreen() {
                   borderColor: BORDER_SOFT,
                 }}
               >
-                <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>#{t}</Text>
+                <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>{t}</Text>
                 <Ionicons name="close-circle" size={18} color={TEXT_MUTED} />
               </Pressable>
             ))}
@@ -421,6 +604,7 @@ export default function CreateGearReviewScreen() {
           Tip: tap a tag to remove it.
         </Text>
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

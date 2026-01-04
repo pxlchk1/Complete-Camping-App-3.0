@@ -108,7 +108,7 @@ export default function CreateQuestionScreen() {
   return (
     <View className="flex-1 bg-parchment">
       <ModalHeader
-        title="Ask question"
+        title="Ask Question"
         showTitle
         rightAction={{
           icon: "checkmark",

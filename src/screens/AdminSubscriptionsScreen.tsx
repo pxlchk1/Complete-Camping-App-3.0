@@ -102,7 +102,7 @@ export default function AdminSubscriptionsScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-      <ModalHeader title="Award subscriptions" showTitle />
+      <ModalHeader title="Award Subscriptions" showTitle />
 
       <ScrollView className="flex-1">
         <View className="px-5 pt-5 pb-8">

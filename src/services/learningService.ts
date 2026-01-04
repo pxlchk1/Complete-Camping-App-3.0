@@ -296,6 +296,11 @@ export async function submitQuizAnswers(
       updatedAt: Timestamp.now(),
     }, { merge: true });
     
+    // Sync badge to profile's meritBadges array for display on My Campsite
+    if (badgeEarned && !earnedBadges.includes(badgeEarned)) {
+      await syncBadgeToProfile(user.uid, badgeEarned);
+    }
+    
     return { score, passed, badgeEarned };
   } catch (error) {
     console.error("[LearningService] Error submitting quiz:", error);
@@ -337,6 +342,55 @@ async function checkAndAwardBadge(
   } catch (error) {
     console.error("[LearningService] Error checking badge:", error);
     return undefined;
+  }
+}
+
+/**
+ * Sync a badge to the user's profile meritBadges array
+ * This ensures badges appear on My Campsite
+ */
+async function syncBadgeToProfile(userId: string, badgeId: BadgeId): Promise<void> {
+  try {
+    const badgeDetails = LEARNING_BADGES[badgeId];
+    if (!badgeDetails) {
+      console.error("[LearningService] Unknown badge ID:", badgeId);
+      return;
+    }
+
+    const profileRef = doc(db, "profiles", userId);
+    const profileSnap = await getDoc(profileRef);
+    
+    if (!profileSnap.exists()) {
+      console.error("[LearningService] Profile not found for user:", userId);
+      return;
+    }
+    
+    const currentBadges = profileSnap.data()?.meritBadges || [];
+    
+    // Check if badge already exists in profile
+    const alreadyHasBadge = currentBadges.some((b: any) => b.id === badgeId);
+    if (alreadyHasBadge) {
+      console.log("[LearningService] Badge already in profile:", badgeId);
+      return;
+    }
+    
+    // Create merit badge object matching MyCampsiteScreen expectations
+    const meritBadge = {
+      id: badgeId,
+      name: badgeDetails.name,
+      icon: badgeDetails.icon,
+      color: badgeDetails.color,
+      earnedAt: Timestamp.now(),
+    };
+    
+    await updateDoc(profileRef, {
+      meritBadges: [...currentBadges, meritBadge],
+    });
+    
+    console.log("[LearningService] Badge synced to profile:", badgeId);
+  } catch (error) {
+    console.error("[LearningService] Error syncing badge to profile:", error);
+    // Don't throw - badge is still earned in learningProgress, just not displayed
   }
 }
 

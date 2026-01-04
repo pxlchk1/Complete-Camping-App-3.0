@@ -4,7 +4,8 @@
  * Enhanced with comprehensive camping meal database
  */
 
-import { MealCategory, MealLibraryItem, PrepType } from "../types/meal";
+import { MealCategory, MealLibraryItem, PrepType, SuggestibleMealCategory } from "../types/meal";
+import { MealIngredient } from "../types/meals";
 import { getMealLibrary } from "./mealsService";
 import { useMealStore } from "../state/mealStore";
 import { 
@@ -13,8 +14,8 @@ import {
   getQuickMeals,
   getNoCookMeals,
   getTopSuggestions,
-  MealSuggestion as EnhancedMealSuggestion,
 } from "../data/mealSuggestions";
+import { MealSuggestion as EnhancedMealSuggestion } from "../types/meals";
 import { CookingMethod, MealComplexity } from "../types/meals";
 
 export interface MealSuggestion {
@@ -51,8 +52,9 @@ export interface SuggestionContext {
 function cookingMethodToPrepType(methods: CookingMethod[]): PrepType {
   if (methods.includes("no-cook")) return "noCook";
   if (methods.includes("campfire")) return "campfire";
-  if (methods.includes("stove") || methods.includes("grill")) return "campStove";
-  if (methods.includes("prep-ahead")) return "cold";
+  if (methods.includes("camp-stove") || methods.includes("grill")) return "campStove";
+  // dutch-oven and foil-packet are campfire variants
+  if (methods.includes("dutch-oven") || methods.includes("foil-packet")) return "campfire";
   return "noCook";
 }
 
@@ -74,7 +76,7 @@ function enhancedToStandard(enhanced: EnhancedMealSuggestion): MealSuggestion {
     type: "idea",
     category: categoryMap[enhanced.mealType] || "snack",
     prepType: cookingMethodToPrepType(enhanced.cookingMethods),
-    ingredients: enhanced.ingredients.map(i => 
+    ingredients: enhanced.ingredients.map((i: MealIngredient) => 
       i.quantity ? `${i.quantity} ${i.unit || ""} ${i.item}`.trim() : i.item
     ),
     description: enhanced.description,
@@ -96,7 +98,7 @@ function enhancedToStandard(enhanced: EnhancedMealSuggestion): MealSuggestion {
 }
 
 // Quick ideas that aren't full recipes (for variety)
-const QUICK_IDEAS: Record<MealCategory, MealSuggestion[]> = {
+const QUICK_IDEAS: Record<SuggestibleMealCategory, MealSuggestion[]> = {
   breakfast: [
     { id: "idea_b1", name: "Trail mix and coffee", type: "idea", category: "breakfast", prepType: "noCook", description: "Quick and energizing start" },
     { id: "idea_b2", name: "Instant oatmeal with dried fruit", type: "idea", category: "breakfast", prepType: "campStove", description: "Hot and filling" },
@@ -159,19 +161,18 @@ function libraryToSuggestion(item: MealLibraryItem): MealSuggestion {
 
 /**
  * Get suggestions for a specific meal category
- * Returns a mix of enhanced suggestions, recipes, and quick ideas
- * Prioritizes the new enhanced meal database for better variety
+ * Returns a mixed pool of enhanced suggestions, library recipes, and quick ideas
+ * Shuffles ALL sources together for true variety on each shuffle
  */
 export async function getSuggestionsForCategory(
-  category: MealCategory,
+  category: SuggestibleMealCategory,
   context: SuggestionContext = {},
   count: number = 3
 ): Promise<MealSuggestion[]> {
-  const suggestions: MealSuggestion[] = [];
   const suitablePrepTypes = getSuitablePrepTypes(context);
   
   // Map category to mealType for enhanced suggestions
-  const mealTypeMap: Record<MealCategory, "breakfast" | "lunch" | "dinner" | "snacks"> = {
+  const mealTypeMap: Record<SuggestibleMealCategory, "breakfast" | "lunch" | "dinner" | "snacks"> = {
     breakfast: "breakfast",
     lunch: "lunch",
     dinner: "dinner",
@@ -179,74 +180,71 @@ export async function getSuggestionsForCategory(
   };
   const mealType = mealTypeMap[category];
   
-  // First, get enhanced suggestions from our comprehensive database
+  // Build a combined pool from ALL sources, then shuffle and pick
+  const combinedPool: MealSuggestion[] = [];
+  const seenNames = new Set<string>();
+  
+  // Helper to add without duplicates
+  const addIfUnique = (suggestion: MealSuggestion) => {
+    const key = suggestion.name.toLowerCase();
+    if (!seenNames.has(key)) {
+      seenNames.add(key);
+      combinedPool.push(suggestion);
+    }
+  };
+  
+  // 1. Enhanced suggestions from our comprehensive database (static)
   const enhancedSuggestions = ENHANCED_MEAL_SUGGESTIONS
     .filter(s => s.mealType === mealType)
     .filter(s => {
       // Filter by cooking methods based on context
       if (context.tripType === "backpacking" || context.tripType === "bikepacking") {
-        // For backpacking, prefer no-cook and stove methods
-        return s.cookingMethods.some(m => m === "no-cook" || m === "stove" || m === "prep-ahead");
+        return s.cookingMethods.some(m => m === "no-cook" || m === "camp-stove");
       }
       if (context.hasCampfire === false) {
         return !s.cookingMethods.includes("campfire");
       }
       if (context.hasStove === false) {
-        return !s.cookingMethods.includes("stove");
+        return !s.cookingMethods.includes("camp-stove");
       }
       return true;
     })
-    .sort(() => Math.random() - 0.5) // Shuffle for variety
-    .slice(0, Math.ceil(count * 0.7))
     .map(enhancedToStandard);
   
-  suggestions.push(...enhancedSuggestions);
+  enhancedSuggestions.forEach(addIfUnique);
   
-  // If we need more, try library meals
-  if (suggestions.length < count) {
-    try {
-      const libraryMeals = await getMealLibrary(category);
-      const suitableMeals = libraryMeals.filter((meal) => {
-        if (!suitablePrepTypes.includes(meal.prepType)) return false;
-        // Avoid duplicates
-        if (suggestions.some(s => s.name.toLowerCase() === meal.name.toLowerCase())) return false;
-        
-        if (context.tripType && meal.suitableFor) {
-          const normalizedTripType = context.tripType.replace("_", " ").toLowerCase();
-          const hasSuitable = meal.suitableFor.some(
-            (s) => s.toLowerCase().includes(normalizedTripType) || s.toLowerCase() === "all"
-          );
-          if (!hasSuitable) return false;
-        }
-        return true;
-      });
+  // 2. Library recipes (user's saved recipes from Firebase) - load ALL suitable ones
+  try {
+    const libraryMeals = await getMealLibrary(category);
+    const suitableLibraryMeals = libraryMeals.filter((meal) => {
+      if (!suitablePrepTypes.includes(meal.prepType)) return false;
       
-      const shuffled = suitableMeals.sort(() => Math.random() - 0.5);
-      const neededCount = count - suggestions.length;
-      const recipeSuggestions = shuffled.slice(0, neededCount).map(libraryToSuggestion);
-      suggestions.push(...recipeSuggestions);
-    } catch {
-      // Firebase unavailable, continue with what we have
-    }
-  }
-  
-  // Fill remaining slots with quick ideas
-  if (suggestions.length < count) {
-    const ideas = QUICK_IDEAS[category].filter((idea) => {
-      if (!suitablePrepTypes.includes(idea.prepType)) return false;
-      // Avoid duplicates
-      if (suggestions.some(s => s.name.toLowerCase() === idea.name.toLowerCase())) return false;
+      if (context.tripType && meal.suitableFor) {
+        const normalizedTripType = context.tripType.replace("_", " ").toLowerCase();
+        const hasSuitable = meal.suitableFor.some(
+          (s) => s.toLowerCase().includes(normalizedTripType) || s.toLowerCase() === "all"
+        );
+        if (!hasSuitable) return false;
+      }
       return true;
     });
-    const shuffledIdeas = ideas.sort(() => Math.random() - 0.5);
     
-    while (suggestions.length < count && shuffledIdeas.length > 0) {
-      const idea = shuffledIdeas.pop();
-      if (idea) suggestions.push(idea);
-    }
+    suitableLibraryMeals.map(libraryToSuggestion).forEach(addIfUnique);
+  } catch {
+    // Firebase unavailable, continue with what we have
   }
   
-  return suggestions.slice(0, count);
+  // 3. Quick ideas as additional variety
+  const ideas = QUICK_IDEAS[category].filter((idea) => {
+    return suitablePrepTypes.includes(idea.prepType);
+  });
+  ideas.forEach(addIfUnique);
+  
+  // Shuffle the entire combined pool for true randomness
+  const shuffled = combinedPool.sort(() => Math.random() - 0.5);
+  
+  // Return requested count
+  return shuffled.slice(0, count);
 }
 
 /**
@@ -254,7 +252,7 @@ export async function getSuggestionsForCategory(
  * Used for one-tap "Suggest" button
  */
 export async function getQuickSuggestion(
-  category: MealCategory,
+  category: SuggestibleMealCategory,
   context: SuggestionContext = {},
   excludeNames: string[] = []
 ): Promise<MealSuggestion | null> {
@@ -280,9 +278,9 @@ export async function getQuickSuggestion(
 export async function getAutoFillSuggestions(
   context: SuggestionContext = {},
   excludeNames: string[] = []
-): Promise<Record<MealCategory, MealSuggestion | null>> {
-  const categories: MealCategory[] = ["breakfast", "lunch", "dinner", "snack"];
-  const result: Record<MealCategory, MealSuggestion | null> = {
+): Promise<Record<SuggestibleMealCategory, MealSuggestion | null>> {
+  const categories: SuggestibleMealCategory[] = ["breakfast", "lunch", "dinner", "snack"];
+  const result: Record<SuggestibleMealCategory, MealSuggestion | null> = {
     breakfast: null,
     lunch: null,
     dinner: null,
@@ -322,18 +320,17 @@ export function getIngredientsFromSuggestions(suggestions: MealSuggestion[]): st
  * Get quick meal suggestions (under 15 minutes total time)
  */
 export function getQuickMealSuggestions(
-  category: MealCategory,
+  category: SuggestibleMealCategory,
   count: number = 5
 ): MealSuggestion[] {
-  const mealTypeMap: Record<MealCategory, "breakfast" | "lunch" | "dinner" | "snacks"> = {
+  const mealTypeMap: Record<SuggestibleMealCategory, "breakfast" | "lunch" | "dinner" | "snacks"> = {
     breakfast: "breakfast",
     lunch: "lunch",
     dinner: "dinner",
     snack: "snacks",
   };
   
-  const quickMeals = getQuickMeals(15)
-    .filter(m => m.mealType === mealTypeMap[category])
+  const quickMeals = getQuickMeals(mealTypeMap[category])
     .slice(0, count)
     .map(enhancedToStandard);
   
@@ -344,10 +341,10 @@ export function getQuickMealSuggestions(
  * Get no-cook meal suggestions (great for hot days or minimal gear)
  */
 export function getNoCookSuggestions(
-  category: MealCategory,
+  category: SuggestibleMealCategory,
   count: number = 5
 ): MealSuggestion[] {
-  const mealTypeMap: Record<MealCategory, "breakfast" | "lunch" | "dinner" | "snacks"> = {
+  const mealTypeMap: Record<SuggestibleMealCategory, "breakfast" | "lunch" | "dinner" | "snacks"> = {
     breakfast: "breakfast",
     lunch: "lunch",
     dinner: "dinner",
@@ -366,10 +363,10 @@ export function getNoCookSuggestions(
  * Get top-rated suggestions for a category
  */
 export function getTopRatedSuggestions(
-  category: MealCategory,
+  category: SuggestibleMealCategory,
   count: number = 5
 ): MealSuggestion[] {
-  const mealTypeMap: Record<MealCategory, "breakfast" | "lunch" | "dinner" | "snacks"> = {
+  const mealTypeMap: Record<SuggestibleMealCategory, "breakfast" | "lunch" | "dinner" | "snacks"> = {
     breakfast: "breakfast",
     lunch: "lunch",
     dinner: "dinner",
@@ -386,9 +383,9 @@ export function getTopRatedSuggestions(
  * Get all enhanced suggestions for a category (for browsing)
  */
 export function getAllEnhancedSuggestions(
-  category: MealCategory
+  category: SuggestibleMealCategory
 ): MealSuggestion[] {
-  const mealTypeMap: Record<MealCategory, "breakfast" | "lunch" | "dinner" | "snacks"> = {
+  const mealTypeMap: Record<SuggestibleMealCategory, "breakfast" | "lunch" | "dinner" | "snacks"> = {
     breakfast: "breakfast",
     lunch: "lunch", 
     dinner: "dinner",

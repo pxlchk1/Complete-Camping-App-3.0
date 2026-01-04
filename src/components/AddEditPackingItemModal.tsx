@@ -59,7 +59,7 @@ export default function AddEditPackingItemModal({
   // Form state
   const [name, setName] = useState("");
   const [category, setCategory] = useState<PackingCategory>(
-    defaultCategory || "camp-comfort"
+    defaultCategory || "camp_comfort"
   );
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState("");
@@ -78,7 +78,7 @@ export default function AddEditPackingItemModal({
         setIsEssential(editingItem.isEssential);
       } else {
         setName("");
-        setCategory(defaultCategory || "camp-comfort");
+        setCategory(defaultCategory || "camp_comfort");
         setQuantity(1);
         setNotes("");
         setIsEssential(false);
@@ -89,7 +89,7 @@ export default function AddEditPackingItemModal({
 
   // Handle save
   const handleSave = async () => {
-    if (!user?.id || !name.trim()) return;
+    if (!user?.uid || !name.trim()) return;
 
     setSaving(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -113,7 +113,7 @@ export default function AddEditPackingItemModal({
         itemData.createdAt = editingItem.createdAt;
       }
 
-      await savePackingItem(user.id, tripId, itemData);
+      await savePackingItem(user.uid, tripId, itemData);
       onSaved();
       onClose();
     } catch (error) {

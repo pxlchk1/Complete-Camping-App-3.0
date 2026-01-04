@@ -251,7 +251,7 @@ export default function PhotoComposerScreen() {
   return (
     <View className="flex-1 bg-parchment">
       <ModalHeader
-        title="Share a photo"
+        title="Share a Photo"
         showTitle
         rightAction={isValid && !uploading ? {
           icon: "checkmark",

@@ -161,7 +161,7 @@ export default function UploadPhotoScreen() {
   return (
     <View className="flex-1 bg-parchment">
       <ModalHeader
-        title="Upload photo"
+        title="Upload Photo"
         showTitle
         rightAction={{
           icon: "checkmark",

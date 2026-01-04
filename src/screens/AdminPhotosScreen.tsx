@@ -217,7 +217,7 @@ export default function AdminPhotosScreen() {
   if (loading) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="Review photos" showTitle />
+        <ModalHeader title="Review Photos" showTitle />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={DEEP_FOREST} />
         </View>
@@ -227,7 +227,7 @@ export default function AdminPhotosScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-      <ModalHeader title="Review photos" showTitle />
+      <ModalHeader title="Review Photos" showTitle />
 
       <ScrollView
         className="flex-1"

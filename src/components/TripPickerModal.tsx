@@ -34,20 +34,25 @@ import {
 
 // Map Gear Closet categories to Packing List categories
 const GEAR_TO_PACKING_CATEGORY: Record<GearCategory, PackingCategory> = {
+  camp_comfort: "camp_comfort",
+  campFurniture: "camp_comfort",
+  clothing: "clothing",
+  documents_essentials: "documents_essentials",
+  electronics: "electronics",
+  entertainment: "optional_extras",
+  food: "food",
+  hygiene: "hygiene",
+  kitchen: "kitchen",
+  lighting: "lighting",
+  meal_prep: "kitchen",
+  optional_extras: "optional_extras",
+  pet_supplies: "optional_extras",
+  safety: "navigation_safety",
+  seating: "camp_comfort",
   shelter: "shelter",
   sleep: "sleep",
-  kitchen: "kitchen",
-  clothing: "clothing",
-  lighting: "lighting",
-  water: "water",
   tools: "tools_repairs",
-  safety: "navigation_safety",
-  camp_comfort: "camp_comfort",
-  electronics: "electronics",
-  hygiene: "hygiene",
-  documents_essentials: "documents_essentials",
-  optional_extras: "optional_extras",
-  seating: "camp_comfort",
+  water: "water",
 };
 
 interface TripPickerModalProps {

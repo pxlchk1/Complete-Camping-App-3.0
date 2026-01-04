@@ -11,6 +11,7 @@ import { db, auth } from "../config/firebase";
 // Flag keys
 export const USER_FLAGS = {
   HAS_SEEN_MY_CAMPGROUND_INFO: "hasSeenMyCampgroundInfoModal",
+  HAS_SEEN_MY_CAMPSITE_WELCOME: "hasSeenMyCampsiteWelcomeModal",
 } as const;
 
 /**
@@ -66,4 +67,48 @@ export async function checkAndSetMyCampgroundInfoSeen(): Promise<boolean> {
   }
   
   return false; // Already seen
+}
+
+// ============================================
+// MY CAMPSITE WELCOME MODAL
+// ============================================
+
+/**
+ * Check if user has seen the My Campsite welcome modal
+ */
+export async function hasSeenMyCampsiteWelcome(): Promise<boolean> {
+  const user = auth.currentUser;
+  if (!user) return true; // Don't show to guests
+
+  try {
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+      return userSnap.data()?.[USER_FLAGS.HAS_SEEN_MY_CAMPSITE_WELCOME] === true;
+    }
+    return false;
+  } catch (error) {
+    console.error("[UserFlags] Error checking hasSeenMyCampsiteWelcome:", error);
+    return true; // On error, don't show modal to avoid blocking
+  }
+}
+
+/**
+ * Mark that user has seen the My Campsite welcome modal
+ */
+export async function setMyCampsiteWelcomeSeen(): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  try {
+    const userRef = doc(db, "users", user.uid);
+    await updateDoc(userRef, {
+      [USER_FLAGS.HAS_SEEN_MY_CAMPSITE_WELCOME]: true,
+      updatedAt: serverTimestamp(),
+    });
+    console.log("[UserFlags] Marked hasSeenMyCampsiteWelcomeModal = true");
+  } catch (error) {
+    console.error("[UserFlags] Error setting hasSeenMyCampsiteWelcomeModal:", error);
+  }
 }

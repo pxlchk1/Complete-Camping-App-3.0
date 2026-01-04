@@ -22,6 +22,14 @@ export interface FeedbackPost {
   karmaScore: number;
   createdAt: Timestamp;
   createdByUserId: string;
+  /** Alias for createdByUserId for moderation service compatibility */
+  authorId?: string;
+  /** Display name of author */
+  authorName?: string;
+  /** Comment count */
+  commentCount?: number;
+  /** Whether content is hidden by moderation */
+  isHidden?: boolean;
 }
 
 export const feedbackService = {

@@ -85,7 +85,7 @@ export async function addFavoritePark(
       name: park.name,
       type: getTypeLabel(park.filter),
       state: park.state,
-      thumbnailUrl: null, // Parks don't have thumbnails yet
+      thumbnailUrl: undefined, // Parks don't have thumbnails yet
       lat: park.latitude,
       lon: park.longitude,
       createdAt: serverTimestamp(),

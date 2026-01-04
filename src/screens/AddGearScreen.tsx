@@ -42,7 +42,7 @@ export default function AddGearScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
 
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<GearCategory>("misc");
+  const [category, setCategory] = useState<GearCategory>("optional_extras");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [weight, setWeight] = useState("");
@@ -158,7 +158,7 @@ export default function AddGearScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="Add gear"
+        title="Add Gear"
         showTitle
         rightAction={{
           icon: "checkmark",

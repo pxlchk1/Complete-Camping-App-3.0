@@ -5,7 +5,7 @@
  * Connect-only actions: Edit/Delete for owners, Remove for admins/mods
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -47,6 +47,7 @@ export default function QuestionDetailScreen() {
   const navigation = useNavigation<RouteParams["navigation"]>();
   const { questionId } = route.params;
   const currentUser = useCurrentUser();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const [question, setQuestion] = useState<Question | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -66,6 +67,14 @@ export default function QuestionDetailScreen() {
         ? "MOD" as const 
         : null 
     : null;
+
+  // Scroll to input when focused so keyboard doesn't cover it
+  const handleInputFocus = () => {
+    // Delay to allow KeyboardAvoidingView to adjust first
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 150);
+  };
 
   // Content action handlers
   const handleDeleteQuestion = async () => {
@@ -300,7 +309,12 @@ export default function QuestionDetailScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={90}
       >
-        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 20 }}>
+        <ScrollView 
+          ref={scrollViewRef}
+          className="flex-1" 
+          contentContainerStyle={{ paddingBottom: 20 }}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Question Card */}
           <View className="mx-5 mt-5 rounded-xl p-5 border" style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}>
             {/* Header with actions */}
@@ -490,6 +504,7 @@ export default function QuestionDetailScreen() {
                 <TextInput
                   value={answerText}
                   onChangeText={setAnswerText}
+                  onFocus={handleInputFocus}
                   placeholder="Share your knowledge and help others..."
                   placeholderTextColor={TEXT_MUTED}
                   multiline

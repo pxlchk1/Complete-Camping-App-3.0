@@ -78,6 +78,14 @@ service firebase.storage {
       allow write, delete: if isSignedIn();
     }
     
+    // Gear Review photos - owner-scoped: gearReviews/{userId}/{fileName}
+    // Owner can write, all signed-in users can read (for community display)
+    match /gearReviews/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow create, write: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+    
     // Default deny for everything else
     match /{allPaths=**} {
       allow read, write: if false;

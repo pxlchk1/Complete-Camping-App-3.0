@@ -18,7 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
-import { MealCategory } from "../types/meal";
+import { SuggestibleMealCategory } from "../types/meal";
 import {
   MealSuggestion,
   getSuggestionsForCategory,
@@ -32,7 +32,7 @@ import {
   TEXT_SECONDARY,
 } from "../constants/colors";
 
-const CATEGORY_LABELS: Record<MealCategory, string> = {
+const CATEGORY_LABELS: Record<SuggestibleMealCategory, string> = {
   breakfast: "Breakfast",
   lunch: "Lunch",
   dinner: "Dinner",
@@ -54,7 +54,7 @@ interface SuggestionPickerSheetProps {
   onClose: () => void;
   tripId: string;
   dayIndex: number;
-  mealType: MealCategory;
+  mealType: SuggestibleMealCategory;
   existingEntryCount: number;
   tripContext?: SuggestionContext;
   onAddSuggestion: (suggestion: MealSuggestion) => void;

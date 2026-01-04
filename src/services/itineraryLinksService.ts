@@ -1,6 +1,7 @@
 /**
  * Itinerary Links Service
  * Firestore operations for managing trip itinerary links
+ * Uses top-level /trips/{tripId}/itineraryLinks collection
  */
 
 import {
@@ -25,9 +26,10 @@ import { sniffProvider, normalizeUrl } from '../utils/providerSniffer';
 
 /**
  * Get itinerary links collection reference for a trip
+ * Uses top-level /trips/{tripId}/itineraryLinks path
  */
-function getLinksCollection(userId: string, tripId: string) {
-  return collection(db, 'users', userId, 'trips', tripId, 'itineraryLinks');
+function getLinksCollection(tripId: string) {
+  return collection(db, 'trips', tripId, 'itineraryLinks');
 }
 
 /**
@@ -55,12 +57,13 @@ export async function createItineraryLink(
     moment: data.moment || null,
     provider: providerInfo.provider,
     providerLabel: providerInfo.label,
+    createdBy: user.uid,
     createdAt: now,
     updatedAt: now,
     sortOrder: Date.now(),
   };
 
-  const linksRef = getLinksCollection(user.uid, tripId);
+  const linksRef = getLinksCollection(tripId);
   const docRef = await addDoc(linksRef, linkData);
 
   return {
@@ -76,7 +79,7 @@ export async function getItineraryLinks(tripId: string): Promise<ItineraryLink[]
   const user = auth.currentUser;
   if (!user) throw new Error('Must be signed in to get itinerary links');
 
-  const linksRef = getLinksCollection(user.uid, tripId);
+  const linksRef = getLinksCollection(tripId);
   const q = query(linksRef, orderBy('dayIndex', 'asc'), orderBy('sortOrder', 'asc'));
   const snapshot = await getDocs(q);
 
@@ -107,7 +110,7 @@ export async function getItineraryLink(
   const user = auth.currentUser;
   if (!user) throw new Error('Must be signed in to get an itinerary link');
 
-  const linkRef = doc(db, 'users', user.uid, 'trips', tripId, 'itineraryLinks', linkId);
+  const linkRef = doc(db, 'trips', tripId, 'itineraryLinks', linkId);
   const linkDoc = await getDoc(linkRef);
 
   if (!linkDoc.exists()) return null;
@@ -129,7 +132,7 @@ export async function updateItineraryLink(
   const user = auth.currentUser;
   if (!user) throw new Error('Must be signed in to update an itinerary link');
 
-  const linkRef = doc(db, 'users', user.uid, 'trips', tripId, 'itineraryLinks', linkId);
+  const linkRef = doc(db, 'trips', tripId, 'itineraryLinks', linkId);
   
   const updateData: Record<string, any> = {
     updatedAt: new Date().toISOString(),
@@ -161,7 +164,7 @@ export async function deleteItineraryLink(tripId: string, linkId: string): Promi
   const user = auth.currentUser;
   if (!user) throw new Error('Must be signed in to delete an itinerary link');
 
-  const linkRef = doc(db, 'users', user.uid, 'trips', tripId, 'itineraryLinks', linkId);
+  const linkRef = doc(db, 'trips', tripId, 'itineraryLinks', linkId);
   await deleteDoc(linkRef);
 }
 

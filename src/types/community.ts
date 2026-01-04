@@ -57,7 +57,10 @@ export interface GearReview {
   pros?: string;
   cons?: string;
   tags: string[];
+  photoUrls?: string[]; // Up to 3 photos
+  productUrl?: string; // Link to product
   authorId: string;
+  authorHandle: string; // @handle of the author
   authorName?: string; // Display name of the author
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
@@ -129,6 +132,9 @@ export interface Story {
   caption: string;
   tags: string[];
   authorId: string;
+  /** @deprecated Use authorId instead */
+  userId?: string;
+  authorHandle?: string;
   displayName?: string;
   createdAt: Timestamp | string;
   locationLabel?: string;

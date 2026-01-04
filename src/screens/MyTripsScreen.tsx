@@ -1,9 +1,9 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { View, Text, Pressable, Modal, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import { useTrips, Trip, useDeleteTrip } from "../state/tripsStore";
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
+import { useTrips, Trip, useDeleteTrip, useTripsStore } from "../state/tripsStore";
 import { useUserStore } from "../state/userStore";
 import { usePlanTabStore, PlanTab } from "../state/planTabStore";
 import { usePackingStore } from "../state/packingStore";
@@ -16,7 +16,7 @@ import ConfirmationModal from "../components/ConfirmationModal";
 import AccountRequiredModal from "../components/AccountRequiredModal";
 import { RootStackParamList } from "../navigation/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, PARCHMENT, BORDER_SOFT } from "../constants/colors";
+import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, PARCHMENT, BORDER_SOFT, CARD_BACKGROUND_LIGHT } from "../constants/colors";
 import * as Haptics from "expo-haptics";
 import { format } from "date-fns";
 
@@ -44,9 +44,21 @@ export default function MyTripsScreen() {
   const nav = useNavigation<MyTripsScreenNavigationProp>();
   const route = useRoute<MyTripsScreenRouteProp>();
   const allTrips = useTrips();
+  const loadTrips = useTripsStore((s) => s.loadTrips);
+  const tripsLoading = useTripsStore((s) => s.loading);
+  const tripsInitialized = useTripsStore((s) => s.initialized);
   const currentUser = useAuthStore((s) => s.user);
   const { isPro, isFree, isGuest } = useUserStatus();
   const insets = useSafeAreaInsets();
+
+  // Load trips from Firebase when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUser && !isGuest) {
+        loadTrips();
+      }
+    }, [currentUser, isGuest, loadTrips])
+  );
 
   // Handle route params for initialTab
   useEffect(() => {
@@ -55,11 +67,10 @@ export default function MyTripsScreen() {
     }
   }, [route.params?.initialTab]);
 
-  // Filter trips to only show those for the current logged-in user
-  // Guest users see no trips
+  // Trips from Firebase are already filtered to user's owned and shared trips
   const trips = useMemo(() => {
     if (!currentUser) return [];
-    return allTrips.filter((t) => t.userId === currentUser.id);
+    return allTrips;
   }, [allTrips, currentUser]);
 
   // Plan section tab state - use shared store
@@ -157,9 +168,19 @@ export default function MyTripsScreen() {
       return;
     }
     
-    // Otherwise, navigate to Firestore-backed packing list with build intent
-    // (the PackingList screen will show existing items if any, or build mode if empty)
-    nav.navigate("PackingList", { tripId, intent: "build" });
+    // Find the trip to get its data for season detection
+    const trip = allUpcomingTrips.find(t => t.id === tripId) || pastTrips.find(t => t.id === tripId);
+    
+    // No local list yet - navigate to create one with trip context
+    nav.navigate("PackingListCreate", { 
+      tripId,
+      tripName: trip?.name,
+      tripStartDate: trip?.startDate,
+      tripEndDate: trip?.endDate,
+      tripCampingStyle: trip?.campingStyle,
+      tripWinterCamping: trip?.winterCamping,
+      tripPackingSeasonOverride: trip?.packingSeasonOverride,
+    });
   };
 
   // Navigate to meals for a specific trip
@@ -187,7 +208,7 @@ export default function MyTripsScreen() {
     }
   };
 
-  // Empty state with quick-start Packing/Meals buttons
+  // Empty state - now uses consistent layout with header, button, and panel
   if (showEmptyState) {
     return (
       <View className="flex-1 bg-parchment">
@@ -196,19 +217,38 @@ export default function MyTripsScreen() {
           contentContainerStyle={{ flexGrow: 1, paddingBottom: bottomSpacer }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Empty State Hero */}
-          <View className="flex-1 items-center justify-center px-6 py-8">
-            <View className="w-20 h-20 rounded-full items-center justify-center mb-6" style={{ backgroundColor: DEEP_FOREST + "15" }}>
-              <Ionicons name="compass" size={40} color={DEEP_FOREST} />
+          {/* Full-width New Trip Button */}
+          <View className="px-4 py-3">
+            <Pressable
+              onPress={isGuest ? handleGuestLogin : handleCreateTrip}
+              className="w-full py-3.5 rounded-xl items-center justify-center active:opacity-90"
+              style={{ backgroundColor: DEEP_FOREST }}
+            >
+              <Text
+                className="text-base"
+                style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+              >
+                {isGuest ? "Log In to Start" : "+ New Trip"}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Empty State Panel */}
+          <View
+            className="flex-1 mx-4 rounded-xl items-center justify-center"
+            style={{ backgroundColor: CARD_BACKGROUND_LIGHT, minHeight: 200 }}
+          >
+            <View className="w-16 h-16 rounded-full items-center justify-center mb-4" style={{ backgroundColor: DEEP_FOREST + "15" }}>
+              <Ionicons name="compass" size={32} color={DEEP_FOREST} />
             </View>
             <Text
-              className="text-2xl text-center mb-2"
-              style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
+              className="text-lg text-center mb-2 px-6"
+              style={{ fontFamily: "Raleway_600SemiBold", color: DEEP_FOREST }}
             >
-              {isGuest ? "Log in to start planning" : "No trips planned"}
+              {isGuest ? "Log in to start planning" : "No trips yet"}
             </Text>
             <Text
-              className="text-base text-center mb-6"
+              className="text-sm text-center px-8"
               style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
             >
               {isGuest 
@@ -216,20 +256,6 @@ export default function MyTripsScreen() {
                 : "Your sleeping bag is giving you side-eye."
               }
             </Text>
-            
-            {/* Primary CTA */}
-            <Pressable
-              onPress={isGuest ? handleGuestLogin : handleCreateTrip}
-              className="w-full py-4 rounded-xl items-center justify-center active:opacity-90"
-              style={{ backgroundColor: DEEP_FOREST }}
-            >
-              <Text
-                className="text-base"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
-              >
-                {isGuest ? "Log in" : "Plan a new trip"}
-              </Text>
-            </Pressable>
           </View>
         </ScrollView>
 
@@ -262,35 +288,36 @@ export default function MyTripsScreen() {
         contentContainerStyle={{ paddingBottom: bottomSpacer }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Upcoming Trips Section (includes active/in-progress and upcoming) */}
-        {allUpcomingTrips.length > 0 && (
-          <View className="px-4 pt-4">
-            <View className="flex-row items-center justify-between mb-3">
-              <Text
-                className="text-xs"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: EARTH_GREEN, letterSpacing: 0.5 }}
-              >
-                UPCOMING TRIPS
-              </Text>
-              <Pressable
-                onPress={handleCreateTrip}
-                className="px-3 py-1.5 rounded-lg active:opacity-90"
-                style={{ backgroundColor: DEEP_FOREST }}
-              >
-                <Text
-                  className="text-xs"
-                  style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
-                >
-                  + New trip
-                </Text>
-              </Pressable>
-            </View>
+        {/* Full-width New Trip Button */}
+        <View className="px-4 py-3">
+          <Pressable
+            onPress={handleCreateTrip}
+            className="w-full py-3.5 rounded-xl items-center justify-center active:opacity-90"
+            style={{ backgroundColor: DEEP_FOREST }}
+          >
+            <Text
+              className="text-base"
+              style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+            >
+              + New trip
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Trips List Container with panel background */}
+        <View
+          className="flex-1 mx-4 rounded-xl"
+          style={{ backgroundColor: CARD_BACKGROUND_LIGHT, minHeight: 100 }}
+        >
+          {/* Upcoming Trips Section (includes active/in-progress and upcoming) */}
+          {allUpcomingTrips.length > 0 && (
+            <View className="p-4">
             
             {allUpcomingTrips.map((trip) => (
               <View
                 key={trip.id}
                 className="rounded-xl p-3 mb-2"
-                style={{ backgroundColor: DEEP_FOREST }}
+                style={{ backgroundColor: "#59625C" }}
               >
                 <View className="flex-row items-start justify-between">
                   <Pressable 
@@ -363,48 +390,43 @@ export default function MyTripsScreen() {
               </View>
             ))}
           </View>
-        )}
+          )}
 
-        {/* New Trip Button when no upcoming trips but have past trips */}
-        {allUpcomingTrips.length === 0 && pastTrips.length > 0 && (
-          <View className="px-4 pt-4 flex-row justify-end">
-            <Pressable
-              onPress={handleCreateTrip}
-              className="px-3 py-1.5 rounded-lg active:opacity-90"
-              style={{ backgroundColor: DEEP_FOREST }}
-            >
+          {/* Empty trips message when no upcoming trips but panel is shown */}
+          {allUpcomingTrips.length === 0 && pastTrips.length === 0 && (
+            <View className="p-6 items-center">
               <Text
-                className="text-xs"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+                className="text-base text-center"
+                style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
               >
-                + New trip
+                No trips yet. Tap the button above to start planning!
               </Text>
-            </Pressable>
-          </View>
-        )}
+            </View>
+          )}
 
-        {/* Past Trips Section */}
-        {pastTrips.length > 0 && (
-          <View className="px-4 pt-4">
-            <Text
-              className="text-xs mb-3"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: EARTH_GREEN, letterSpacing: 0.5 }}
-            >
-              PAST
-            </Text>
-            {pastTrips.map((trip) => (
-              <TripCard
-                key={trip.id}
-                trip={trip}
-                onResume={() => onResume(trip)}
-                onMenu={() => onMenu(trip)}
-                onPackingPress={() => handlePackingPress(trip.id)}
-                onWeatherPress={() => onResume(trip)}
-                onMealsPress={() => handleMealsPress(trip.id)}
-              />
-            ))}
-          </View>
-        )}
+          {/* Past Trips Section */}
+          {pastTrips.length > 0 && (
+            <View className="p-4 pt-2">
+              <Text
+                className="text-xs mb-3"
+                style={{ fontFamily: "SourceSans3_600SemiBold", color: EARTH_GREEN, letterSpacing: 0.5 }}
+              >
+                PAST
+              </Text>
+              {pastTrips.map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  trip={trip}
+                  onResume={() => onResume(trip)}
+                  onMenu={() => onMenu(trip)}
+                  onPackingPress={() => handlePackingPress(trip.id)}
+                  onWeatherPress={() => onResume(trip)}
+                  onMealsPress={() => handleMealsPress(trip.id)}
+                />
+              ))}
+            </View>
+          )}
+        </View>
       </ScrollView>
 
       {/* Modals */}

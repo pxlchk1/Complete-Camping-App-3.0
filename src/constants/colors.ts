@@ -14,6 +14,7 @@ export const RIVER_ROCK = "#DDEBE4"; // pale mint hint used in selected states
 
 export const GRANITE_GOLD = "#986C42"; // warm tan
 export const RUST = "#B5591D";
+export const RUST_ORANGE = RUST; // Alias for backward compatibility
 export const RUST_DEEP = "#7E4015";
 
 export const TEXT_PRIMARY = INK;

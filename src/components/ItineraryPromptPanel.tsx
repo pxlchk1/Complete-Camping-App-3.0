@@ -79,7 +79,7 @@ export default function ItineraryPromptPanel({
             </Pressable>
             
             <Pressable onPress={handleDismissPress} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Not now</Text>
+              <Text style={styles.secondaryButtonText}>Not Now</Text>
             </Pressable>
           </View>
         </View>

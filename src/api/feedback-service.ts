@@ -23,6 +23,7 @@ export interface FeedbackPost {
   message: string;
   userId: string;
   createdAt: Timestamp | any;
+  score?: number; // upvotes - downvotes, if voting enabled
 }
 
 export interface FeedbackComment {

@@ -13,10 +13,18 @@ bun.lockb
 # macOS
 .DS_Store
 
-# Ignore Bun lockfiles
-bun.lock
-bun.lockb
+# Secrets - NEVER commit these
+serviceAccountKey.json
+GoogleService-Info.plist
+google-services.json
+*.pem
+*.p12
+*.key
 
-# Ignore Bun lockfiles
-bun.lock
-bun.lockb
+# Logs
+functions/firebase-debug.log
+*.log
+
+# Scratch scripts (root-level only, not src/scripts which are needed for the app)
+scripts/**
+!scripts/patch-ios-podspecs.js

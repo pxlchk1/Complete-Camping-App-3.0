@@ -103,7 +103,7 @@ export default function CreateTripScreen() {
       parkType: destination.placeType === "park" ? "State Park" : null,
     } : undefined;
 
-    const tripId = addTrip({
+    const tripId = await addTrip({
       name: tripName.trim(),
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
@@ -132,7 +132,7 @@ export default function CreateTripScreen() {
         {/* Header */}
         <View className="px-5 pt-4 pb-3 border-b border-parchmentDark">
           <View className="flex-row items-center justify-between">
-            <Heading2>Plan new trip</Heading2>
+            <Heading2>Plan New Trip</Heading2>
             <View className="flex-row items-center gap-2">
               <Pressable
                 onPress={() => navigation.goBack()}

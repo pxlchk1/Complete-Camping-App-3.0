@@ -75,11 +75,14 @@ export default function InviteOptionsSheet({
     }
 
     try {
-      // Get inviter's name
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const inviterName = userDoc.exists()
-        ? userDoc.data().displayName || "A camper"
-        : "A camper";
+      // Get inviter's name from profiles collection
+      const profileDoc = await getDoc(doc(db, "profiles", user.uid));
+      const profileData = profileDoc.exists() ? profileDoc.data() : null;
+      
+      // Use displayName from profile, fall back to Firebase Auth displayName
+      const inviterName = profileData?.displayName 
+        || user.displayName 
+        || "A camper";
 
       // Check for existing pending invite
       if (contact.contactEmail) {
@@ -170,13 +173,15 @@ export default function InviteOptionsSheet({
         return;
       }
 
-      // Get inviter name for message
+      // Get inviter name from profile
       const user = auth.currentUser;
       let inviterName = "A camper";
       if (user) {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          inviterName = userDoc.data().displayName || "A camper";
+        const profileDoc = await getDoc(doc(db, "profiles", user.uid));
+        if (profileDoc.exists()) {
+          inviterName = profileDoc.data().displayName || user.displayName || "A camper";
+        } else if (user.displayName) {
+          inviterName = user.displayName;
         }
       }
 
@@ -221,15 +226,17 @@ export default function InviteOptionsSheet({
         return;
       }
 
-      // Get inviter first name for message
+      // Get inviter first name from profile
       const user = auth.currentUser;
       let inviterName = "A friend";
       if (user) {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const displayName = userDoc.data().displayName || "A friend";
+        const profileDoc = await getDoc(doc(db, "profiles", user.uid));
+        if (profileDoc.exists()) {
+          const displayName = profileDoc.data().displayName || user.displayName || "A friend";
           // Extract first name
           inviterName = displayName.trim().split(/\s+/)[0] || "A friend";
+        } else if (user.displayName) {
+          inviterName = user.displayName.trim().split(/\s+/)[0] || "A friend";
         }
       }
 
@@ -406,7 +413,7 @@ export default function InviteOptionsSheet({
                 className="text-center"
                 style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_SECONDARY }}
               >
-                Not now
+                Not Now
               </Text>
             </Pressable>
           </View>

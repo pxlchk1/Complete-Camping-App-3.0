@@ -236,6 +236,11 @@ export const sendCampgroundInviteEmail = functions
 
       const inviteLink = getInviteLink(invite.token);
 
+      // Get the inviter's current display name from their profile
+      const inviterProfileDoc = await db.collection("profiles").doc(invite.inviterUid).get();
+      const inviterProfile = inviterProfileDoc.exists ? inviterProfileDoc.data() : null;
+      const inviterDisplayName = inviterProfile?.displayName || invite.inviterName || "A friend";
+
       // Send email using SendGrid dynamic template
       // Template ID: d-a00eabe7198844468abf694b6cbea063 (My Campground Invite)
       const msg = {
@@ -244,7 +249,7 @@ export const sendCampgroundInviteEmail = functions
         templateId: "d-a00eabe7198844468abf694b6cbea063",
         dynamicTemplateData: {
           // Use first name only for invite message
-          inviterName: getFirstName(invite.inviterName),
+          inviterName: getFirstName(inviterDisplayName),
           inviteLink: inviteLink,
           year: new Date().getFullYear(),
         },
@@ -434,12 +439,23 @@ export const redeemCampgroundInvite = functions.https.onCall(
  * Triggered on user creation
  */
 export const onUserCreated = functions.auth.user().onCreate(async (user) => {
-  if (!user.email) return;
+  functions.logger.info("onUserCreated triggered", {
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName,
+  });
+
+  if (!user.email) {
+    functions.logger.warn("User created without email, skipping invite check", { uid: user.uid });
+    return;
+  }
 
   const email = user.email.toLowerCase();
 
   try {
     const db = admin.firestore();
+
+    functions.logger.info("Checking for pending invites", { email });
 
     // Check for pending invitations by email
     const invitesSnapshot = await db
@@ -448,26 +464,54 @@ export const onUserCreated = functions.auth.user().onCreate(async (user) => {
       .where("status", "==", "pending")
       .get();
 
+    functions.logger.info("Invite query completed", {
+      email,
+      invitesFound: invitesSnapshot.size,
+    });
+
     if (invitesSnapshot.empty) {
-      functions.logger.info("No pending invites found for new user", { email });
+      // Also log what invites exist for debugging
+      const allInvitesSnapshot = await db
+        .collection("campgroundInvites")
+        .where("status", "==", "pending")
+        .limit(5)
+        .get();
+      
+      functions.logger.info("No pending invites found for new user", {
+        email,
+        totalPendingInvites: allInvitesSnapshot.size,
+        sampleInviteEmails: allInvitesSnapshot.docs.map(d => d.data().inviteeEmail),
+      });
       return;
     }
 
     const batch = db.batch();
+    let processedCount = 0;
+    let expiredCount = 0;
 
     for (const inviteDoc of invitesSnapshot.docs) {
       const invite = inviteDoc.data() as CampgroundInvite;
 
+      functions.logger.info("Processing invite", {
+        inviteId: inviteDoc.id,
+        inviteeEmail: invite.inviteeEmail,
+        inviterUid: invite.inviterUid,
+        inviterName: invite.inviterName,
+        expiresAt: invite.expiresAt?.toDate?.() || invite.expiresAt,
+      });
+
       // Check if expired
       const now = admin.firestore.Timestamp.now();
-      if (invite.expiresAt.toMillis() < now.toMillis()) {
+      if (invite.expiresAt && invite.expiresAt.toMillis() < now.toMillis()) {
+        functions.logger.info("Invite expired, marking as expired", { inviteId: inviteDoc.id });
         batch.update(inviteDoc.ref, { status: "expired" });
+        expiredCount++;
         continue;
       }
 
       // Add to inviter's campground contacts
       const contactRef = db.collection("campgroundContacts").doc();
-      batch.set(contactRef, {
+      const contactData = {
         ownerId: invite.inviterUid,
         contactUserId: user.uid,
         contactName: user.displayName || email.split("@")[0],
@@ -475,11 +519,17 @@ export const onUserCreated = functions.auth.user().onCreate(async (user) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         addedVia: "invite-auto",
         inviteId: inviteDoc.id,
+      };
+      batch.set(contactRef, contactData);
+
+      functions.logger.info("Creating contact for inviter", {
+        contactId: contactRef.id,
+        ...contactData,
       });
 
       // Also add inviter to new user's contacts
       const reverseContactRef = db.collection("campgroundContacts").doc();
-      batch.set(reverseContactRef, {
+      const reverseContactData = {
         ownerId: user.uid,
         contactUserId: invite.inviterUid,
         contactName: invite.inviterName,
@@ -487,6 +537,12 @@ export const onUserCreated = functions.auth.user().onCreate(async (user) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         addedVia: "invite-auto-accepted",
         inviteId: inviteDoc.id,
+      };
+      batch.set(reverseContactRef, reverseContactData);
+
+      functions.logger.info("Creating reverse contact for new user", {
+        contactId: reverseContactRef.id,
+        ...reverseContactData,
       });
 
       // Mark invite as accepted
@@ -496,6 +552,8 @@ export const onUserCreated = functions.auth.user().onCreate(async (user) => {
         acceptedUid: user.uid,
       });
 
+      processedCount++;
+
       functions.logger.info("Auto-accepted invite for new user", {
         email,
         inviteId: inviteDoc.id,
@@ -504,11 +562,187 @@ export const onUserCreated = functions.auth.user().onCreate(async (user) => {
     }
 
     await batch.commit();
+
+    functions.logger.info("Invite processing complete", {
+      email,
+      processedCount,
+      expiredCount,
+    });
   } catch (error) {
-    functions.logger.error("Error processing invites on user creation", { email, error });
+    functions.logger.error("Error processing invites on user creation", {
+      email,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     // Don't throw - we don't want to block user creation
   }
 });
+
+// ============================================
+// CHECK PENDING INVITES ON LOGIN
+// ============================================
+
+/**
+ * Check and accept pending invitations for an existing user
+ * Called after user logs in to catch invites sent to existing users
+ */
+export const checkPendingInvitesOnLogin = functions.https.onCall(
+  async (_data: unknown, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "Must be authenticated to check invites"
+      );
+    }
+
+    const userId = context.auth.uid;
+    const email = context.auth.token.email?.toLowerCase();
+
+    if (!email) {
+      functions.logger.info("User has no email, skipping invite check", { userId });
+      return { processed: 0, message: "No email associated with account" };
+    }
+
+    functions.logger.info("checkPendingInvitesOnLogin called", { userId, email });
+
+    try {
+      const db = admin.firestore();
+
+      // Check for pending invitations by email
+      const invitesSnapshot = await db
+        .collection("campgroundInvites")
+        .where("inviteeEmail", "==", email)
+        .where("status", "==", "pending")
+        .get();
+
+      if (invitesSnapshot.empty) {
+        functions.logger.info("No pending invites found on login", { email });
+        return { processed: 0, message: "No pending invites" };
+      }
+
+      functions.logger.info("Found pending invites on login", {
+        email,
+        count: invitesSnapshot.size,
+      });
+
+      // Get user info for contact creation
+      const userRecord = await admin.auth().getUser(userId);
+      const userName = userRecord.displayName || email.split("@")[0];
+
+      const batch = db.batch();
+      let processedCount = 0;
+      let expiredCount = 0;
+      const inviterNames: string[] = [];
+
+      for (const inviteDoc of invitesSnapshot.docs) {
+        const invite = inviteDoc.data() as CampgroundInvite;
+
+        // Check if expired
+        const now = admin.firestore.Timestamp.now();
+        if (invite.expiresAt && invite.expiresAt.toMillis() < now.toMillis()) {
+          functions.logger.info("Invite expired, marking as expired", { inviteId: inviteDoc.id });
+          batch.update(inviteDoc.ref, { status: "expired" });
+          expiredCount++;
+          continue;
+        }
+
+        // Check if this contact relationship already exists (to avoid duplicates)
+        const existingContact = await db
+          .collection("campgroundContacts")
+          .where("ownerId", "==", invite.inviterUid)
+          .where("contactUserId", "==", userId)
+          .limit(1)
+          .get();
+
+        if (!existingContact.empty) {
+          functions.logger.info("Contact already exists, marking invite as accepted", {
+            inviteId: inviteDoc.id,
+            inviterUid: invite.inviterUid,
+          });
+          batch.update(inviteDoc.ref, {
+            status: "accepted",
+            acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+            acceptedUid: userId,
+          });
+          continue;
+        }
+
+        // Add to inviter's campground contacts
+        const contactRef = db.collection("campgroundContacts").doc();
+        batch.set(contactRef, {
+          ownerId: invite.inviterUid,
+          contactUserId: userId,
+          contactName: userName,
+          contactEmail: email,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          addedVia: "invite-login",
+          inviteId: inviteDoc.id,
+        });
+
+        // Also add inviter to user's contacts
+        const reverseContactRef = db.collection("campgroundContacts").doc();
+        batch.set(reverseContactRef, {
+          ownerId: userId,
+          contactUserId: invite.inviterUid,
+          contactName: invite.inviterName,
+          contactEmail: "",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          addedVia: "invite-login-accepted",
+          inviteId: inviteDoc.id,
+        });
+
+        // Mark invite as accepted
+        batch.update(inviteDoc.ref, {
+          status: "accepted",
+          acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+          acceptedUid: userId,
+        });
+
+        processedCount++;
+        inviterNames.push(getFirstName(invite.inviterName));
+
+        functions.logger.info("Accepted invite on login", {
+          email,
+          inviteId: inviteDoc.id,
+          inviterUid: invite.inviterUid,
+        });
+      }
+
+      await batch.commit();
+
+      functions.logger.info("Login invite processing complete", {
+        email,
+        processedCount,
+        expiredCount,
+      });
+
+      if (processedCount === 0) {
+        return { processed: 0, message: "No new invites to process" };
+      }
+
+      const message = processedCount === 1
+        ? `You've joined ${inviterNames[0]}'s campground!`
+        : `You've joined ${processedCount} campgrounds!`;
+
+      return {
+        processed: processedCount,
+        expired: expiredCount,
+        message,
+        inviterNames,
+      };
+    } catch (error) {
+      functions.logger.error("Error checking pending invites on login", {
+        userId,
+        email,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new functions.https.HttpsError(
+        "internal",
+        "Failed to check pending invites"
+      );
+    }
+  }
+);
 
 // ============================================
 // DELETE PHOTO FUNCTION

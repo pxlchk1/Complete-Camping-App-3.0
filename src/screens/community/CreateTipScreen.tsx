@@ -90,7 +90,7 @@ export default function CreateTipScreen() {
   return (
     <View className="flex-1 bg-parchment">
       <ModalHeader
-        title="New tip"
+        title="New Tip"
         showTitle
         rightAction={{
           icon: "checkmark",

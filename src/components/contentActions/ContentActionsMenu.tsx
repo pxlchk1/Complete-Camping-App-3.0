@@ -80,10 +80,10 @@ export interface ContentActionsMenuProps {
 }
 
 const DEFAULT_CONFIRM_COPY: Required<ConfirmCopy> = {
-  deleteTitle: "Delete this?",
+  deleteTitle: "Delete This?",
   deleteBody: "This can't be undone.",
   deleteConfirm: "Delete",
-  removeTitle: "Remove this?",
+  removeTitle: "Remove This?",
   removeBody: "This removes it for everyone. This can't be undone.",
   removeConfirm: "Remove",
 };

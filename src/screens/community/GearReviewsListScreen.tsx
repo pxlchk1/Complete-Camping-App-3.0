@@ -3,7 +3,7 @@
  * Shows list of gear reviews with category filtering
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,14 +13,14 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect, useRoute, RouteProp } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { DocumentSnapshot } from "firebase/firestore";
 import * as Haptics from "expo-haptics";
 import { getGearReviews } from "../../services/gearReviewsService";
 import { gearReviewVotesService } from "../../services/firestore/gearReviewVotesService";
 import { GearReview, GearCategory } from "../../types/community";
-import { RootStackNavigationProp } from "../../navigation/types";
+import { RootStackNavigationProp, RootStackParamList } from "../../navigation/types";
 import { useCurrentUser } from "../../state/userStore";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
 import { requirePro } from "../../utils/gating";
@@ -53,8 +53,12 @@ const CATEGORIES: { value: CategoryFilter; label: string }[] = [
 
 export default function GearReviewsListScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
+  const route = useRoute<RouteProp<RootStackParamList, "GearReviewsListScreen">>();
   const currentUser = useCurrentUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Tag filter from navigation params
+  const [tagFilter, setTagFilter] = useState<string | null>(route.params?.filterByTag || null);
 
   const [reviews, setReviews] = useState<(GearReview & { voteScore: number; userVote: "up" | "down" | null })[]>([]);
   const [filteredReviews, setFilteredReviews] = useState<(GearReview & { voteScore: number; userVote: "up" | "down" | null })[]>([]);
@@ -169,21 +173,44 @@ export default function GearReviewsListScreen() {
     loadReviews(true);
   }, [category]);
 
+  // Refresh reviews when screen gains focus (e.g., after navigating back from detail/delete)
+  useFocusEffect(
+    useCallback(() => {
+      // Update tag filter from route params when screen is focused
+      const newTagFilter = route.params?.filterByTag || null;
+      if (newTagFilter !== tagFilter) {
+        setTagFilter(newTagFilter);
+      }
+      // Only refresh if we already have reviews loaded (skip initial mount)
+      if (reviews.length > 0) {
+        loadReviews(true);
+      }
+    }, [category, route.params?.filterByTag])
+  );
+
   useEffect(() => {
+    let filtered = reviews;
+
+    // Apply tag filter if active
+    if (tagFilter) {
+      filtered = filtered.filter((r) =>
+        r.tags?.some((t) => t.toLowerCase() === tagFilter.toLowerCase())
+      );
+    }
+
+    // Apply search query filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      setFilteredReviews(
-        reviews.filter(
-          (r) =>
-            r.gearName.toLowerCase().includes(query) ||
-            r.brand?.toLowerCase().includes(query) ||
-            r.summary.toLowerCase().includes(query)
-        )
+      filtered = filtered.filter(
+        (r) =>
+          r.gearName.toLowerCase().includes(query) ||
+          r.brand?.toLowerCase().includes(query) ||
+          r.summary.toLowerCase().includes(query)
       );
-    } else {
-      setFilteredReviews(reviews);
     }
-  }, [searchQuery, reviews]);
+
+    setFilteredReviews(filtered);
+  }, [searchQuery, reviews, tagFilter]);
 
   const renderReviewItem = ({ item }: { item: GearReview & { voteScore: number; userVote: "up" | "down" | null } }) => (
     <Pressable
@@ -247,18 +274,23 @@ export default function GearReviewsListScreen() {
       {item.tags && item.tags.length > 0 && (
         <View className="flex-row flex-wrap gap-2 mb-2">
           {item.tags.slice(0, 3).map((tag) => (
-            <View
+            <Pressable
               key={tag}
-              className="px-2 py-1 rounded-full"
-              style={{ backgroundColor: "#F3F4F6" }}
+              onPress={(e) => {
+                e.stopPropagation();
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setTagFilter(tag);
+              }}
+              className="px-2 py-1 rounded-full active:opacity-70"
+              style={{ backgroundColor: tagFilter === tag ? DEEP_FOREST : "#F3F4F6" }}
             >
               <Text
                 className="text-xs"
-                style={{ fontFamily: "SourceSans3_600SemiBold", color: "#6B7280" }}
+                style={{ fontFamily: "SourceSans3_600SemiBold", color: tagFilter === tag ? PARCHMENT : "#6B7280" }}
               >
                 {tag}
               </Text>
-            </View>
+            </Pressable>
           ))}
         </View>
       )}
@@ -364,7 +396,7 @@ export default function GearReviewsListScreen() {
     <View className="flex-1 bg-parchment">
       {/* Action Bar */}
       <CommunitySectionHeader
-        title="Gear reviews"
+        title="Gear Reviews"
         onAddPress={() => {
           // Gear Reviews require PRO subscription
           const canProceed = requirePro({
@@ -399,6 +431,29 @@ export default function GearReviewsListScreen() {
 
       {/* Category Filters */}
       <View className="px-5 pb-3">
+        {/* Active Tag Filter Indicator */}
+        {tagFilter && (
+          <View className="flex-row items-center mb-3">
+            <Text style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY, marginRight: 8 }}>
+              Filtered by tag:
+            </Text>
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setTagFilter(null);
+                // Clear the route param as well
+                navigation.setParams({ filterByTag: undefined });
+              }}
+              className="flex-row items-center px-3 py-1.5 rounded-full"
+              style={{ backgroundColor: DEEP_FOREST }}
+            >
+              <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT, marginRight: 6 }}>
+                {tagFilter}
+              </Text>
+              <Ionicons name="close-circle" size={16} color={PARCHMENT} />
+            </Pressable>
+          </View>
+        )}
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}

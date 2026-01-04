@@ -22,10 +22,12 @@ const TIP_COMMENTS_COLLECTION = "tipComments";
 export interface Tip {
   id: string;
   text: string;
+  body?: string; // Alias for text in some contexts
   userId: string;
   createdAt: Timestamp | any;
   images?: string[];
   likesCount?: number;
+  score?: number; // upvotes - downvotes, if voting enabled
 }
 
 export interface TipComment {

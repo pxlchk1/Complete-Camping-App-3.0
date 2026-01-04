@@ -21,7 +21,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
-import { MealCategory, MealLibraryItem } from "../types/meal";
+import { MealLibraryItem, SuggestibleMealCategory } from "../types/meal";
+import { MealType, mealCategoryToMealType } from "../constants/mealTypes";
+import { libraryItemMatchesMealType } from "../utils/recipeMealTypeUtils";
 import { MealSuggestion, getSuggestionsForCategory, SuggestionContext } from "../services/mealSuggestionService";
 import { getMealLibrary } from "../services/mealsService";
 import { useMealStore } from "../state/mealStore";
@@ -36,14 +38,14 @@ import {
   GRANITE_GOLD,
 } from "../constants/colors";
 
-const CATEGORY_LABELS: Record<MealCategory, string> = {
+const CATEGORY_LABELS: Record<SuggestibleMealCategory, string> = {
   breakfast: "Breakfast",
   lunch: "Lunch",
   dinner: "Dinner",
   snack: "Snack",
 };
 
-const CATEGORY_ICONS: Record<MealCategory, keyof typeof Ionicons.glyphMap> = {
+const CATEGORY_ICONS: Record<SuggestibleMealCategory, keyof typeof Ionicons.glyphMap> = {
   breakfast: "sunny",
   lunch: "restaurant",
   dinner: "moon",
@@ -63,7 +65,7 @@ const FILTER_CHIPS = [
 interface MealSlotSheetProps {
   visible: boolean;
   onClose: () => void;
-  category: MealCategory;
+  category: SuggestibleMealCategory;
   dayIndex: number;
   context?: SuggestionContext;
   initialTab?: "suggest" | "recipes" | "custom";
@@ -91,6 +93,9 @@ export default function MealSlotSheet({
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
+  
+  // Show all recipes toggle - when off, filter to current meal slot category
+  const [showAllRecipes, setShowAllRecipes] = useState(false);
 
   // Custom meal form
   const [customName, setCustomName] = useState("");
@@ -118,6 +123,7 @@ export default function MealSlotSheet({
       setActiveSection(initialTab);
       setSearchQuery("");
       setSelectedFilter("all");
+      setShowAllRecipes(false); // Reset to filtered by meal slot
       resetCustomForm();
       // If opening to recipes tab, load them
       if (initialTab === "recipes") {
@@ -144,17 +150,17 @@ export default function MealSlotSheet({
 
     setLoadingRecipes(true);
     try {
-      const libraryRecipes = await getMealLibrary(category);
+      // Load ALL recipes - we'll filter client-side by mealTypes
+      const libraryRecipes = await getMealLibrary();
       if (libraryRecipes.length > 0) {
         setRecipes(libraryRecipes);
       } else {
-        // Fallback to local
+        // Fallback to local - get all recipes
         const state = useMealStore.getState();
         if (state.mealLibrary.length === 0) {
           state.initializeMealLibrary();
         }
-        const local = useMealStore.getState().mealLibrary.filter((m) => m.category === category);
-        setRecipes(local);
+        setRecipes(useMealStore.getState().mealLibrary);
       }
     } catch {
       console.log("[MealSlotSheet] Using local recipes");
@@ -162,8 +168,7 @@ export default function MealSlotSheet({
       if (state.mealLibrary.length === 0) {
         state.initializeMealLibrary();
       }
-      const local = useMealStore.getState().mealLibrary.filter((m) => m.category === category);
-      setRecipes(local);
+      setRecipes(useMealStore.getState().mealLibrary);
     } finally {
       setLoadingRecipes(false);
     }
@@ -178,7 +183,17 @@ export default function MealSlotSheet({
 
   // Filter recipes
   const filteredRecipes = useMemo(() => {
+    // Convert category to MealType for filtering
+    const slotMealType: MealType = mealCategoryToMealType(category);
+    
     return recipes.filter((recipe) => {
+      // First, filter by meal type (unless "show all" is on)
+      if (!showAllRecipes) {
+        if (!libraryItemMatchesMealType(recipe, slotMealType)) {
+          return false;
+        }
+      }
+      
       // Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -201,7 +216,7 @@ export default function MealSlotSheet({
 
       return true;
     });
-  }, [recipes, searchQuery, selectedFilter]);
+  }, [recipes, searchQuery, selectedFilter, showAllRecipes, category]);
 
   const handleSelectSuggestion = (suggestion: MealSuggestion) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -564,6 +579,36 @@ export default function MealSlotSheet({
                         </Pressable>
                       ))}
                     </ScrollView>
+
+                    {/* Show all recipes toggle */}
+                    <Pressable
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setShowAllRecipes(!showAllRecipes);
+                      }}
+                      className="flex-row items-center mb-3"
+                    >
+                      <View
+                        className="w-5 h-5 rounded border mr-2 items-center justify-center"
+                        style={{
+                          backgroundColor: showAllRecipes ? DEEP_FOREST : "transparent",
+                          borderColor: showAllRecipes ? DEEP_FOREST : TEXT_SECONDARY,
+                        }}
+                      >
+                        {showAllRecipes && (
+                          <Ionicons name="checkmark" size={14} color={PARCHMENT} />
+                        )}
+                      </View>
+                      <Text
+                        style={{
+                          fontFamily: "SourceSans3_400Regular",
+                          fontSize: 13,
+                          color: TEXT_SECONDARY,
+                        }}
+                      >
+                        Show all recipes (not just {CATEGORY_LABELS[category].toLowerCase()})
+                      </Text>
+                    </Pressable>
 
                     {/* Recipe list */}
                     {loadingRecipes ? (

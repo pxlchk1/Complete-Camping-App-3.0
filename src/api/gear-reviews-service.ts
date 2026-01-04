@@ -26,6 +26,7 @@ export interface GearReview {
   imageUrl?: string;
   userId: string;
   createdAt: Timestamp | any;
+  score?: number; // upvotes - downvotes, if voting enabled
 }
 
 // Create a gear review

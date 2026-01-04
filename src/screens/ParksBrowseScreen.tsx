@@ -191,6 +191,7 @@ export default function ParksBrowseScreen({ onTabChange, selectedParkId: selecte
       lng: park.longitude,
       formattedAddress: park.address || null,
       parkType: getParkTypeDisplay(park.filter),
+      url: park.url || null, // Reservation URL for "Reserve a Site" button
       updatedAt: new Date().toISOString(),
     };
   }, [getParkTypeDisplay]);
@@ -1061,7 +1062,7 @@ export default function ParksBrowseScreen({ onTabChange, selectedParkId: selecte
             setSelectedPark(null);
             onParkDetailClosed?.();
           }}
-          tripIdForDestination={tripContextId}
+          tripIdForDestination={tripContextId ?? undefined}
           onSetAsDestination={async (park, tripId) => {
             // DESTINATION PICKER FLOW: Save park as trip destination and return to TripDetail
             console.log("[ParksBrowse] Setting destination for trip:", tripId, "Park:", park.name);
@@ -1147,7 +1148,7 @@ export default function ParksBrowseScreen({ onTabChange, selectedParkId: selecte
             onParkDetailClosed?.();
             navigation.navigate("Paywall", { triggerKey, variant });
           }}
-          onCheckWeather={(park) => {
+          onCheckWeather={(park: Park) => {
             console.log("Check weather for park:", park.name);
             setSelectedPark(null);
             onParkDetailClosed?.();

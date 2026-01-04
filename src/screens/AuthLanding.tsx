@@ -575,7 +575,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
                 setShowEmailAuth(true);
               }}
             >
-              <Text style={styles.primaryButtonText}>Create account</Text>
+              <Text style={styles.primaryButtonText}>Create Account</Text>
             </TouchableOpacity>
 
             {/* 2. Sign In - For existing users */}
@@ -586,7 +586,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
                 setShowEmailAuth(true);
               }}
             >
-              <Text style={styles.secondaryButtonText}>Sign in</Text>
+              <Text style={styles.secondaryButtonText}>Sign In</Text>
             </TouchableOpacity>
 
             {/* 3. Sign in with Apple - Apple Standard Style */}

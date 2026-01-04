@@ -29,6 +29,13 @@ import { useUserStatus } from "../utils/authHelper";
 import { useIsModerator, useIsAdministrator } from "../state/userStore";
 import { HERO_IMAGES } from "../constants/images";
 import AccountRequiredModal from "../components/AccountRequiredModal";
+import MyCampsiteWelcomeModal from "../components/MyCampsiteWelcomeModal";
+import { hasSeenMyCampsiteWelcome, setMyCampsiteWelcomeSeen } from "../services/userFlagsService";
+import { 
+  trackMyCampsiteWelcomeShown, 
+  trackMyCampsiteWelcomeCtaTapped, 
+  trackMyCampsiteWelcomeDismissed 
+} from "../services/analyticsService";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -37,6 +44,7 @@ import {
   CARD_BACKGROUND_LIGHT,
   TEXT_PRIMARY_STRONG,
   TEXT_SECONDARY,
+  TEXT_MUTED,
   BORDER_SOFT,
   RUST,
 } from "../constants/colors";
@@ -124,6 +132,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
   const [connectContributions, setConnectContributions] = useState<ConnectContribution[]>([]);
   const [connectLoading, setConnectLoading] = useState(true);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const insets = useSafeAreaInsets();
 
   const loadProfile = useCallback(async (userId: string) => {
@@ -376,6 +385,19 @@ export default function MyCampsiteScreen({ navigation }: any) {
       
       // Only load favorites and saved places for the current user's own profile
       if (!isViewingOtherUser) {
+        // Check if we should show the welcome modal for brand new accounts
+        // Only for logged-in users (not guests) viewing their own profile
+        const checkWelcomeModal = async () => {
+          if (!isGuest && targetUserId) {
+            const hasSeen = await hasSeenMyCampsiteWelcome();
+            if (!hasSeen) {
+              setShowWelcomeModal(true);
+              trackMyCampsiteWelcomeShown();
+            }
+          }
+        };
+        checkWelcomeModal();
+
         // Listen to favorite parks
         setFavoritesLoading(true);
         const unsubscribeFavorites = listenToFavoriteParks(targetUserId, (favorites) => {
@@ -401,7 +423,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
         setFavoriteParks([]);
         setSavedPlaces([]);
       }
-    }, [navigation, loadProfile, loadUserPhotos, loadConnectContributions, viewingUserId, isViewingOtherUser])
+    }, [navigation, loadProfile, loadUserPhotos, loadConnectContributions, viewingUserId, isViewingOtherUser, isGuest])
   );
 
   const createDefaultProfile = async (userId: string) => {
@@ -564,20 +586,18 @@ export default function MyCampsiteScreen({ navigation }: any) {
   };
 
   const getMembershipLabel = (tier: MembershipTier): string => {
-    // Check admin/moderator status first (from hooks)
-    if (isAdministrator || tier === "isAdmin") return "Admin";
-    if (isModerator || tier === "isModerator") return "Moderator";
+    // Use the profile's membershipTier to determine badge (not the viewer's status)
+    // Only profiles with isAdmin in Firebase show "Admin"
+    if (tier === "isAdmin") return "Admin";
+    if (tier === "isModerator") return "Moderator";
     switch (tier) {
       case "subscribed":
-        return "Pro Member";
       case "weekendCamper":
-        return "Weekend Camper";
       case "trailLeader":
-        return "Trail Leader";
       case "backcountryGuide":
-        return "Backcountry Guide";
+        return "Pro Account";
       default:
-        return "Free Member";
+        return "Free Account";
     }
   };
 
@@ -626,27 +646,24 @@ export default function MyCampsiteScreen({ navigation }: any) {
       state: null,
       address: place.address || null,
       lat: place.lat || null,
-      lng: place.lng || null,
+      lng: place.lon || null,
     };
 
     navigation.navigate("CreateTrip", { prefillLocation });
   };
 
   const getMembershipBadgeColor = (tier: MembershipTier): string => {
-    // Check admin/moderator status first (from hooks)
-    if (isAdministrator || tier === "isAdmin") return "#dc2626"; // Red for admin
-    if (isModerator || tier === "isModerator") return "#2563eb"; // Blue for moderator
+    // Use the profile's membershipTier to determine badge color (not the viewer's status)
+    if (tier === "isAdmin") return "#dc2626"; // Red for admin
+    if (tier === "isModerator") return "#2563eb"; // Blue for moderator
     switch (tier) {
       case "subscribed":
-        return GRANITE_GOLD;
       case "weekendCamper":
-        return GRANITE_GOLD;
       case "trailLeader":
-        return "#2563eb";
       case "backcountryGuide":
-        return "#7c3aed";
+        return GRANITE_GOLD; // Gold for all Pro tiers
       default:
-        return EARTH_GREEN;
+        return EARTH_GREEN; // Green for free accounts
     }
   };
 
@@ -1214,7 +1231,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
                 <Ionicons name="compass-outline" size={18} color={EARTH_GREEN} />
                 <View className="ml-2">
                   <Text
-                    style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: EARTH_GREEN }}
+                    style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: EARTH_GREEN }}
                   >
                     Favorite Camping Style
                   </Text>
@@ -1235,7 +1252,7 @@ export default function MyCampsiteScreen({ navigation }: any) {
                   <Ionicons name="bag-handle-outline" size={18} color={EARTH_GREEN} style={{ marginTop: 2 }} />
                   <Text
                     className="ml-2"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: EARTH_GREEN }}
+                    style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 15, color: EARTH_GREEN }}
                   >
                     Favorite Gear
                   </Text>
@@ -1465,8 +1482,8 @@ export default function MyCampsiteScreen({ navigation }: any) {
         </View>
         )}
 
-        {/* Favorite Parks Section - only visible if profile content is public or viewing own profile */}
-        {isProfileContentVisible && (
+        {/* Favorite Parks Section - only visible when viewing own profile (never public) */}
+        {!shouldHidePrivateContent && (
         <View className="mb-6 px-5">
           <Text
             className="text-lg mb-3"
@@ -1615,8 +1632,8 @@ export default function MyCampsiteScreen({ navigation }: any) {
         </View>
         )}
 
-        {/* Parks I've Added Section - only visible if profile content is public or viewing own profile */}
-        {isProfileContentVisible && (
+        {/* Parks I've Added Section - only visible when viewing own profile (never public) */}
+        {!shouldHidePrivateContent && (
         <View className="mb-6 px-5">
           <Text
             className="text-lg mb-3"
@@ -1959,6 +1976,24 @@ export default function MyCampsiteScreen({ navigation }: any) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Welcome Modal for brand new accounts */}
+      <MyCampsiteWelcomeModal
+        visible={showWelcomeModal}
+        onSetupProfile={async () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowWelcomeModal(false);
+          await setMyCampsiteWelcomeSeen();
+          trackMyCampsiteWelcomeCtaTapped();
+          navigation.navigate("EditProfile");
+        }}
+        onNotNow={async () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowWelcomeModal(false);
+          await setMyCampsiteWelcomeSeen();
+          trackMyCampsiteWelcomeDismissed();
+        }}
+      />
     </View>
   );
 }

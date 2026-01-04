@@ -10,7 +10,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { useFocusEffect } from "@react-navigation/native";
 
-import { usePlanTabStore } from "../state/planTabStore";
+import { usePlanTabStore, PlanTab } from "../state/planTabStore";
 
 import AccountButtonHeader from "../components/AccountButtonHeader";
 
@@ -42,13 +42,13 @@ const getHeroImage = (routeName: string) => {
 const getHeroContent = (routeName: string) => {
   switch (routeName) {
     case "Plan":
-      return { title: "Plan your trip", description: "Organize trips, explore parks, and prepare for adventure" };
+      return { title: "Plan Your Trip", description: "Organize everything here—destination, packing, meals, and weather—all in one place." };
     case "Parks":
-      return { title: "Find a park", description: "Search thousands of National Park, National Forest, and State Park campgrounds across all US states & territories." };
+      return { title: "Find a Park", description: "Search thousands of National Park, National Forest, and State Park campgrounds across all US states & territories." };
     case "Weather":
       return { title: "Weather", description: "Check conditions for your camping destination" };
     default:
-      return { title: "Plan your trip", description: "Organize trips, explore parks, and prepare for adventure" };
+      return { title: "Plan Your Trip", description: "Organize everything here—destination, packing, meals, and weather—all in one place." };
   }
 };
 
@@ -140,7 +140,7 @@ export default function PlanTopTabsNavigator() {
     weather: "Weather",
   };
 
-  const routeToTabKey: Record<string, string> = {
+  const routeToTabKey: Record<string, PlanTab> = {
     Plan: "trips",
     Parks: "parks",
     Weather: "weather",

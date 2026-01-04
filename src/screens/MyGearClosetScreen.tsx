@@ -139,15 +139,27 @@ export default function MyGearClosetScreen() {
 
   const getCategoryColor = (category: GearCategory): string => {
     const colors: Record<GearCategory, string> = {
+      camp_comfort: "#10B981",
+      campFurniture: "#059669",
+      clothing: "#7C3AED",
+      documents_essentials: "#8B5CF6",
+      electronics: "#6366F1",
+      entertainment: "#F59E0B",
+      food: "#D97706",
+      hygiene: "#EC4899",
+      kitchen: "#D97706",
+      lighting: "#F59E0B",
+      meal_prep: "#EA580C",
+      optional_extras: "#78716C",
+      pet_supplies: "#84CC16",
+      safety: "#EF4444",
+      seating: "#14B8A6",
       shelter: "#8B4513",
       sleep: "#4A5568",
-      kitchen: "#D97706",
-      clothing: "#7C3AED",
-      bags: "#059669",
-      lighting: "#F59E0B",
-      misc: "#6B7280",
+      tools: "#6B7280",
+      water: "#3B82F6",
     };
-    return colors[category];
+    return colors[category] || "#6B7280";
   };
 
   const getCategoryLabel = (category: GearCategory): string => {
@@ -158,7 +170,7 @@ export default function MyGearClosetScreen() {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
         <ModalHeader
-          title="My gear closet"
+          title="My Gear Closet"
           showTitle
           rightAction={{
             icon: "add",
@@ -178,7 +190,7 @@ export default function MyGearClosetScreen() {
   if (error && !auth.currentUser) {
     return (
       <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-        <ModalHeader title="My gear closet" showTitle />
+        <ModalHeader title="My Gear Closet" showTitle />
         <View className="flex-1 items-center justify-center px-5">
           <Ionicons name="briefcase-outline" size={64} color={EARTH_GREEN} />
           <Text
@@ -199,7 +211,7 @@ export default function MyGearClosetScreen() {
             style={{ backgroundColor: DEEP_FOREST }}
           >
             <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
-              Log in / Create account
+              Log In / Create Account
             </Text>
           </Pressable>
         </View>
@@ -210,7 +222,7 @@ export default function MyGearClosetScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
       <ModalHeader
-        title="My gear closet"
+        title="My Gear Closet"
         showTitle
         rightAction={{
           icon: "add",
@@ -293,13 +305,15 @@ export default function MyGearClosetScreen() {
               className="mt-4 text-center text-lg"
               style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
             >
-              Your gear closet is empty
+              {gear.length === 0 ? "Your gear closet is empty" : "This category is empty"}
             </Text>
             <Text
               className="mt-2 text-center"
               style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}
             >
-              Add the gear you own so you can pack and plan faster next time.
+              {gear.length === 0 
+                ? "Add the gear you own so you can pack and plan faster next time."
+                : "Add gear to this category or browse your other items."}
             </Text>
             <Pressable
               onPress={handleAddGear}
@@ -307,7 +321,7 @@ export default function MyGearClosetScreen() {
               style={{ backgroundColor: DEEP_FOREST }}
             >
               <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
-                Add your first item
+                {gear.length === 0 ? "Add your first item" : "Add gear"}
               </Text>
             </Pressable>
           </View>

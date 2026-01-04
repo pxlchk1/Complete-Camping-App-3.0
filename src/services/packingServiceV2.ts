@@ -250,20 +250,25 @@ async function updatePackingListTotals(
 
 // Map gear categories to packing categories
 const GEAR_TO_PACKING_CATEGORY: Record<GearCategory, PackingCategory> = {
+  camp_comfort: "camp_comfort",
+  campFurniture: "camp_comfort",
+  clothing: "clothing",
+  documents_essentials: "documents_essentials",
+  electronics: "electronics",
+  entertainment: "optional_extras",
+  food: "food",
+  hygiene: "hygiene",
+  kitchen: "kitchen",
+  lighting: "lighting",
+  meal_prep: "kitchen",
+  optional_extras: "optional_extras",
+  pet_supplies: "optional_extras",
+  safety: "navigation_safety",
+  seating: "camp_comfort",
   shelter: "shelter",
   sleep: "sleep",
-  kitchen: "kitchen",
-  water: "water",
-  lighting: "lighting",
   tools: "tools_repairs",
-  safety: "navigation_safety",
-  clothing: "clothing",
-  camp_comfort: "camp_comfort",
-  electronics: "electronics",
-  hygiene: "hygiene",
-  documents_essentials: "documents_essentials",
-  optional_extras: "optional_extras",
-  seating: "camp_comfort",
+  water: "water",
 };
 
 /**

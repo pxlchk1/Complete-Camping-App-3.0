@@ -147,6 +147,8 @@ export interface PackingItemV2 {
   // Source tracking
   isFromGearCloset: boolean;
   gearClosetId?: string;
+  gearItemId?: string; // Reference to gear closet item
+  gearVariant?: GearVariant; // Variant of the gear item
   isFromTemplate: boolean;
   templateItemId?: string;
   // Gear group for smart selection

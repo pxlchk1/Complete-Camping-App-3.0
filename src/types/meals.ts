@@ -52,7 +52,14 @@ export interface MealIngredient {
 export interface MealSuggestion {
   id: string;
   name: string;
+  /** @deprecated Use mealTypes instead. Kept for backward compat. */
   mealType: "breakfast" | "lunch" | "dinner" | "snacks";
+  /** 
+   * Array of meal types this recipe is suitable for.
+   * Most recipes have 1, some can have 2 (e.g., "Breakfast Burritos" = breakfast + lunch).
+   * Required for new recipes. Legacy recipes will have this inferred.
+   */
+  mealTypes?: ("breakfast" | "lunch" | "dinner" | "snacks")[];
   description?: string;
   complexity: MealComplexity;
   cookingMethods: CookingMethod[];

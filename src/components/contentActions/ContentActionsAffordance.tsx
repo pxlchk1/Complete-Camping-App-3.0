@@ -114,7 +114,7 @@ export function ContentActionsAffordance({
 
   const confirmRemove = useCallback(() => {
     const copy = {
-      title: confirmCopy?.removeTitle || "Remove this?",
+      title: confirmCopy?.removeTitle || "Remove This?",
       body: confirmCopy?.removeBody || "This removes it for everyone. This can't be undone.",
       confirm: confirmCopy?.removeConfirm || "Remove",
     };

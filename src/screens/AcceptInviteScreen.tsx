@@ -297,7 +297,7 @@ export default function AcceptInviteScreen() {
             className="text-center"
             style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_SECONDARY }}
           >
-            Not now
+            Not Now
           </Text>
         </Pressable>
       </View>

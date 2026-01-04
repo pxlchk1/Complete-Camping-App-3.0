@@ -20,7 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
-import { MealCategory } from "../types/meal";
+import { SuggestibleMealCategory } from "../types/meal";
 import {
   MealSuggestion,
   getAutoFillSuggestions,
@@ -35,16 +35,16 @@ import {
   TEXT_SECONDARY,
 } from "../constants/colors";
 
-const MEAL_ORDER: MealCategory[] = ["breakfast", "lunch", "dinner", "snack"];
+const MEAL_ORDER: SuggestibleMealCategory[] = ["breakfast", "lunch", "dinner", "snack"];
 
-const CATEGORY_LABELS: Record<MealCategory, string> = {
+const CATEGORY_LABELS: Record<SuggestibleMealCategory, string> = {
   breakfast: "Breakfast",
   lunch: "Lunch",
   dinner: "Dinner",
   snack: "Snacks",
 };
 
-const CATEGORY_ICONS: Record<MealCategory, keyof typeof Ionicons.glyphMap> = {
+const CATEGORY_ICONS: Record<SuggestibleMealCategory, keyof typeof Ionicons.glyphMap> = {
   breakfast: "sunny",
   lunch: "restaurant",
   dinner: "moon",
@@ -58,8 +58,8 @@ interface AutoFillPreviewSheetProps {
   dayIndex: number;
   tripContext?: SuggestionContext;
   existingMealIds: string[];
-  onConfirm: (suggestions: Record<MealCategory, MealSuggestion | null>) => void;
-  onBrowseRecipes: (mealType: MealCategory) => void;
+  onConfirm: (suggestions: Record<SuggestibleMealCategory, MealSuggestion | null>) => void;
+  onBrowseRecipes: (mealType: SuggestibleMealCategory) => void;
 }
 
 export default function AutoFillPreviewSheet({
@@ -73,13 +73,13 @@ export default function AutoFillPreviewSheet({
   onBrowseRecipes,
 }: AutoFillPreviewSheetProps) {
   const [loading, setLoading] = useState(true);
-  const [suggestions, setSuggestions] = useState<Record<MealCategory, MealSuggestion | null>>({
+  const [suggestions, setSuggestions] = useState<Record<SuggestibleMealCategory, MealSuggestion | null>>({
     breakfast: null,
     lunch: null,
     dinner: null,
     snack: null,
   });
-  const [swappingCategory, setSwappingCategory] = useState<MealCategory | null>(null);
+  const [swappingCategory, setSwappingCategory] = useState<SuggestibleMealCategory | null>(null);
 
   // Load suggestions when sheet opens
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function AutoFillPreviewSheet({
     }
   };
 
-  const handleSwap = async (category: MealCategory) => {
+  const handleSwap = async (category: SuggestibleMealCategory) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSwappingCategory(category);
 
@@ -128,7 +128,7 @@ export default function AutoFillPreviewSheet({
     }
   };
 
-  const handleChooseRecipe = (category: MealCategory) => {
+  const handleChooseRecipe = (category: SuggestibleMealCategory) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onBrowseRecipes(category);
     // Parent should handle navigation and returning with selected recipe

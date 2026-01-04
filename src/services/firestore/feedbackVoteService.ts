@@ -62,13 +62,14 @@ export const feedbackVoteService = {
     
     await runTransaction(db, async (transaction) => {
       const postSnap = await transaction.get(postRef);
-      if (!postSnap.exists) throw new Error('Post not found');
+      if (!postSnap.exists()) throw new Error('Post not found');
       const voteSnap = await transaction.get(voteRef);
-      let karmaScore = postSnap.data().karmaScore || 0;
-      let downvotes = postSnap.data().downvotes || 0;
+      const postData = postSnap.data()!;
+      let karmaScore = postData.karmaScore || 0;
+      let downvotes = postData.downvotes || 0;
       let prevValue = 0;
-      if (voteSnap.exists) {
-        prevValue = voteSnap.data().value;
+      if (voteSnap.exists()) {
+        prevValue = voteSnap.data()?.value || 0;
       }
       // If same vote, remove
       if (prevValue === value) {

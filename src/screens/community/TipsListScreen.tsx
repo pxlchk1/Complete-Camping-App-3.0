@@ -297,7 +297,7 @@ export default function TipsListScreen() {
     <View className="flex-1 bg-parchment">
       {/* Action Bar */}
       <CommunitySectionHeader
-        title="Camping tips"
+        title="Camping Tips"
         onAddPress={handleCreateTip}
       />
 

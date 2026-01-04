@@ -88,7 +88,7 @@ export default function WeatherForecastSection({
           }}
           style={styles.viewMoreButton}
         >
-          <Text style={styles.viewMoreText}>View more</Text>
+          <Text style={styles.viewMoreText}>View More</Text>
           <Ionicons name="chevron-forward" size={16} color={EARTH_GREEN} />
         </Pressable>
       </View>
@@ -117,7 +117,7 @@ export default function WeatherForecastSection({
       {isEmpty ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>
-            No forecast data available. Tap "View more" to check the weather.
+            No forecast data available. Tap "View More" to check the weather.
           </Text>
         </View>
       ) : (

@@ -7,7 +7,7 @@ import { DEEP_FOREST, PARCHMENT, BORDER_SOFT, EARTH_GREEN } from "../constants/c
 interface ParksMapProps {
   parks: Park[];
   userLocation: { latitude: number; longitude: number } | null;
-  mode: "near" | "search";
+  mode: "near" | "search" | "state" | "distance";
   onParkPress?: (park: Park) => void;
 }
 

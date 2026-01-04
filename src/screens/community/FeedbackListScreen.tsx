@@ -325,7 +325,7 @@ export default function FeedbackListScreen() {
     <View className="flex-1 bg-parchment">
       {/* Action Bar */}
       <CommunitySectionHeader
-        title="App feedback"
+        title="App Feedback"
         onAddPress={handleCreatePost}
       />
 

@@ -3,6 +3,7 @@ import { View, Text, Pressable } from "react-native";
 
 export class PlanErrorBoundary extends React.Component<{
   children: React.ReactNode;
+  navigation?: any;
 }, { hasError: boolean; error: any }> {
   constructor(props: any) {
     super(props);

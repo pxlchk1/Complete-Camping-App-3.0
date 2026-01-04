@@ -286,7 +286,7 @@ export default function QuestionsListScreen() {
     return (
       <View className="flex-1 bg-parchment">
         <CommunitySectionHeader
-          title="Ask a camper"
+          title="Ask a Camper"
           onAddPress={handleAskQuestion}
         />
         <View className="flex-1 items-center justify-center px-5">
@@ -321,7 +321,7 @@ export default function QuestionsListScreen() {
     <View className="flex-1 bg-parchment">
       {/* Action Bar */}
       <CommunitySectionHeader
-        title="Ask a camper"
+        title="Ask a Camper"
         onAddPress={handleAskQuestion}
       />
 

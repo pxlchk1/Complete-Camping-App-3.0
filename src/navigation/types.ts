@@ -57,18 +57,23 @@ export type RootStackParamList = {
   ModuleDetail: { moduleId: string };
 
   // Plan section with trip context
-  PackingList: { tripId: string; intent?: "build" | "view" };
-  PackingListGenerate: { tripId: string };
   MealPlan: { tripId: string };
 
-  // New Packing List screens (local-first)
-  PackingListCreate: { tripId?: string; tripName?: string } | undefined;
+  // Packing List screens (local-first store-based)
+  PackingListCreate: { 
+    tripId?: string; 
+    tripName?: string;
+    tripStartDate?: string;
+    tripEndDate?: string;
+    tripCampingStyle?: string;
+    tripWinterCamping?: boolean;
+    tripPackingSeasonOverride?: "winter" | "spring" | "summer" | "fall";
+  } | undefined;
   PackingListEditor: { listId: string };
   MealPlanning: { tripId: string };
   ShoppingList: { tripId: string };
   AddMeal: { tripId: string; category?: "breakfast" | "lunch" | "dinner" | "snack" };
   MealLibrary: { tripId: string; category?: "breakfast" | "lunch" | "dinner" | "snack" };
-  AddPackingItem: { tripId: string; category?: string };
 
   // Community screens
   Community: { initialTab?: "tips" | "connect" | "images" | "feedback" | "gear" };
@@ -81,8 +86,9 @@ export type RootStackParamList = {
   // Gear Reviews
   GearReviewDetail: { reviewId: string };
   CreateGearReview: undefined;
+  EditGearReview: { reviewId: string };
   SubmitGearReview: undefined;
-  GearReviewsListScreen: undefined;
+  GearReviewsListScreen: { filterByTag?: string } | undefined;
 
   // Questions/Ask
   QuestionDetail: { questionId: string };
@@ -93,7 +99,7 @@ export type RootStackParamList = {
   QuestionsListScreen: undefined;
 
   // Photos/Stories
-  PhotoDetail: { storyId: string };
+  PhotoDetail: { storyId?: string; photoId?: string };
   UploadPhoto: undefined;
   PhotoComposer: { postType?: string };
   PhotosListScreen: undefined;

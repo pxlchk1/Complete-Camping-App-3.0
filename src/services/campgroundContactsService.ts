@@ -96,6 +96,7 @@ export async function createCampgroundContact(
     contactUserId: null,
     contactName: data.contactName,
     contactEmail: data.contactEmail || null,
+    contactPhone: data.contactPhone || null,
     contactNote: data.contactNote || null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -119,6 +120,7 @@ export async function updateCampgroundContact(
 
   if (data.contactName !== undefined) updateData.contactName = data.contactName;
   if (data.contactEmail !== undefined) updateData.contactEmail = data.contactEmail;
+  if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone;
   if (data.contactNote !== undefined) updateData.contactNote = data.contactNote;
 
   await updateDoc(contactRef, updateData);

@@ -1,7 +1,45 @@
 import React, { useState } from "react";
-import { Modal, View, Text, TextInput, Pressable, StyleSheet, Alert } from "react-native";
+import { Modal, View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { DEEP_FOREST, PARCHMENT } from "../constants/colors";
+
+/**
+ * Parses a pasted string that may contain descriptive text followed by a URL.
+ * Example: "Riverbed and Night Herron Trail https://alltrails.com/trail/us/ca/riverbed"
+ * Returns: { title: "Riverbed and Night Herron Trail", url: "https://alltrails.com/trail/us/ca/riverbed" }
+ * 
+ * If no URL is found, returns the original text as title with empty url.
+ * If only a URL is found (no prefix text), returns empty title with the url.
+ */
+function parseDescriptiveUrl(input: string): { title: string; url: string } {
+  const trimmed = input.trim();
+  
+  // Regex to match URLs starting with http:// or https://
+  const urlPattern = /(https?:\/\/[^\s]+)/i;
+  const match = trimmed.match(urlPattern);
+  
+  if (!match) {
+    // No URL found - check if it looks like a URL without protocol
+    const noProtocolPattern = /^(www\.|[a-z0-9-]+\.(com|org|net|io|co|app|us|uk|ca|au|gov|edu)[^\s]*)/i;
+    if (noProtocolPattern.test(trimmed)) {
+      // It's just a URL without protocol
+      return { title: "", url: trimmed };
+    }
+    // No URL at all, treat as title
+    return { title: trimmed, url: "" };
+  }
+  
+  const url = match[1];
+  const urlIndex = trimmed.indexOf(url);
+  
+  // Extract text before the URL as the title
+  const titlePart = trimmed.substring(0, urlIndex).trim();
+  
+  // Clean up common separators at the end of title (like " - ", " | ", etc.)
+  const cleanedTitle = titlePart.replace(/[\s\-–—|:]+$/, "").trim();
+  
+  return { title: cleanedTitle, url };
+}
 
 export type AddLinkModalProps = {
   visible: boolean;
@@ -21,6 +59,31 @@ export default function AddLinkModal({ visible, onSave, onClose }: AddLinkModalP
       setError("");
     }
   }, [visible]);
+
+  /**
+   * Handle URL input change - parse descriptive text if present.
+   * When user pastes "Riverbed Trail https://alltrails.com/...", 
+   * we extract the title and url separately.
+   */
+  function handleUrlChange(input: string) {
+    // Check if this looks like a paste with descriptive text + URL
+    const parsed = parseDescriptiveUrl(input);
+    
+    if (parsed.title && parsed.url) {
+      // Found both title and URL - populate both fields
+      // Only auto-fill title if it's currently empty (don't overwrite user edits)
+      if (!title.trim()) {
+        setTitle(parsed.title);
+      }
+      setUrl(parsed.url);
+    } else if (parsed.url) {
+      // Just a URL, no descriptive text
+      setUrl(parsed.url);
+    } else {
+      // No URL found, just set as-is (user might be typing)
+      setUrl(input);
+    }
+  }
 
   function validateAndSave() {
     if (title.trim().length < 2) {
@@ -71,8 +134,8 @@ export default function AddLinkModal({ visible, onSave, onClose }: AddLinkModalP
           <TextInput
             style={styles.input}
             value={url}
-            onChangeText={setUrl}
-            placeholder="Paste or type URL (e.g. alltrails.com/...)"
+            onChangeText={handleUrlChange}
+            placeholder="Paste link (e.g. Trail Name https://alltrails.com/...)"
             autoCapitalize="none"
             keyboardType="url"
           />

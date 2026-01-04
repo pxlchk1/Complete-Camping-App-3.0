@@ -635,7 +635,7 @@ export default function PhotosListScreen() {
   if (error) {
     return (
       <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
-        <CommunitySectionHeader title="Camping photos" onAddPress={handleUploadPhoto} />
+        <CommunitySectionHeader title="Camping Photos" onAddPress={handleUploadPhoto} />
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 20 }}>
           <Ionicons name="alert-circle-outline" size={48} color={EARTH_GREEN} />
           <Text style={{ marginTop: 12, fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
@@ -655,7 +655,7 @@ export default function PhotosListScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
       {/* Header */}
-      <CommunitySectionHeader title="Camping photos" onAddPress={handleUploadPhoto} />
+      <CommunitySectionHeader title="Camping Photos" onAddPress={handleUploadPhoto} />
 
       {/* Photo Grid */}
       <FlatList

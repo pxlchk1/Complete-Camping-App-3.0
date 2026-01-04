@@ -18,7 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
-import { TripType, Season, TRIP_TYPES, SEASONS } from "../types/packingV2";
+import { TripType, Season, TRIP_TYPES, SEASONS, TRIP_TYPE_LABELS, SEASON_LABELS } from "../types/packingV2";
 import { saveAsTemplate } from "../services/packingServiceV2";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -93,14 +93,14 @@ export default function SaveTemplateModal({
 
   // Handle save
   const handleSave = async () => {
-    if (!user?.id || !name.trim()) return;
+    if (!user?.uid || !name.trim()) return;
 
     setSaving(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
       await saveAsTemplate(
-        user.id,
+        user.uid,
         tripId,
         name.trim(),
         description.trim() || undefined,
@@ -118,27 +118,9 @@ export default function SaveTemplateModal({
 
   const canSave = name.trim().length > 0;
 
-  // Trip type labels
-  const tripTypeLabels: Record<TripType, string> = {
-    backpacking: "Backpacking",
-    "car-camping": "Car Camping",
-    "hammock-camping": "Hammock Camping",
-    "rv-camping": "RV/Glamping",
-    "dispersed-camping": "Dispersed",
-    "family-camping": "Family",
-    winter: "Winter",
-    bikepacking: "Bikepacking",
-    kayaking: "Kayaking",
-  };
-
-  // Season labels
-  const seasonLabels: Record<Season, string> = {
-    spring: "Spring",
-    summer: "Summer",
-    fall: "Fall",
-    winter: "Winter",
-    "3-season": "3-Season",
-  };
+  // Use imported labels from packingV2
+  const tripTypeLabels = TRIP_TYPE_LABELS;
+  const seasonLabels = SEASON_LABELS;
 
   return (
     <Modal

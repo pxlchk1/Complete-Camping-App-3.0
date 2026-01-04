@@ -115,7 +115,7 @@ export default function AdminUsersScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-      <ModalHeader title="Manage users" showTitle />
+      <ModalHeader title="Manage Users" showTitle />
 
       <ScrollView className="flex-1">
         <View className="px-5 pt-5 pb-8">

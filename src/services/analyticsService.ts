@@ -52,6 +52,11 @@ export const AnalyticsEvents = {
   ACCOUNT_REQUIRED_CTA_TAPPED: "account_required_cta_tapped",
   ACCOUNT_REQUIRED_DISMISSED: "account_required_dismissed",
   PRO_ATTEMPT_GATE: "pro_attempt_gate",
+  
+  // Welcome Modals
+  MY_CAMPSITE_WELCOME_SHOWN: "my_campsite_welcome_shown",
+  MY_CAMPSITE_WELCOME_PRIMARY_CTA_TAPPED: "my_campsite_welcome_primary_cta_tapped",
+  MY_CAMPSITE_WELCOME_DISMISSED: "my_campsite_welcome_dismissed",
 } as const;
 
 // ============================================
@@ -415,3 +420,10 @@ export const trackAccountRequiredDismissed = (triggerKey: string) =>
 export const trackProAttemptGate = (gateKey: string, attemptCount: number) => 
   analyticsService.trackEvent(AnalyticsEvents.PRO_ATTEMPT_GATE, { gate_key: gateKey, attempt_count: attemptCount });
 
+// Welcome modal tracking functions
+export const trackMyCampsiteWelcomeShown = () => 
+  analyticsService.trackEvent(AnalyticsEvents.MY_CAMPSITE_WELCOME_SHOWN);
+export const trackMyCampsiteWelcomeCtaTapped = () => 
+  analyticsService.trackEvent(AnalyticsEvents.MY_CAMPSITE_WELCOME_PRIMARY_CTA_TAPPED);
+export const trackMyCampsiteWelcomeDismissed = () => 
+  analyticsService.trackEvent(AnalyticsEvents.MY_CAMPSITE_WELCOME_DISMISSED);

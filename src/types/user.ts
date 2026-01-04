@@ -20,6 +20,10 @@ export interface User {
   membershipTier: MembershipTier;
   membershipExpiresAt?: string; // ISO string, undefined for lifetime or free
   isProfileContentPublic?: boolean; // Whether profile content (below header) is visible to others. Default true.
+  /** Whether user is subscribed to email newsletter */
+  emailSubscribed?: boolean;
+  /** Whether user has enabled push notifications */
+  notificationsEnabled?: boolean;
   isBanned: boolean;
   bannedAt?: string;
   bannedBy?: string; // Admin user ID

@@ -30,6 +30,7 @@ import {
   EARTH_GREEN,
   DEEP_FOREST,
   RUST,
+  RUST_ORANGE,
 } from "../constants/colors";
 import {
   getNotificationStatus,

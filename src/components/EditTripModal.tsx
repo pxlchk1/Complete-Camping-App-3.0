@@ -130,7 +130,7 @@ export default function EditTripModal({ visible, onClose, tripId }: EditTripModa
             }}
           >
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <Text style={{ fontFamily: "Raleway_700Bold", fontSize: 24, color: PARCHMENT, flex: 1, marginRight: 12 }}>Edit trip details</Text>
+              <Text style={{ fontFamily: "Raleway_700Bold", fontSize: 24, color: PARCHMENT, flex: 1, marginRight: 12 }}>Edit Trip Details</Text>
               <Pressable
                 onPress={onClose}
                 style={{

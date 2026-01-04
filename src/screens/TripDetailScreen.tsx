@@ -27,8 +27,7 @@ import {
   getTripParticipants,
 } from "../services/tripParticipantsService";
 import { getCampgroundContactById } from "../services/campgroundContactsService";
-import { Heading2, BodyText } from "../components/Typography";
-import Button from "../components/Button";
+import { BodyText } from "../components/Typography";
 import EditTripModal from "../components/EditTripModal";
 import DetailsCard, { DetailsLink } from "../components/DetailsCard";
 import EditNotesModal from "../components/EditNotesModal";
@@ -141,7 +140,7 @@ export default function TripDetailScreen() {
       state: dest.state || "",
       latitude: dest.lat || 0,
       longitude: dest.lng || 0,
-      url: "", // Not available from TripDestination, modal handles missing URL gracefully
+      url: dest.url || "", // Reservation URL from TripDestination
     };
   }, [trip?.tripDestination]);
 
@@ -220,7 +219,7 @@ export default function TripDetailScreen() {
   useEffect(() => {
     if (!trip) return;
     setDetailsNotes(trip.detailsNotes || "");
-    setDetailsLinks(trip.detailsLinks || []);
+    setDetailsLinks((trip.detailsLinks || []) as DetailsLink[]);
   }, [trip]);
 
   const handleOpenPacking = useCallback(async () => {
@@ -232,22 +231,24 @@ export default function TripDetailScreen() {
     
     if (!trip) return;
     
-    // First check if there's a local packing list for this trip (created via PackingListCreate)
+    // Check if there's a local packing list for this trip (created via PackingListCreate)
     if (localPackingLists.length > 0) {
       // Navigate to the local packing list editor
       navigation.navigate("PackingListEditor", { listId: localPackingLists[0].id });
       return;
     }
     
-    // Otherwise use Firestore-backed packing list
-    if (hasPackingList) {
-      // Has items in Firestore - go to view/manage existing packing list
-      navigation.navigate("PackingList", { tripId: trip.id, intent: "view" });
-    } else {
-      // No items - go to packing list with build intent to add items
-      navigation.navigate("PackingList", { tripId: trip.id, intent: "build" });
-    }
-  }, [navigation, trip, hasPackingList, localPackingLists]);
+    // No local list yet - navigate to create one with trip context for season detection
+    navigation.navigate("PackingListCreate", { 
+      tripId: trip.id, 
+      tripName: trip.name,
+      tripStartDate: trip.startDate,
+      tripEndDate: trip.endDate,
+      tripCampingStyle: trip.campingStyle,
+      tripWinterCamping: trip.winterCamping,
+      tripPackingSeasonOverride: trip.packingSeasonOverride,
+    });
+  }, [navigation, trip, localPackingLists]);
 
   const handleOpenMeals = useCallback(async () => {
     try {
@@ -492,19 +493,22 @@ export default function TripDetailScreen() {
   if (!trip || !startDate || !endDate) return null;
 
   return (
-    <SafeAreaView className="flex-1 bg-parchment" edges={["top"]}>
-      {/* Header */}
-      <View className="px-5 pt-4 pb-3 border-b" style={{ borderColor: "#e7e5e4" }}>
+    <SafeAreaView className="flex-1 bg-parchment" edges={["top"]} style={{ backgroundColor: DEEP_FOREST }}>
+      {/* Header - Deep Forest background extending to top of screen */}
+      <View className="px-5 pt-4 pb-4" style={{ backgroundColor: DEEP_FOREST }}>
         <View className="flex-row items-center justify-between mb-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            icon="arrow-back"
+          <Pressable
             onPress={() => navigation.goBack()}
-            className="mr-2"
+            className="flex-row items-center active:opacity-70"
           >
-            Back
-          </Button>
+            <Ionicons name="arrow-back" size={20} color={PARCHMENT} />
+            <Text
+              className="text-sm ml-1"
+              style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
+            >
+              Back
+            </Text>
+          </Pressable>
 
           <Pressable
             onPress={async () => {
@@ -521,22 +525,27 @@ export default function TripDetailScreen() {
               setShowEditTripModal(true);
             }}
             className="px-3 py-1.5 rounded-lg active:opacity-70 flex-row items-center"
-            style={{ backgroundColor: "#f0f9f4", gap: 6 }}
+            style={{ backgroundColor: "rgba(255,255,255,0.15)", gap: 6 }}
           >
-            <Ionicons name="create-outline" size={16} color={DEEP_FOREST} />
+            <Ionicons name="create-outline" size={16} color={PARCHMENT} />
             <Text
               className="text-sm"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST }}
+              style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}
             >
-              Edit trip
+              Edit Trip
             </Text>
           </Pressable>
         </View>
 
-        <Heading2>{trip.name}</Heading2>
+        <Text
+          className="text-xl"
+          style={{ fontFamily: "Raleway_600SemiBold", color: PARCHMENT }}
+        >
+          {trip.name}
+        </Text>
       </View>
 
-      <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 px-5 bg-parchment" showsVerticalScrollIndicator={false}>
         {/* Trip Overview */}
         <View className="py-6">
           {/* Dates */}
@@ -967,8 +976,8 @@ export default function TripDetailScreen() {
           onClose={() => setShowAddItineraryModal(false)}
           onSave={async (data) => {
             // Import and use the service to add the link
-            const { addItineraryLink } = await import('../services/itineraryLinksService');
-            await addItineraryLink(tripId, data);
+            const { createItineraryLink } = await import('../services/itineraryLinksService');
+            await createItineraryLink(tripId, data);
           }}
           tripStartDate={trip.startDate}
           tripEndDate={trip.endDate}

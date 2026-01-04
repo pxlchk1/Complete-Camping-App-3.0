@@ -13,11 +13,13 @@ import {
   View,
   Text,
   ScrollView,
-  // Pressable,
+  Pressable,
   Alert,
   ActivityIndicator,
+  Image,
+  Linking,
 } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -50,12 +52,16 @@ type GearReview = {
   rating: number;
   pros?: string[];
   cons?: string[];
+  tags?: string[];
   upvoteCount: number;
   upvotes?: number;
   downvotes?: number;
   createdAt?: any;
   authorId?: string;
+  authorHandle?: string | null;
   displayName?: string | null;
+  photoUrls?: string[];
+  productUrl?: string | null;
 };
 
 type RouteParams = {
@@ -85,6 +91,11 @@ export default function GearReviewDetailScreen() {
     : null;
 
   // Content action handlers
+  const handleEditReview = () => {
+    if (!reviewId) return;
+    navigation.navigate("EditGearReview", { reviewId });
+  };
+
   const handleDeleteReview = async () => {
     if (!reviewId) return;
     Alert.alert(
@@ -162,16 +173,20 @@ export default function GearReviewDetailScreen() {
         brand: data.brand ?? "",
         category: data.category ?? "",
         summary: data.summary ?? "",
-        reviewText: data.reviewText ?? data.fullReview ?? "",
+        reviewText: data.reviewText ?? data.fullReview ?? data.body ?? "",
         rating: typeof data.rating === "number" ? data.rating : 0,
         pros: Array.isArray(data.pros) ? data.pros : [],
         cons: Array.isArray(data.cons) ? data.cons : [],
+        tags: Array.isArray(data.tags) ? data.tags : [],
         upvoteCount: typeof data.upvoteCount === "number" ? data.upvoteCount : 0,
         upvotes: data.upvotes || 0,
         downvotes: data.downvotes || 0,
         createdAt: data.createdAt,
         authorId: data.authorId,
+        authorHandle: data.authorHandle ?? null,
         displayName: data.displayName ?? data.authorName ?? null,
+        photoUrls: Array.isArray(data.photoUrls) ? data.photoUrls : [],
+        productUrl: data.productUrl ?? null,
       };
       setReview(normalized);
     } catch {
@@ -182,9 +197,12 @@ export default function GearReviewDetailScreen() {
     }
   }, [navigation, reviewId]);
 
-  useEffect(() => {
-    loadReview();
-  }, [loadReview]);
+  // Reload when screen comes into focus (e.g., returning from edit)
+  useFocusEffect(
+    useCallback(() => {
+      loadReview();
+    }, [loadReview])
+  );
 
   const requireAuthOrShowModal = () => {
     const uid = auth?.currentUser?.uid;
@@ -310,6 +328,7 @@ export default function GearReviewDetailScreen() {
             currentUserId={currentUser?.id}
             canModerate={canModerate}
             roleLabel={roleLabel}
+            onRequestEdit={handleEditReview}
             onRequestDelete={handleDeleteReview}
             onRequestRemove={handleRemoveReview}
             layout="cardHeader"
@@ -381,6 +400,65 @@ export default function GearReviewDetailScreen() {
           </View>
         )}
 
+        {/* Photos */}
+        {review.photoUrls && review.photoUrls.length > 0 && (
+          <View className="mb-4">
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10 }}
+            >
+              {review.photoUrls.map((url, index) => (
+                <Image
+                  key={index}
+                  source={{ uri: url }}
+                  style={{
+                    width: 200,
+                    height: 150,
+                    borderRadius: 12,
+                    backgroundColor: "#E5E7EB",
+                  }}
+                  resizeMode="cover"
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Product Link */}
+        {!!review.productUrl && (
+          <Pressable
+            onPress={() => {
+              if (review.productUrl) {
+                // Normalize URL: add https:// if no scheme is present
+                let urlToOpen = review.productUrl.trim();
+                if (urlToOpen && !urlToOpen.match(/^https?:\/\//i)) {
+                  urlToOpen = `https://${urlToOpen}`;
+                }
+                Linking.openURL(urlToOpen).catch((err) => {
+                  console.error("[GearReviewDetail] Failed to open URL:", urlToOpen, err);
+                  Alert.alert("Error", "Could not open link. Please check the URL is valid.");
+                });
+              }
+            }}
+            className="mb-4 flex-row items-center p-3 rounded-xl"
+            style={{ backgroundColor: "#EFF6FF" }}
+          >
+            <Ionicons name="link-outline" size={18} color="#2563EB" />
+            <Text
+              className="ml-2 flex-1"
+              style={{
+                fontFamily: "SourceSans3_600SemiBold",
+                color: "#2563EB",
+              }}
+              numberOfLines={1}
+            >
+              View Product
+            </Text>
+            <Ionicons name="open-outline" size={16} color="#2563EB" />
+          </Pressable>
+        )}
+
         {/* Pros / Cons */}
         {(review.pros?.length || review.cons?.length) ? (
           <View className="mb-4">
@@ -395,7 +473,7 @@ export default function GearReviewDetailScreen() {
                 >
                   Pros
                 </Text>
-                {review.pros!.map((p, idx) => (
+                {(review.pros ?? []).map((p, idx) => (
                   <View key={`pro_${idx}`} className="flex-row mb-1">
                     <Text style={{ color: TEXT_PRIMARY_STRONG }}>• </Text>
                     <Text
@@ -424,7 +502,7 @@ export default function GearReviewDetailScreen() {
                 >
                   Cons
                 </Text>
-                {review.cons!.map((c, idx) => (
+                {(review.cons ?? []).map((c, idx) => (
                   <View key={`con_${idx}`} className="flex-row mb-1">
                     <Text style={{ color: TEXT_PRIMARY_STRONG }}>• </Text>
                     <Text
@@ -459,17 +537,52 @@ export default function GearReviewDetailScreen() {
           </View>
         )}
 
+        {/* Tags - tappable capsules at the bottom */}
+        {review.tags && review.tags.length > 0 && (
+          <View className="mb-4">
+            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+              {review.tags.map((tag) => (
+                <Pressable
+                  key={tag}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    navigation.navigate("GearReviewsListScreen", { filterByTag: tag });
+                  }}
+                  className="px-3 py-1.5 rounded-full"
+                  style={{ backgroundColor: "#F3F4F6" }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      fontSize: 13,
+                      color: "#6B7280",
+                    }}
+                  >
+                    {tag}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Author and Vote row */}
         <View className="flex-row items-center justify-between py-3 border-t" style={{ borderColor: BORDER_SOFT, marginBottom: 24 }}>
-          {review.authorId ? (
+          {review.authorId && review.authorHandle ? (
             <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: review.authorId })}>
               <Text className="text-sm" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
-                by {review.displayName || "Anonymous"}
+                @{review.authorHandle}
+              </Text>
+            </Pressable>
+          ) : review.authorId ? (
+            <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: review.authorId })}>
+              <Text className="text-sm" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
+                {review.displayName || "View Profile"}
               </Text>
             </Pressable>
           ) : (
             <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-              by {review.displayName || "Anonymous"}
+              Anonymous
             </Text>
           )}
           <VotePill

@@ -299,7 +299,7 @@ export default function AcceptInvitationScreen() {
           className="py-3 items-center active:opacity-70"
         >
           <Text style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
-            Not now
+            Not Now
           </Text>
         </Pressable>
       </View>

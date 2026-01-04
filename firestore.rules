@@ -127,37 +127,76 @@ service cloud.firestore {
     }
 
     // Trips collection
+    // Members (recipients) have READ-ONLY access - only owner can edit
     match /trips/{tripId} {
+      // Helper function to check if user is the trip owner
+      function isTripOwner() {
+        return isSignedIn() && request.auth.uid == resource.data.userId;
+      }
+      
+      // Helper function to check if user is the trip owner (for subcollections)
+      function isTripOwnerForSubcollection() {
+        return isSignedIn() && get(/databases/$(database)/documents/trips/$(tripId)).data.userId == request.auth.uid;
+      }
+      
+      // Helper function to check if user is a trip member (read-only recipient)
+      function isTripMember() {
+        return isSignedIn() && request.auth.uid in resource.data.memberIds;
+      }
+      
+      // Helper function to check if user can read trip (owner OR member)
+      function canReadTrip() {
+        return isTripOwner() || isTripMember();
+      }
+      
       // Owner or trip member can read
       allow read: if isSignedIn() && (
         request.auth.uid == resource.data.userId ||
         request.auth.uid in resource.data.memberIds
       );
       allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
-      // Only owner can update or delete
+      // Only owner can update or delete - members are READ-ONLY
       allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
 
-      // Participants subcollection - trip owner can manage
+      // Participants subcollection - only trip owner can manage
       match /participants/{participantId} {
-        allow read: if isSignedIn();
-        allow create, update, delete: if isSignedIn() && 
-          get(/databases/$(database)/documents/trips/$(tripId)).data.userId == request.auth.uid;
+        // Owner and members can read participants
+        allow read: if isSignedIn() && (
+          isTripOwnerForSubcollection() ||
+          request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberIds
+        );
+        // Only owner can manage participants
+        allow create, update, delete: if isTripOwnerForSubcollection();
       }
 
-      // Packing list subcollection - trip owner or members can manage
+      // Packing list subcollection - members can READ, only owner can WRITE
       match /packingList/{itemId} {
-        allow read, write: if isSignedIn() && (
-          get(/databases/$(database)/documents/trips/$(tripId)).data.userId == request.auth.uid ||
+        allow read: if isSignedIn() && (
+          isTripOwnerForSubcollection() ||
           request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberIds
         );
+        // Only owner can write - members are READ-ONLY
+        allow write: if isTripOwnerForSubcollection();
       }
 
-      // Meals subcollection - trip owner or members can manage
+      // Meals subcollection - members can READ, only owner can WRITE
       match /meals/{mealId} {
-        allow read, write: if isSignedIn() && (
-          get(/databases/$(database)/documents/trips/$(tripId)).data.userId == request.auth.uid ||
+        allow read: if isSignedIn() && (
+          isTripOwnerForSubcollection() ||
           request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberIds
         );
+        // Only owner can write - members are READ-ONLY
+        allow write: if isTripOwnerForSubcollection();
+      }
+
+      // Itinerary Links subcollection - members can READ, only owner can WRITE
+      match /itineraryLinks/{linkId} {
+        allow read: if isSignedIn() && (
+          isTripOwnerForSubcollection() ||
+          request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberIds
+        );
+        // Only owner can write - members are READ-ONLY
+        allow write: if isTripOwnerForSubcollection();
       }
     }
 
@@ -418,6 +457,13 @@ service cloud.firestore {
     match /emailSubscribers/{userId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
       allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // User Email Index (for account lookup by email)
+    match /userEmailIndex/{emailId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
     }
 
     // Push Tokens
