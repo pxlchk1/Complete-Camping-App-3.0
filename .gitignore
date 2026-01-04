@@ -16,6 +16,7 @@ bun.lockb
 # Secrets - NEVER commit these
 serviceAccountKey.json
 GoogleService-Info.plist
+!ios/CompleteCampingApp/GoogleService-Info.plist
 google-services.json
 *.pem
 *.p12
