@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import * as Haptics from "expo-haptics";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { useLocationStore } from "../state/locationStore";
@@ -33,6 +33,8 @@ import {
   TEXT_SECONDARY,
   PARCHMENT,
 } from "../constants/colors";
+import { resolveTripWeatherLocation } from "../utils/weatherTripLocation";
+import { Trip } from "../types/camping";
 
 interface WeatherScreenProps {
   onTabChange?: (tab: "trips" | "parks" | "weather") => void;
@@ -104,6 +106,27 @@ export default function WeatherScreen({ onTabChange }: WeatherScreenProps = {}) 
   const [showAccountModal, setShowAccountModal] = useState(false);
 
   const { updateTrip } = useTripsStore();
+
+  // Find the trip associated with weatherPickerTripId (when navigated from TripDetailScreen)
+  const tripForWeather = useMemo(() => {
+    if (!weatherPickerTripId) return null;
+    return (trips as unknown as Trip[]).find((t) => t.id === weatherPickerTripId) ?? null;
+  }, [trips, weatherPickerTripId]);
+
+  // Auto-inherit trip destination when screen gains focus (if navigated from a trip)
+  useFocusEffect(
+    useCallback(() => {
+      if (!weatherPickerTripId || !tripForWeather) return;
+      const loc = resolveTripWeatherLocation(tripForWeather);
+      if (loc) {
+        setSelectedLocation({
+          name: loc.name,
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+        });
+      }
+    }, [weatherPickerTripId, tripForWeather, setSelectedLocation])
+  );
 
   // Prevent out-of-order weather responses from overwriting newer results.
   const requestIdRef = useRef(0);
