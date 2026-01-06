@@ -232,22 +232,16 @@ export default function TripDetailScreen() {
     
     if (!trip) return;
     
-    // First check if there's a local packing list for this trip (created via PackingListCreate)
-    if (localPackingLists.length > 0) {
-      // Navigate to the local packing list editor
-      navigation.navigate("PackingListEditor", { listId: localPackingLists[0].id });
-      return;
-    }
-    
-    // Otherwise use Firestore-backed packing list
-    if (hasPackingList) {
-      // Has items in Firestore - go to view/manage existing packing list
-      navigation.navigate("PackingList", { tripId: trip.id, intent: "view" });
+    // Trip packing flow:
+    // - If trip has a local packing list -> go to PackingListEditor with listId
+    // - Else -> go to PackingListCreate (category picker) with tripId
+    const listForTrip = localPackingLists?.[0] ?? null;
+    if (listForTrip?.id) {
+      navigation.navigate("PackingListEditor", { listId: listForTrip.id, tripId: trip.id });
     } else {
-      // No items - go to packing list with build intent to add items
-      navigation.navigate("PackingList", { tripId: trip.id, intent: "build" });
+      navigation.navigate("PackingListCreate", { tripId: trip.id, tripName: trip.name });
     }
-  }, [navigation, trip, hasPackingList, localPackingLists]);
+  }, [navigation, trip, localPackingLists]);
 
   const handleOpenMeals = useCallback(async () => {
     try {
