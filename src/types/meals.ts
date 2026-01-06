@@ -36,7 +36,8 @@ export type IngredientCategory =
   | "condiments"
   | "spices"
   | "snacks"
-  | "beverages";
+  | "beverages"
+  | "staples";
 
 // Individual ingredient with structured data
 export interface MealIngredient {
@@ -187,6 +188,7 @@ export const CATEGORY_LABELS: Record<IngredientCategory, string> = {
   spices: "Spices & Seasonings",
   snacks: "Snacks",
   beverages: "Beverages",
+  staples: "Staples",
 };
 
 // Order for displaying categories in shopping list (store navigation order)
@@ -200,4 +202,5 @@ export const CATEGORY_ORDER: IngredientCategory[] = [
   "spices",
   "snacks",
   "beverages",
+  "staples",
 ];

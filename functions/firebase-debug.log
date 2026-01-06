@@ -1,0 +1,48 @@
+[debug] [2026-01-02T07:04:06.992Z] ----------------------------------------------------------------------
+[debug] [2026-01-02T07:04:06.995Z] Command:       /usr/local/Cellar/node@20/20.19.6/bin/node /usr/local/bin/firebase deploy --only functions:sendCampgroundInviteEmail
+[debug] [2026-01-02T07:04:06.996Z] CLI Version:   15.1.0
+[debug] [2026-01-02T07:04:06.996Z] Platform:      darwin
+[debug] [2026-01-02T07:04:06.996Z] Node Version:  v20.19.6
+[debug] [2026-01-02T07:04:06.996Z] Time:          Fri Jan 02 2026 01:04:06 GMT-0600 (Central Standard Time)
+[debug] [2026-01-02T07:04:06.996Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-01-02T07:04:08.717Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-01-02T07:04:08.718Z] > authorizing via signed-in user (alana@alanawaters.com)
+[debug] [2026-01-02T07:04:08.718Z] [iam] checking project tentandlanternapp for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2026-01-02T07:04:08.719Z] Checked if tokens are valid: false, expires at: 1767330682332
+[debug] [2026-01-02T07:04:08.719Z] Checked if tokens are valid: false, expires at: 1767330682332
+[debug] [2026-01-02T07:04:08.719Z] > refreshing access token with scopes: []
+[debug] [2026-01-02T07:04:08.721Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-01-02T07:04:08.721Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-01-02T07:04:08.915Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-01-02T07:04:08.915Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-01-02T07:04:08.965Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentandlanternapp:testIamPermissions [none]
+[debug] [2026-01-02T07:04:08.965Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentandlanternapp:testIamPermissions x-goog-quota-user=projects/tentandlanternapp
+[debug] [2026-01-02T07:04:08.965Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentandlanternapp:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-01-02T07:04:09.189Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentandlanternapp:testIamPermissions 200
+[debug] [2026-01-02T07:04:09.189Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/tentandlanternapp:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-01-02T07:04:09.190Z] Checked if tokens are valid: true, expires at: 1767341047915
+[debug] [2026-01-02T07:04:09.190Z] Checked if tokens are valid: true, expires at: 1767341047915
+[debug] [2026-01-02T07:04:09.190Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/tentandlanternapp/serviceAccounts/tentandlanternapp@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2026-01-02T07:04:09.190Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/tentandlanternapp/serviceAccounts/tentandlanternapp@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2026-01-02T07:04:09.369Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/tentandlanternapp/serviceAccounts/tentandlanternapp@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2026-01-02T07:04:09.369Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/tentandlanternapp/serviceAccounts/tentandlanternapp@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'tentandlanternapp'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run lint
+[info] Running command: npm --prefix "$RESOURCE_DIR" run build
+[info] ✔  functions: Finished running predeploy script. 
+[debug] [2026-01-02T07:04:14.214Z] Checked if tokens are valid: true, expires at: 1767341047915
+[debug] [2026-01-02T07:04:14.215Z] Checked if tokens are valid: true, expires at: 1767341047915
+[debug] [2026-01-02T07:04:14.215Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/tentandlanternapp [none]
+[debug] [2026-01-02T07:04:14.360Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/tentandlanternapp 200
+[debug] [2026-01-02T07:04:14.360Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/tentandlanternapp {"projectNumber":"566740556205","projectId":"tentandlanternapp","lifecycleState":"ACTIVE","name":"TentAndLanternApp","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-09-30T22:50:49.167588Z","parent":{"type":"organization","id":"262098607646"}}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2026-01-02T07:04:14.362Z] Checked if tokens are valid: true, expires at: 1767341047915
+[debug] [2026-01-02T07:04:14.362Z] Checked if tokens are valid: true, expires at: 1767341047915
+[debug] [2026-01-02T07:04:14.362Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/tentandlanternapp/adminSdkConfig [none]

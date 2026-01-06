@@ -56,7 +56,8 @@ const CATEGORY_ICONS: Record<IngredientCategory, keyof typeof Ionicons.glyphMap>
   condiments: "flask-outline",
   spices: "flame-outline",
   snacks: "fast-food-outline",
-  beverages: "water-outline",
+  beverages: "cafe-outline",
+  staples: "star-outline",
 };
 
 interface IngredientItem {
@@ -223,14 +224,71 @@ export default function ShoppingListScreen() {
     return groups;
   }, [ingredients]);
 
-  // Get suggested staples
+  // Get suggested staples (filter out ones already in the ingredients list)
   const suggestedStaples = useMemo(() => {
     if (!showStaples) return [];
-    return ShoppingListParser.getSuggestedStaples(tripDays, numCampers).map((item) => ({
+    const allStaples = ShoppingListParser.getSuggestedStaples(tripDays, numCampers).map((item) => ({
       ...item,
       mealNames: ["Essential"],
     }));
-  }, [tripDays, numCampers, showStaples]);
+    
+    // Filter out staples that are already in the shopping list
+    return allStaples.filter(
+      (staple) => !ingredients.some(
+        (ing) => ing.name.toLowerCase() === staple.item.toLowerCase()
+      )
+    );
+  }, [tripDays, numCampers, showStaples, ingredients]);
+
+  // Suggested beverages list
+  const SUGGESTED_BEVERAGES = [
+    { item: "Coffee / Tea", category: "beverages" },
+    { item: "Drinking Water", category: "beverages" },
+    { item: "Soda", category: "beverages" },
+    { item: "Juice", category: "beverages" },
+    { item: "Milk", category: "beverages" },
+    { item: "Adult Beverages", category: "beverages" },
+  ];
+
+  // Get suggested beverages (filter out ones already in the ingredients list)
+  const suggestedBeverages = useMemo(() => {
+    if (!showStaples) return [];
+    
+    // Filter out beverages that are already in the shopping list
+    return SUGGESTED_BEVERAGES.filter(
+      (bev) => !ingredients.some(
+        (ing) => ing.name.toLowerCase() === bev.item.toLowerCase()
+      )
+    );
+  }, [showStaples, ingredients]);
+
+  // Add a suggested beverage to the shopping list
+  const addBeverage = async (beverage: { item: string; category: string }) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Check if already in list
+    const exists = ingredients.some(
+      (ing) => ing.name.toLowerCase() === beverage.item.toLowerCase()
+    );
+    
+    if (exists) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+    
+    // Add to ingredients list under "beverages" category
+    setIngredients((prev) => [
+      ...prev,
+      {
+        name: beverage.item,
+        category: "beverages" as IngredientCategory,
+        mealNames: ["Beverages"],
+        checked: false,
+      },
+    ]);
+    
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
 
   // Handle export/share
   const handleExport = async () => {
@@ -265,6 +323,35 @@ export default function ShoppingListScreen() {
         i === index ? { ...item, checked: !item.checked } : item
       )
     );
+  };
+
+  // Add a suggested staple to the shopping list
+  const addStaple = async (staple: { item: string; category: string }) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    // Check if already in list
+    const exists = ingredients.some(
+      (ing) => ing.name.toLowerCase() === staple.item.toLowerCase()
+    );
+    
+    if (exists) {
+      // Already in list - just give feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+    
+    // Add to ingredients list under "staples" category
+    setIngredients((prev) => [
+      ...prev,
+      {
+        name: staple.item,
+        category: "staples" as IngredientCategory,
+        mealNames: ["Staples"],
+        checked: false,
+      },
+    ]);
+    
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const checkedCount = ingredients.filter((i) => i.checked).length;
@@ -536,6 +623,47 @@ export default function ShoppingListScreen() {
                 </View>
               ))}
 
+              {/* Suggested Beverages Section */}
+              {showStaples && suggestedBeverages.length > 0 && (
+                <View className="mb-4">
+                  <View className="flex-row items-center mb-2 px-1">
+                    <View 
+                      className="w-8 h-8 rounded-full items-center justify-center mr-2"
+                      style={{ backgroundColor: "#4A90A4" + "20" }}
+                    >
+                      <Ionicons name="cafe-outline" size={16} color="#4A90A4" />
+                    </View>
+                    <Text
+                      className="text-sm flex-1"
+                      style={{ fontFamily: "Raleway_700Bold", color: "#4A90A4" }}
+                    >
+                      Suggested Beverages
+                    </Text>
+                  </View>
+                  <Text
+                    className="text-xs mb-2 px-1"
+                    style={{ fontFamily: "SourceSans3_400Regular", color: EARTH_GREEN }}
+                  >
+                    Don&apos;t forget drinks for your trip!
+                  </Text>
+                  {suggestedBeverages.map((beverage) => (
+                    <Pressable
+                      key={beverage.item}
+                      onPress={() => addBeverage({ item: beverage.item, category: beverage.category })}
+                      className="flex-row items-center p-3 mb-2 rounded-xl border bg-sky-50/50 border-sky-200 active:opacity-70"
+                    >
+                      <Ionicons name="add-circle-outline" size={20} color="#4A90A4" />
+                      <Text
+                        className="ml-3 text-sm"
+                        style={{ fontFamily: "SourceSans3_600SemiBold", color: "#4A90A4" }}
+                      >
+                        {beverage.item}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
               {/* Suggested Staples Section */}
               {showStaples && suggestedStaples.length > 0 && (
                 <View className="mb-4">
@@ -560,9 +688,10 @@ export default function ShoppingListScreen() {
                     Common items for a {tripDays}-day trip with {numCampers} {numCampers === 1 ? "person" : "people"}
                   </Text>
                   {suggestedStaples.map((staple) => (
-                    <View
+                    <Pressable
                       key={staple.item}
-                      className="flex-row items-center p-3 mb-2 rounded-xl border bg-amber-50/50 border-amber-200"
+                      onPress={() => addStaple({ item: staple.item, category: staple.category })}
+                      className="flex-row items-center p-3 mb-2 rounded-xl border bg-amber-50/50 border-amber-200 active:opacity-70"
                     >
                       <Ionicons name="add-circle-outline" size={20} color="#8B7355" />
                       <Text
@@ -571,7 +700,7 @@ export default function ShoppingListScreen() {
                       >
                         {staple.item}
                       </Text>
-                    </View>
+                    </Pressable>
                   ))}
                 </View>
               )}
