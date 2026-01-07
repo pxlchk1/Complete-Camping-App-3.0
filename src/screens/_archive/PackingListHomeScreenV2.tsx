@@ -93,21 +93,16 @@ export default function PackingListHomeScreenV2() {
 
   // Load data
   const loadData = useCallback(async () => {
-    if (!user?.uid) {
-      // No user yet, but still exit loading state so UI renders
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+    if (!user?.id) return;
 
     try {
       // Load user templates
-      const templates = await getUserTemplates(user.uid);
+      const templates = await getUserTemplates(user.id);
       setUserTemplates(templates);
 
       // Load trip packing progress
       if (selectedTripId) {
-        const packingList = await getTripPackingList(user.uid, selectedTripId);
+        const packingList = await getTripPackingList(user.id, selectedTripId);
         if (packingList) {
           setTripProgress({
             packed: packingList.packedCount,
@@ -123,7 +118,7 @@ export default function PackingListHomeScreenV2() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.uid, selectedTripId]);
+  }, [user?.id, selectedTripId]);
 
   useEffect(() => {
     loadData();
@@ -135,18 +130,18 @@ export default function PackingListHomeScreenV2() {
     loadData();
   }, [loadData]);
 
-  // Navigate to packing list detail (V2)
+  // Navigate to packing list
   const goToPackingList = () => {
     if (!selectedTripId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    navigation.navigate("PackingListDetailV2", { tripId: selectedTripId });
+    navigation.navigate("PackingList", { tripId: selectedTripId });
   };
 
-  // Navigate to generate screen (V2)
+  // Navigate to generate screen
   const goToGenerate = () => {
     if (!selectedTripId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    navigation.navigate("PackingListGenerateV2", { tripId: selectedTripId });
+    navigation.navigate("PackingListGenerate", { tripId: selectedTripId });
   };
 
   // Format date

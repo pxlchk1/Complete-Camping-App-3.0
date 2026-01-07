@@ -57,7 +57,7 @@ import AddEditPackingItemModal from "../components/AddEditPackingItemModal";
 import GearClosetPickerModal from "../components/GearClosetPickerModal";
 import SaveTemplateModal from "../components/SaveTemplateModal";
 
-type PackingListDetailRouteProp = RouteProp<RootStackParamList, "PackingListDetailV2">;
+type PackingListDetailRouteProp = RouteProp<RootStackParamList, "PackingList">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 // ============================================================================
@@ -104,15 +104,10 @@ export default function PackingListDetailScreen() {
 
   // Load items
   const loadItems = useCallback(async () => {
-    if (!user?.uid) {
-      // No user yet, but still exit loading state so UI renders
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+    if (!user?.id) return;
 
     try {
-      const loadedItems = await getTripPackingItems(user.uid, tripId);
+      const loadedItems = await getTripPackingItems(user.id, tripId);
       setItems(loadedItems);
     } catch (error) {
       console.error("[PackingListDetail] Error loading items:", error);
@@ -120,7 +115,7 @@ export default function PackingListDetailScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.uid, tripId]);
+  }, [user?.id, tripId]);
 
   useEffect(() => {
     loadItems();
@@ -147,7 +142,7 @@ export default function PackingListDetailScreen() {
 
   // Toggle item packed
   const handleTogglePacked = async (item: PackingItemV2) => {
-    if (!user?.uid) return;
+    if (!user?.id) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -157,7 +152,7 @@ export default function PackingListDetailScreen() {
     );
 
     try {
-      await toggleItemPacked(user.uid, tripId, item.id, !item.isPacked);
+      await toggleItemPacked(user.id, tripId, item.id, !item.isPacked);
     } catch (error) {
       // Revert on error
       setItems((prev) =>
@@ -168,7 +163,7 @@ export default function PackingListDetailScreen() {
 
   // Delete item - REQUIRES PRO
   const handleDeleteItem = async (item: PackingItemV2) => {
-    if (!user?.uid) return;
+    if (!user?.id) return;
     
     // Pro gating for customization
     if (!checkProForCustomization()) return;
@@ -182,7 +177,7 @@ export default function PackingListDetailScreen() {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           setItems((prev) => prev.filter((i) => i.id !== item.id));
           try {
-            await deletePackingItem(user.uid, tripId, item.id);
+            await deletePackingItem(user.id, tripId, item.id);
           } catch (error) {
             loadItems(); // Reload on error
           }
@@ -220,10 +215,10 @@ export default function PackingListDetailScreen() {
         {
           text: "Reset",
           onPress: async () => {
-            if (!user?.uid) return;
+            if (!user?.id) return;
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             setItems((prev) => prev.map((i) => ({ ...i, isPacked: false })));
-            await resetPackingList(user.uid, tripId);
+            await resetPackingList(user.id, tripId);
           },
         },
       ]

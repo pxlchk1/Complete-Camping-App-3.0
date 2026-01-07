@@ -50,7 +50,7 @@ import {
   FOREST_BG,
 } from "../constants/colors";
 
-type PackingListGenerateRouteProp = RouteProp<RootStackParamList, "PackingListGenerateV2">;
+type PackingListGenerateRouteProp = RouteProp<RootStackParamList, "PackingListGenerate">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 // Trip type labels
@@ -119,15 +119,11 @@ export default function PackingListGenerateScreen() {
   // Load user templates and past trips
   useEffect(() => {
     async function loadData() {
-      if (!user?.uid) {
-        // No user yet, but still exit loading state so UI renders
-        setLoading(false);
-        return;
-      }
+      if (!user?.id) return;
       try {
         const [templates, pastTrips] = await Promise.all([
-          getUserTemplates(user.uid),
-          getTripsWithPackingLists(user.uid, tripId),
+          getUserTemplates(user.id),
+          getTripsWithPackingLists(user.id, tripId),
         ]);
         setUserTemplates(templates);
         setPastTripsWithLists(pastTrips);
@@ -138,7 +134,7 @@ export default function PackingListGenerateScreen() {
       }
     }
     loadData();
-  }, [user?.uid, tripId]);
+  }, [user?.id, tripId]);
 
   // Auto-select recommended template based on trip type and season
   useEffect(() => {
@@ -187,7 +183,7 @@ export default function PackingListGenerateScreen() {
 
   // Copy from previous trip
   const handleCopyFromTrip = async (sourceTripId: string) => {
-    if (!user?.uid) return;
+    if (!user?.id) return;
 
     const sourceTrip = trips.find((t) => t.id === sourceTripId);
     const tripName = sourceTrip?.name || "previous trip";
@@ -205,14 +201,14 @@ export default function PackingListGenerateScreen() {
 
             try {
               const { copiedCount, linkedCount } = await copyPackingListFromTrip(
-                user.uid,
+                user.id,
                 sourceTripId,
                 tripId
               );
 
               // Track analytics
               trackPackingListGenerated(tripId);
-              trackCoreAction(user.uid, "packing_list_generated");
+              trackCoreAction(user.id, "packing_list_generated");
 
               // Show success and navigate
               Alert.alert(
@@ -221,7 +217,7 @@ export default function PackingListGenerateScreen() {
                 [
                   {
                     text: "View List",
-                    onPress: () => navigation.replace("PackingListDetailV2", { tripId }),
+                    onPress: () => navigation.replace("PackingList", { tripId }),
                   },
                 ]
               );
@@ -239,14 +235,14 @@ export default function PackingListGenerateScreen() {
 
   // Generate list
   const handleGenerate = async () => {
-    if (!user?.uid || !selectedTemplate) return;
+    if (!user?.id || !selectedTemplate) return;
 
     setGenerating(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
       await generatePackingList(
-        user.uid,
+        user.id,
         tripId,
         selectedTemplate,
         {
@@ -260,10 +256,10 @@ export default function PackingListGenerateScreen() {
 
       // Track analytics and core action
       trackPackingListGenerated(tripId);
-      trackCoreAction(user.uid, "packing_list_generated");
+      trackCoreAction(user.id, "packing_list_generated");
 
-      // Navigate to the packing list (V2)
-      navigation.replace("PackingListDetailV2", { tripId });
+      // Navigate to the packing list
+      navigation.replace("PackingList", { tripId });
     } catch (error) {
       console.error("[PackingListGenerate] Error generating list:", error);
       Alert.alert("Error", "Failed to generate packing list. Please try again.");
