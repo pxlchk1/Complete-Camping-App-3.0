@@ -62,8 +62,13 @@ export type RootStackParamList = {
   MealPlan: { tripId: string };
 
   // New Packing List screens (local-first)
-  PackingListCreate: { tripId?: string; tripName?: string } | undefined;
-  PackingListEditor: { listId: string };
+  PackingListCreate: {
+    tripId?: string;
+    tripName?: string;
+    inheritedSeason?: "spring" | "summer" | "fall" | "winter";
+    inheritedTripType?: "one-night" | "weekend" | "multi-day" | "backpacking" | "car-camping" | "day-hike";
+  } | undefined;
+  PackingListEditor: { listId: string; tripId?: string };
   MealPlanning: { tripId: string };
   ShoppingList: { tripId: string };
   AddMeal: { tripId: string; category?: "breakfast" | "lunch" | "dinner" | "snack" };

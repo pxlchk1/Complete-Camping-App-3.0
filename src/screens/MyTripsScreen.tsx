@@ -17,6 +17,12 @@ import AccountRequiredModal from "../components/AccountRequiredModal";
 import { RootStackParamList } from "../navigation/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { DEEP_FOREST, EARTH_GREEN, GRANITE_GOLD, PARCHMENT, BORDER_SOFT } from "../constants/colors";
+import {
+  deriveSeasonFromDate,
+  mapCampingStyleToTripType,
+  calculateTripNights,
+  deriveTripTypeFromLength,
+} from "../utils/packingTripHelpers";
 import * as Haptics from "expo-haptics";
 import { format } from "date-fns";
 
@@ -157,9 +163,23 @@ export default function MyTripsScreen() {
       return;
     }
     
-    // Otherwise, navigate to Firestore-backed packing list with build intent
-    // (the PackingList screen will show existing items if any, or build mode if empty)
-    nav.navigate("PackingList", { tripId, intent: "build" });
+    // Otherwise, navigate to create a new packing list (template picker)
+    const trip = trips.find(t => t.id === tripId);
+    if (trip) {
+      const inheritedSeason = deriveSeasonFromDate(trip.startDate);
+      const styleBasedType = mapCampingStyleToTripType(trip.campingStyle);
+      const nights = calculateTripNights(trip.startDate, trip.endDate);
+      const inheritedTripType = styleBasedType ?? deriveTripTypeFromLength(nights);
+
+      nav.navigate("PackingListCreate", {
+        tripId,
+        tripName: trip.name,
+        inheritedSeason,
+        inheritedTripType,
+      });
+    } else {
+      nav.navigate("PackingListCreate", { tripId });
+    }
   };
 
   // Navigate to meals for a specific trip

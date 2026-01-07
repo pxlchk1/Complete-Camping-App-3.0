@@ -28,8 +28,6 @@ import {
 } from "../constants/colors";
 import {
   PACKING_TEMPLATES,
-  TRIP_TYPE_OPTIONS,
-  SEASON_OPTIONS,
 } from "../constants/packingTemplatesV2";
 import {
   usePackingStore,
@@ -47,14 +45,17 @@ export default function PackingListCreateScreen() {
   const route = useRoute<RouteProps>();
   const { createPackingList } = usePackingStore();
   
-  // Get tripId and tripName from route params (if navigating from a trip)
+  // Get params from route (if navigating from a trip)
   const tripId = route.params?.tripId;
   const tripName = route.params?.tripName;
+  const inheritedSeason = route.params?.inheritedSeason;
+  const inheritedTripType = route.params?.inheritedTripType;
 
   // Form state - pre-fill with trip name if available
   const [listName, setListName] = useState(tripName ? `${tripName} Packing List` : "");
-  const [tripType, setTripType] = useState<TripType>("weekend");
-  const [season, setSeason] = useState<Season>("summer");
+  // Use inherited values from trip, or fall back to defaults
+  const tripType: TripType = inheritedTripType ?? "weekend";
+  const season: Season = inheritedSeason ?? "summer";
   const [selectedTemplates, setSelectedTemplates] = useState<Set<PackingTemplateKey>>(
     new Set(["essential"])
   );
@@ -158,96 +159,6 @@ export default function PackingListCreateScreen() {
                 borderColor: BORDER_SOFT,
               }}
             />
-          </View>
-
-          {/* Trip Type */}
-          <View className="px-4 pt-5">
-            <Text
-              className="text-xs mb-3"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: EARTH_GREEN }}
-            >
-              TRIP TYPE
-            </Text>
-            <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-              {TRIP_TYPE_OPTIONS.map((option) => {
-                const isSelected = tripType === option.value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setTripType(option.value as TripType);
-                    }}
-                    className="flex-row items-center px-4 py-2 rounded-full border"
-                    style={{
-                      backgroundColor: isSelected ? DEEP_FOREST : "#FFFFFF",
-                      borderColor: isSelected ? DEEP_FOREST : BORDER_SOFT,
-                    }}
-                  >
-                    <Ionicons
-                      name={option.icon as any}
-                      size={16}
-                      color={isSelected ? PARCHMENT : DEEP_FOREST}
-                    />
-                    <Text
-                      className="ml-2"
-                      style={{
-                        fontFamily: "SourceSans3_600SemiBold",
-                        fontSize: 14,
-                        color: isSelected ? PARCHMENT : DEEP_FOREST,
-                      }}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Season */}
-          <View className="px-4 pt-5">
-            <Text
-              className="text-xs mb-3"
-              style={{ fontFamily: "SourceSans3_600SemiBold", color: EARTH_GREEN }}
-            >
-              SEASON
-            </Text>
-            <View className="flex-row" style={{ gap: 8 }}>
-              {SEASON_OPTIONS.map((option) => {
-                const isSelected = season === option.value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setSeason(option.value as Season);
-                    }}
-                    className="flex-1 items-center py-3 rounded-xl border"
-                    style={{
-                      backgroundColor: isSelected ? DEEP_FOREST : "#FFFFFF",
-                      borderColor: isSelected ? DEEP_FOREST : BORDER_SOFT,
-                    }}
-                  >
-                    <Ionicons
-                      name={option.icon as any}
-                      size={24}
-                      color={isSelected ? PARCHMENT : DEEP_FOREST}
-                    />
-                    <Text
-                      className="mt-1"
-                      style={{
-                        fontFamily: "SourceSans3_600SemiBold",
-                        fontSize: 13,
-                        color: isSelected ? PARCHMENT : DEEP_FOREST,
-                      }}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
           </View>
 
           {/* Templates */}

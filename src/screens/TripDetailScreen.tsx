@@ -58,6 +58,12 @@ import {
   PARCHMENT_BORDER,
   TEXT_SECONDARY,
 } from "../constants/colors";
+import {
+  deriveSeasonFromDate,
+  mapCampingStyleToTripType,
+  calculateTripNights,
+  deriveTripTypeFromLength,
+} from "../utils/packingTripHelpers";
 
 type TripDetailScreenRouteProp = RouteProp<RootStackParamList, "TripDetail">;
 type TripDetailScreenNavigationProp = NativeStackNavigationProp<
@@ -239,7 +245,18 @@ export default function TripDetailScreen() {
     if (listForTrip?.id) {
       navigation.navigate("PackingListEditor", { listId: listForTrip.id, tripId: trip.id });
     } else {
-      navigation.navigate("PackingListCreate", { tripId: trip.id, tripName: trip.name });
+      // Derive season and trip type from trip data
+      const inheritedSeason = deriveSeasonFromDate(trip.startDate);
+      const styleBasedType = mapCampingStyleToTripType(trip.campingStyle);
+      const nights = calculateTripNights(trip.startDate, trip.endDate);
+      const inheritedTripType = styleBasedType ?? deriveTripTypeFromLength(nights);
+
+      navigation.navigate("PackingListCreate", {
+        tripId: trip.id,
+        tripName: trip.name,
+        inheritedSeason,
+        inheritedTripType,
+      });
     }
   }, [navigation, trip, localPackingLists]);
 
