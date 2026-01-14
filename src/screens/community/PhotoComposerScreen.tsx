@@ -200,7 +200,7 @@ export default function PhotoComposerScreen() {
       return;
     }
 
-    // Check photo limit
+    // Check photo limit (bypasses automatically for PRO/admin)
     const limitCheck = await canUploadPhotoToday();
     if (!limitCheck.canUpload) {
       setError(limitCheck.message || "You've reached your daily photo limit.");

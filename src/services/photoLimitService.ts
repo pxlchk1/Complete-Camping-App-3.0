@@ -4,6 +4,7 @@
  * Manages daily photo upload limits for FREE users.
  * - FREE users: 1 photo per calendar day
  * - PRO users: Unlimited
+ * - ADMIN users: Unlimited (treated as full subscribers)
  * 
  * Uses America/Chicago timezone for consistent day boundaries.
  * Stores limit data in Firestore: /users/{userId}/dailyUsage/{YYYY-MM-DD}
@@ -12,9 +13,32 @@
 import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { useSubscriptionStore } from '../state/subscriptionStore';
+import { getUser, isAdmin } from './userService';
 
 // Daily limit for FREE users
 export const FREE_DAILY_PHOTO_LIMIT = 1;
+
+/**
+ * Check if current user has unlimited photo uploads (PRO or admin)
+ */
+async function hasUnlimitedUploads(): Promise<boolean> {
+  // Check subscription store first (PRO)
+  const isPro = useSubscriptionStore.getState().isPro;
+  if (isPro) return true;
+
+  // Check admin status from user profile
+  const user = auth.currentUser;
+  if (!user) return false;
+
+  try {
+    const profile = await getUser(user.uid);
+    if (profile && isAdmin(profile)) return true;
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+  }
+
+  return false;
+}
 
 /**
  * Get today's date string in YYYY-MM-DD format using America/Chicago timezone
@@ -44,6 +68,7 @@ interface DailyUsage {
 
 /**
  * Check if the current user can upload a photo today
+ * Automatically bypasses limits for PRO subscribers and admins
  * @returns { canUpload: boolean, remaining: number, isPro: boolean }
  */
 export async function canUploadPhotoToday(): Promise<{ 
@@ -57,9 +82,9 @@ export async function canUploadPhotoToday(): Promise<{
     return { canUpload: false, remaining: 0, isPro: false, message: 'Not logged in' };
   }
 
-  // Check if user is PRO - unlimited uploads
-  const isPro = useSubscriptionStore.getState().isPro;
-  if (isPro) {
+  // Check if user is PRO or admin - unlimited uploads
+  const unlimited = await hasUnlimitedUploads();
+  if (unlimited) {
     return { canUpload: true, remaining: -1, isPro: true }; // -1 indicates unlimited
   }
 
@@ -99,6 +124,7 @@ export async function canUploadPhotoToday(): Promise<{
 /**
  * Record a photo upload for the current user
  * Call this AFTER a successful photo upload
+ * No-op for PRO subscribers and admins (they have unlimited)
  */
 export async function recordPhotoUpload(): Promise<void> {
   const user = auth.currentUser;
@@ -106,8 +132,13 @@ export async function recordPhotoUpload(): Promise<void> {
     throw new Error('User must be logged in to record photo upload');
   }
 
-  // PRO users don't need to track (but we can for analytics)
-  const isPro = useSubscriptionStore.getState().isPro;
+  // PRO or admin users don't need to track limits
+  const unlimited = await hasUnlimitedUploads();
+  if (unlimited) {
+    return; // No-op for unlimited users
+  }
+
+  const isPro = false; // We know they're not unlimited at this point
   
   const today = getTodayDateString();
   const usageRef = getDailyUsageRef(user.uid, today);

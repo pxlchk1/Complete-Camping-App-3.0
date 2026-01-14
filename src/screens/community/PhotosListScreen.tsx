@@ -216,6 +216,7 @@ export default function PhotosListScreen() {
   const handleUploadPhoto = async () => {
     if (!requireAccount({ openAccountModal: () => setShowAccountModal(true) })) return;
 
+    // Check daily photo limit (bypasses automatically for PRO/admin)
     const limitCheck = await canUploadPhotoToday();
     if (!limitCheck.canUpload) {
       Alert.alert("Daily Limit Reached", limitCheck.message || "Try again tomorrow.", [

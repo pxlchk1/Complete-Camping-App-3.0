@@ -28,8 +28,6 @@ import AddCamperScreen from "../screens/AddCamperScreen";
 import EditCamperScreen from "../screens/EditCamperScreen";
 import AddPeopleToTripScreen from "../screens/AddPeopleToTripScreen";
 import AuthLanding from "../screens/AuthLanding";
-import PackingListScreen from "../screens/PackingListScreen";
-import PackingListGenerateScreenV2 from "../screens/PackingListGenerateScreenV2";
 import PackingListCreateScreen from "../screens/PackingListCreateScreen";
 import PackingListEditorScreen from "../screens/PackingListEditorScreen";
 import MealPlanningScreen from "../screens/MealPlanningScreen";
@@ -188,7 +186,6 @@ export default function RootNavigator() {
       )}
 
       {/* Trip Planning screens */}
-      <Stack.Screen name="PackingList" component={PackingListScreen} />
       <Stack.Screen name="MealPlanning" component={MealPlanningScreen} />
       <Stack.Screen name="ShoppingList" component={ShoppingListScreen} />
       <Stack.Screen name="MealPlan" component={MyCampsiteScreen} />
