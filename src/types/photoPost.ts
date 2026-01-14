@@ -8,48 +8,71 @@ import { Timestamp } from "firebase/firestore";
 // ==================== Post Types ====================
 
 export type PhotoPostType =
-  | "campsite-spotlight"
-  | "conditions-report"
-  | "setup-ideas"
-  | "gear-in-real-life"
-  | "camp-cooking"
-  | "wildlife-nature"
-  | "accessibility";
+  | "accessibility"
+  | "camp-setups"
+  | "campground-reviews"
+  | "campsites"
+  | "cooking"
+  | "gear"
+  | "pets"
+  | "tips-hacks"
+  | "trip-highlights"
+  | "vehicles"
+  | "wildlife-nature";
 
-// Map legacy tip-or-fix posts to setup-ideas for display
+// Map legacy post types for backwards compatibility
 export const mapLegacyPostType = (postType: string): PhotoPostType => {
-  if (postType === "tip-or-fix") return "setup-ideas";
-  return postType as PhotoPostType;
+  const legacyMap: Record<string, PhotoPostType> = {
+    "tip-or-fix": "tips-hacks",
+    "setup-ideas": "camp-setups",
+    "campsite-spotlight": "campsites",
+    "conditions-report": "trip-highlights",
+    "gear-in-real-life": "gear",
+    "camp-cooking": "cooking",
+  };
+  return legacyMap[postType] || (postType as PhotoPostType);
 };
 
 export const POST_TYPE_LABELS: Record<PhotoPostType, string> = {
-  "campsite-spotlight": "Campsite Spotlight",
-  "conditions-report": "Conditions Report",
-  "setup-ideas": "Setup Ideas",
-  "gear-in-real-life": "Gear in Real Life",
-  "camp-cooking": "Camp Cooking",
-  "wildlife-nature": "Wildlife & Nature",
   "accessibility": "Accessibility",
+  "camp-setups": "Camp Setups",
+  "campground-reviews": "Campground Reviews",
+  "campsites": "Campsites",
+  "cooking": "Cooking",
+  "gear": "Gear",
+  "pets": "Pets",
+  "tips-hacks": "Tips & Hacks",
+  "trip-highlights": "Trip Highlights",
+  "vehicles": "Vehicles",
+  "wildlife-nature": "Wildlife & Nature",
 };
 
 export const POST_TYPE_ICONS: Record<PhotoPostType, string> = {
-  "campsite-spotlight": "location",
-  "conditions-report": "cloudy-night",
-  "setup-ideas": "construct",
-  "gear-in-real-life": "backpack",
-  "camp-cooking": "flame",
-  "wildlife-nature": "leaf",
   "accessibility": "accessibility",
+  "camp-setups": "construct",
+  "campground-reviews": "star",
+  "campsites": "location",
+  "cooking": "flame",
+  "gear": "backpack",
+  "pets": "paw",
+  "tips-hacks": "bulb",
+  "trip-highlights": "sunny",
+  "vehicles": "car",
+  "wildlife-nature": "leaf",
 };
 
 export const POST_TYPE_COLORS: Record<PhotoPostType, string> = {
-  "campsite-spotlight": "#2563eb", // blue
-  "conditions-report": "#7c3aed", // violet
-  "setup-ideas": "#16a34a", // green
-  "gear-in-real-life": "#ea580c", // orange
-  "camp-cooking": "#dc2626", // red
-  "wildlife-nature": "#059669", // emerald
   "accessibility": "#0891b2", // cyan
+  "camp-setups": "#16a34a", // green
+  "campground-reviews": "#eab308", // yellow
+  "campsites": "#2563eb", // blue
+  "cooking": "#dc2626", // red
+  "gear": "#ea580c", // orange
+  "pets": "#ec4899", // pink
+  "tips-hacks": "#8b5cf6", // violet
+  "trip-highlights": "#f59e0b", // amber
+  "vehicles": "#6366f1", // indigo
+  "wildlife-nature": "#059669", // emerald
 };
 
 // ==================== Trip Styles ====================
@@ -115,36 +138,20 @@ export const DETAIL_TAG_LABELS: Record<DetailTag, string> = {
 };
 
 // ==================== Caption Placeholder Templates ====================
+// No helper text - users write their own captions
 
 export const CAPTION_TEMPLATES: Record<PhotoPostType, string> = {
-  "campsite-spotlight": `Campground:
-Campsite:
-Best for:
-Ground:
-Shade:
-Privacy:
-Notes:`,
-  "conditions-report": `Today it's:
-What surprised me:
-What I wish I packed:`,
-  "gear-in-real-life": `Gear:
-Worked great because:
-Didn't work because:
-One tip:`,
-  "setup-ideas": `What you're looking at:
-Why it works:
-What I'd do differently:`,
-  "camp-cooking": `What I made:
-Stove setup:
-Prep notes:
-Would I make it again:`,
-  "wildlife-nature": `What I spotted:
-Where:
-Tips for seeing this:`,
-  "accessibility": `Terrain:
-Path to site/bathroom:
-Pad situation:
-Notes for mobility needs:`,
+  "accessibility": "",
+  "camp-setups": "",
+  "campground-reviews": "",
+  "campsites": "",
+  "cooking": "",
+  "gear": "",
+  "pets": "",
+  "tips-hacks": "",
+  "trip-highlights": "",
+  "vehicles": "",
+  "wildlife-nature": "",
 };
 
 // ==================== Photo Post Document ====================
@@ -228,50 +235,97 @@ export interface QuickPostTile {
 // Primary 4 categories for the 2x2 grid on Photos page
 export const PRIMARY_PHOTO_TILES: QuickPostTile[] = [
   {
-    postType: "campsite-spotlight",
-    label: "Campsite Spotlight",
+    postType: "campsites",
+    label: "Campsites",
     icon: "location",
-    color: POST_TYPE_COLORS["campsite-spotlight"],
+    color: POST_TYPE_COLORS["campsites"],
   },
   {
-    postType: "conditions-report",
-    label: "Conditions Report",
-    icon: "cloudy-night",
-    color: POST_TYPE_COLORS["conditions-report"],
+    postType: "trip-highlights",
+    label: "Trip Highlights",
+    icon: "sunny",
+    color: POST_TYPE_COLORS["trip-highlights"],
   },
   {
-    postType: "setup-ideas",
-    label: "Setup Ideas",
+    postType: "camp-setups",
+    label: "Camp Setups",
     icon: "construct",
-    color: POST_TYPE_COLORS["setup-ideas"],
+    color: POST_TYPE_COLORS["camp-setups"],
   },
   {
-    postType: "gear-in-real-life",
-    label: "Gear in Real Life",
+    postType: "gear",
+    label: "Gear",
     icon: "backpack",
-    color: POST_TYPE_COLORS["gear-in-real-life"],
+    color: POST_TYPE_COLORS["gear"],
   },
 ];
 
-// All available post types for the composer (excludes tip-or-fix)
+// All available photo topics for the composer
 export const QUICK_POST_TILES: QuickPostTile[] = [
-  ...PRIMARY_PHOTO_TILES,
   {
-    postType: "camp-cooking",
-    label: "Camp Cooking",
+    postType: "accessibility",
+    label: "Accessibility",
+    icon: "accessibility",
+    color: POST_TYPE_COLORS["accessibility"],
+  },
+  {
+    postType: "camp-setups",
+    label: "Camp Setups",
+    icon: "construct",
+    color: POST_TYPE_COLORS["camp-setups"],
+  },
+  {
+    postType: "campground-reviews",
+    label: "Campground Reviews",
+    icon: "star",
+    color: POST_TYPE_COLORS["campground-reviews"],
+  },
+  {
+    postType: "campsites",
+    label: "Campsites",
+    icon: "location",
+    color: POST_TYPE_COLORS["campsites"],
+  },
+  {
+    postType: "cooking",
+    label: "Cooking",
     icon: "flame",
-    color: POST_TYPE_COLORS["camp-cooking"],
+    color: POST_TYPE_COLORS["cooking"],
+  },
+  {
+    postType: "gear",
+    label: "Gear",
+    icon: "backpack",
+    color: POST_TYPE_COLORS["gear"],
+  },
+  {
+    postType: "pets",
+    label: "Pets",
+    icon: "paw",
+    color: POST_TYPE_COLORS["pets"],
+  },
+  {
+    postType: "tips-hacks",
+    label: "Tips & Hacks",
+    icon: "bulb",
+    color: POST_TYPE_COLORS["tips-hacks"],
+  },
+  {
+    postType: "trip-highlights",
+    label: "Trip Highlights",
+    icon: "sunny",
+    color: POST_TYPE_COLORS["trip-highlights"],
+  },
+  {
+    postType: "vehicles",
+    label: "Vehicles",
+    icon: "car",
+    color: POST_TYPE_COLORS["vehicles"],
   },
   {
     postType: "wildlife-nature",
     label: "Wildlife & Nature",
     icon: "leaf",
     color: POST_TYPE_COLORS["wildlife-nature"],
-  },
-  {
-    postType: "accessibility",
-    label: "Accessibility",
-    icon: "accessibility",
-    color: POST_TYPE_COLORS["accessibility"],
   },
 ];

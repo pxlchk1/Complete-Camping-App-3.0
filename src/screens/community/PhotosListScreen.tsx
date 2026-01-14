@@ -51,21 +51,21 @@ const ITEM_WIDTH = (width - GRID_PADDING * 2 - GRID_GAP) / 2;
 // Category chips - compact, text only
 const CATEGORY_CHIPS: { key: PhotoPostType | "all"; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "campsite-spotlight", label: "Campsites" },
-  { key: "conditions-report", label: "Conditions" },
-  { key: "setup-ideas", label: "Setups" },
-  { key: "gear-in-real-life", label: "Gear" },
+  { key: "campsites", label: "Campsites" },
+  { key: "trip-highlights", label: "Highlights" },
+  { key: "camp-setups", label: "Setups" },
+  { key: "gear", label: "Gear" },
 ];
 
 // Tag chips - collapsible row
 const TAG_CHIPS: { key: string; label: string }[] = [
-  { key: "camp-cooking", label: "Cooking" },
+  { key: "cooking", label: "Cooking" },
   { key: "wildlife-nature", label: "Wildlife" },
+  { key: "pets", label: "Pets" },
+  { key: "vehicles", label: "Vehicles" },
   { key: "accessibility", label: "Accessible" },
-  { key: "car-camping", label: "Car Camping" },
-  { key: "backpacking", label: "Backpacking" },
-  { key: "winter-camping", label: "Winter" },
-  { key: "family-camping", label: "Family" },
+  { key: "tips-hacks", label: "Tips" },
+  { key: "campground-reviews", label: "Reviews" },
 ];
 
 export default function PhotosListScreen() {

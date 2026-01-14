@@ -37,7 +37,6 @@ import {
   POST_TYPE_LABELS,
   POST_TYPE_COLORS,
   POST_TYPE_ICONS,
-  CAPTION_TEMPLATES,
   TRIP_STYLE_LABELS,
   DETAIL_TAG_LABELS,
   QUICK_POST_TILES,
@@ -116,18 +115,6 @@ export default function PhotoComposerScreen() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Set caption template when post type changes
-  useEffect(() => {
-    if (postType) {
-      // Only set template if caption is empty or is still a template
-      const isTemplate = Object.values(CAPTION_TEMPLATES).some(t => caption === t || caption === "");
-      if (isTemplate || !caption) {
-        setCaption(CAPTION_TEMPLATES[postType] || "");
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [postType]);
-
   const pickImage = async () => {
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -157,10 +144,6 @@ export default function PhotoComposerScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setPostType(type);
     setShowPostTypeSelector(false);
-    // Set caption template
-    if (!caption || caption === CAPTION_TEMPLATES[postType || "campsite-spotlight"]) {
-      setCaption(CAPTION_TEMPLATES[type]);
-    }
   };
 
   const handleToggleTripStyle = (style: TripStyle) => {
@@ -235,9 +218,9 @@ export default function PhotoComposerScreen() {
         storagePaths: [storagePath],
         postType,
         caption: caption.trim(),
-        campgroundName: postType === "campsite-spotlight" && campgroundName.trim() ? campgroundName.trim() : undefined,
-        campsiteNumber: postType === "campsite-spotlight" && campsiteNumber.trim() ? campsiteNumber.trim() : undefined,
-        hideCampsiteNumber: postType === "campsite-spotlight" ? hideCampsiteNumber : undefined,
+        campgroundName: postType === "campsites" && campgroundName.trim() ? campgroundName.trim() : undefined,
+        campsiteNumber: postType === "campsites" && campsiteNumber.trim() ? campsiteNumber.trim() : undefined,
+        hideCampsiteNumber: postType === "campsites" ? hideCampsiteNumber : undefined,
         tripStyle: tripStyle || undefined,
         detailTags: detailTags.length > 0 ? detailTags : undefined,
       });
@@ -318,10 +301,10 @@ export default function PhotoComposerScreen() {
               )}
             </Pressable>
 
-            {/* Post Type Selector */}
+            {/* Photo Topic Selector */}
             <View className="mb-5">
               <Text className="mb-2" style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}>
-                Post Type *
+                Photo Topic *
               </Text>
               
               {postType && !showPostTypeSelector ? (
@@ -382,7 +365,7 @@ export default function PhotoComposerScreen() {
             </View>
 
             {/* Campsite Spotlight Fields */}
-            {postType === "campsite-spotlight" && (
+            {postType === "campsites" && (
               <View className="mb-5 p-4 rounded-xl border" style={{ backgroundColor: "#2563eb10", borderColor: "#2563eb40" }}>
                 <Text className="mb-3" style={{ fontFamily: "SourceSans3_600SemiBold", color: "#2563eb" }}>
                   📍 Campsite Details
