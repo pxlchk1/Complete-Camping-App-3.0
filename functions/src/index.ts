@@ -542,9 +542,17 @@ export const deletePhotoSecure = functions.https.onCall(
       const db = admin.firestore();
       const storage = admin.storage();
 
-      // Get the photo document
-      const photoRef = db.collection("stories").doc(photoId);
-      const photoDoc = await photoRef.get();
+      // Try photoPosts collection first (canonical), then fall back to stories (legacy)
+      let photoRef = db.collection("photoPosts").doc(photoId);
+      let photoDoc = await photoRef.get();
+      let collectionName = "photoPosts";
+
+      if (!photoDoc.exists) {
+        // Try legacy stories collection
+        photoRef = db.collection("stories").doc(photoId);
+        photoDoc = await photoRef.get();
+        collectionName = "stories";
+      }
 
       if (!photoDoc.exists) {
         throw new functions.https.HttpsError("not-found", "Photo not found");
@@ -552,7 +560,7 @@ export const deletePhotoSecure = functions.https.onCall(
 
       const photoData = photoDoc.data()!;
       const ownerId =
-        photoData.ownerUid || photoData.userId || photoData.authorId;
+        photoData.userId || photoData.ownerUid || photoData.authorId;
 
       // Check if caller is owner
       const isOwner = ownerId === callerId;
@@ -574,7 +582,8 @@ export const deletePhotoSecure = functions.https.onCall(
       }
 
       // Step 1: Delete from Storage
-      const storagePath = photoData.storagePath;
+      // Try storagePath first, then storagePaths array (photoPosts schema)
+      const storagePath = photoData.storagePath || (photoData.storagePaths && photoData.storagePaths[0]);
       if (storagePath) {
         try {
           const bucket = storage.bucket();
@@ -589,11 +598,16 @@ export const deletePhotoSecure = functions.https.onCall(
           });
         }
       } else {
-        // Try fallback paths
-        const patterns = [
-          `stories/${ownerId}/${photoId}`,
-          `stories/${ownerId}/${photoId}.jpg`,
-        ];
+        // Try fallback paths based on collection
+        const patterns = collectionName === "photoPosts"
+          ? [
+              `photoPosts/${ownerId}/${photoId}.jpg`,
+              `photoPosts/${ownerId}/${photoId}`,
+            ]
+          : [
+              `stories/${ownerId}/${photoId}`,
+              `stories/${ownerId}/${photoId}.jpg`,
+            ];
 
         for (const pattern of patterns) {
           try {
