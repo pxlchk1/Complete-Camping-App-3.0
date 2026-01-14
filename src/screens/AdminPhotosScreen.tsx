@@ -22,33 +22,36 @@ import {
   DEEP_FOREST,
 } from "../constants/colors";
 
-interface Story {
+interface PhotoPost {
   id: string;
-  imageUrl: string;
+  photoUrls?: string[];
+  imageUrl?: string; // Legacy fallback
   caption: string;
   userId: string;
-  ownerUid?: string;
-  authorId?: string;
-  storagePath?: string;
+  displayName?: string;
+  userHandle?: string;
+  storagePaths?: string[];
+  storagePath?: string; // Legacy fallback
   createdAt: any;
-  uploaderName?: string; // Will be fetched when needed
+  postType?: string;
+  isHidden?: boolean;
 }
 
 export default function AdminPhotosScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [stories, setStories] = useState<Story[]>([]);
+  const [photos, setPhotos] = useState<PhotoPost[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-  const [photoToDelete, setPhotoToDelete] = useState<Story | null>(null);
+  const [photoToDelete, setPhotoToDelete] = useState<PhotoPost | null>(null);
   const [uploaderNames, setUploaderNames] = useState<Record<string, string>>({});
   const currentUserId = auth.currentUser?.uid;
   const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     checkAdminStatus();
-    loadStories();
+    loadPhotos();
   }, []);
 
   const checkAdminStatus = async () => {
@@ -87,21 +90,22 @@ export default function AdminPhotosScreen() {
     return userId.slice(0, 8);
   }, [uploaderNames]);
 
-  const loadStories = async () => {
+  const loadPhotos = async () => {
     try {
-      const storiesRef = collection(db, "stories");
-      const q = query(storiesRef, orderBy("createdAt", "desc"), limit(50));
+      // Query the photoPosts collection (canonical collection for Connect photos)
+      const photosRef = collection(db, "photoPosts");
+      const q = query(photosRef, orderBy("createdAt", "desc"), limit(50));
       const snapshot = await getDocs(q);
 
-      const storiesData = snapshot.docs.map(doc => ({
+      const photosData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })) as Story[];
+      })) as PhotoPost[];
 
-      setStories(storiesData);
+      setPhotos(photosData);
 
       // Fetch uploader names for all unique userIds
-      const uniqueUserIds = [...new Set(storiesData.map(s => s.ownerUid || s.userId || s.authorId).filter(Boolean))];
+      const uniqueUserIds = [...new Set(photosData.map(p => p.userId).filter(Boolean))];
       const namesMap: Record<string, string> = {};
       
       await Promise.all(
@@ -123,7 +127,7 @@ export default function AdminPhotosScreen() {
       
       setUploaderNames(namesMap);
     } catch (error) {
-      console.error("[AdminPhotos] Error loading stories:", error);
+      console.error("[AdminPhotos] Error loading photos:", error);
       showError("Failed to load photos");
     } finally {
       setLoading(false);
@@ -132,29 +136,32 @@ export default function AdminPhotosScreen() {
   };
 
   // Check if current user can delete this photo (owner OR admin)
-  const canDeletePhoto = (story: Story): boolean => {
+  const canDeletePhoto = (photo: PhotoPost): boolean => {
     if (!currentUserId) return false;
     
-    const ownerId = story.ownerUid || story.userId || story.authorId;
+    const ownerId = photo.userId;
     const isOwner = ownerId === currentUserId;
     
     return isOwner || isAdmin;
   };
 
   // Get uploader display name
-  const getUploaderName = (story: Story): string => {
-    const ownerId = story.ownerUid || story.userId || story.authorId;
+  const getUploaderName = (photo: PhotoPost): string => {
+    // Use displayName from post if available
+    if (photo.displayName) return photo.displayName;
+    
+    const ownerId = photo.userId;
     if (!ownerId) return "Unknown";
     return uploaderNames[ownerId] || ownerId.slice(0, 8);
   };
 
   // Step 1: Show confirmation modal
-  const handleRemoveRequest = (story: Story) => {
-    if (!canDeletePhoto(story)) {
+  const handleRemoveRequest = (photo: PhotoPost) => {
+    if (!canDeletePhoto(photo)) {
       showError("You can only delete your own photos.");
       return;
     }
-    setPhotoToDelete(story);
+    setPhotoToDelete(photo);
     setConfirmModalVisible(true);
   };
 
@@ -162,9 +169,9 @@ export default function AdminPhotosScreen() {
   const handleConfirmDelete = async () => {
     if (!photoToDelete) return;
     
-    const story = photoToDelete;
+    const photo = photoToDelete;
     setConfirmModalVisible(false);
-    setDeletingPhotoId(story.id);
+    setDeletingPhotoId(photo.id);
 
     try {
       // Use Cloud Function for secure deletion (handles both Firestore + Storage)
@@ -173,19 +180,19 @@ export default function AdminPhotosScreen() {
         { success: boolean; photoId: string }
       >(functions, "deletePhotoSecure");
 
-      const result = await deletePhotoSecure({ photoId: story.id });
+      const result = await deletePhotoSecure({ photoId: photo.id });
       
       if (result.data.success) {
         // Log moderation action (for admins deleting others' photos)
-        const ownerId = story.ownerUid || story.userId || story.authorId;
+        const ownerId = photo.userId;
         if (isAdmin && ownerId !== currentUserId) {
           try {
             await addDoc(collection(db, "moderationLogs"), {
               action: "delete_photo",
-              photoId: story.id,
+              photoId: photo.id,
               removedByUid: currentUserId,
               uploaderUid: ownerId,
-              photoCaption: story.caption?.slice(0, 100) || "",
+              photoCaption: photo.caption?.slice(0, 100) || "",
               timestamp: serverTimestamp(),
             });
           } catch (logError) {
@@ -194,7 +201,7 @@ export default function AdminPhotosScreen() {
         }
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setStories(prev => prev.filter(s => s.id !== story.id));
+        setPhotos(prev => prev.filter(p => p.id !== photo.id));
         showSuccess("Photo removed");
       } else {
         throw new Error("Delete failed");
@@ -236,14 +243,14 @@ export default function AdminPhotosScreen() {
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              loadStories();
+              loadPhotos();
             }}
             tintColor={DEEP_FOREST}
           />
         }
       >
         <View className="px-5 pt-5 pb-8">
-          {stories.length === 0 && (
+          {photos.length === 0 && (
             <View className="items-center py-12">
               <Ionicons name="images-outline" size={48} color={TEXT_SECONDARY} />
               <Text className="mt-4 text-center" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}>
@@ -251,18 +258,20 @@ export default function AdminPhotosScreen() {
               </Text>
             </View>
           )}
-          {stories.map((story) => {
-            const isDeleting = deletingPhotoId === story.id;
-            const hasPermission = canDeletePhoto(story);
+          {photos.map((photo) => {
+            const isDeleting = deletingPhotoId === photo.id;
+            const hasPermission = canDeletePhoto(photo);
+            // Use photoUrls array (new schema) or imageUrl (legacy fallback)
+            const imageUrl = photo.photoUrls?.[0] || photo.imageUrl || "";
             
             return (
               <View
-                key={story.id}
+                key={photo.id}
                 className="mb-4 rounded-xl overflow-hidden border"
                 style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT, opacity: isDeleting ? 0.6 : 1 }}
               >
                 <Image
-                  source={{ uri: story.imageUrl }}
+                  source={{ uri: imageUrl }}
                   style={{ width: "100%", height: 300 }}
                   resizeMode="cover"
                 />
@@ -271,19 +280,19 @@ export default function AdminPhotosScreen() {
                     className="mb-2"
                     style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_PRIMARY_STRONG }}
                   >
-                    {story.caption || "(No caption)"}
+                    {photo.caption || "(No caption)"}
                   </Text>
                   <Text
                     className="mb-3 text-xs"
                     style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
                   >
-                    Uploaded by: {getUploaderName(story)}
+                    Uploaded by: {getUploaderName(photo)}
                   </Text>
                   
                   {/* Permission-based button rendering */}
                   {hasPermission ? (
                     <Pressable
-                      onPress={() => handleRemoveRequest(story)}
+                      onPress={() => handleRemoveRequest(photo)}
                       disabled={isDeleting}
                       className="p-3 rounded-xl items-center active:opacity-70 flex-row justify-center"
                       style={{ backgroundColor: isDeleting ? "#aaa" : "#D32F2F" }}
