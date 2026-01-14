@@ -20,3 +20,4 @@ bun.lockb
 # Ignore Bun lockfiles
 bun.lock
 bun.lockb
+functions/firebase-debug.log
