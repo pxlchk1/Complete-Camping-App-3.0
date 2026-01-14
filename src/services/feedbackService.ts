@@ -21,6 +21,7 @@ import {
   DocumentSnapshot,
 } from "firebase/firestore";
 import firebaseApp from "../config/firebase";
+import { generateCamperHandle } from "../utils/userHandle";
 import { FeedbackPost, FeedbackComment, FeedbackCategory, FeedbackStatus } from "../types/community";
 
 const db = getFirestore(firebaseApp);
@@ -109,14 +110,17 @@ export async function createFeedbackPost(data: {
   body: string;
   category: FeedbackCategory;
   authorId: string;
+  authorHandle?: string;
 }): Promise<string> {
   const postsRef = collection(db, "feedbackPosts");
 
+  // IMPORTANT: authorHandle must always have a value (fallback to @CamperXXXX)
   const docRef = await addDoc(postsRef, {
     title: data.title,
     body: data.body,
     category: data.category,
     authorId: data.authorId,
+    authorHandle: data.authorHandle || generateCamperHandle(data.authorId),
     createdAt: serverTimestamp(),
     status: "open" as FeedbackStatus,
     voteCount: 0,
@@ -191,6 +195,7 @@ export async function addFeedbackComment(data: {
   feedbackId: string;
   body: string;
   authorId: string;
+  authorHandle?: string;
 }): Promise<string> {
   const commentsRef = collection(db, "feedbackComments");
 
@@ -198,6 +203,7 @@ export async function addFeedbackComment(data: {
     feedbackId: data.feedbackId,
     body: data.body,
     authorId: data.authorId,
+    authorHandle: data.authorHandle || generateCamperHandle(data.authorId),
     createdAt: serverTimestamp(),
   });
 

@@ -34,6 +34,7 @@ import {
   TEXT_MUTED,
 } from "../../constants/colors";
 import HandleLink from "../../components/HandleLink";
+import { getDisplayHandle } from "../../utils/userHandle";
 import { DocumentSnapshot } from "firebase/firestore";
 
 type FilterOption = "all" | "unanswered" | "answered" | "popular";
@@ -236,21 +237,15 @@ export default function QuestionsListScreen() {
 
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
-          {item.authorId && item.authorHandle ? (
+          {(item.authorId || item.userId) ? (
             <HandleLink 
-              handle={item.authorHandle}
-              userId={item.authorId}
+              handle={getDisplayHandle({ handle: item.authorHandle || item.userHandle, id: item.authorId || item.userId }).replace(/^@/, '')}
+              userId={(item.authorId || item.userId)!}
               style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12 }}
             />
-          ) : item.authorId ? (
-            <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: item.authorId })}>
-              <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: DEEP_FOREST, textDecorationLine: "underline" }}>
-                {item.authorHandle ? `@${item.authorHandle}` : "Anonymous"}
-              </Text>
-            </Pressable>
           ) : (
             <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
-              {item.authorHandle ? `@${item.authorHandle}` : "Anonymous"}
+              {getDisplayHandle({ handle: item.authorHandle || item.userHandle, id: item.authorId || item.userId })}
             </Text>
           )}
           <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>

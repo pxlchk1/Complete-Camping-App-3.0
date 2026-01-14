@@ -4,9 +4,10 @@
  */
 
 import React, { useState } from "react";
-import { View, Text, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ModalHeader from "../../components/ModalHeader";
 import * as Haptics from "expo-haptics";
 import { createQuestion } from "../../services/questionsService";
@@ -14,6 +15,7 @@ import { useCurrentUser } from "../../state/userStore";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
 import { requireAccount } from "../../utils/gating";
 import { requireEmailVerification } from "../../utils/authHelper";
+import { getUserHandleForUid } from "../../services/userHandleService";
 import { RootStackNavigationProp } from "../../navigation/types";
 import {
   DEEP_FOREST,
@@ -33,6 +35,7 @@ const SUGGESTED_TAGS = [
 export default function CreateQuestionScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const currentUser = useCurrentUser();
+  const insets = useSafeAreaInsets();
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [title, setTitle] = useState("");
@@ -89,12 +92,13 @@ export default function CreateQuestionScreen() {
       setError(null);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+      const authorHandle = await getUserHandleForUid(currentUser.id);
       const questionId = await createQuestion({
         title: title.trim(),
         body: body.trim(),
         tags,
         authorId: currentUser.id,
-        authorHandle: currentUser.handle || currentUser.displayName || "Anonymous",
+        authorHandle,
       });
 
       // Navigate to the question detail
@@ -279,7 +283,50 @@ export default function CreateQuestionScreen() {
               ))}
             </View>
           </View>
+
+          {/* Bottom spacer for fixed button */}
+          <View style={{ height: 80 }} />
         </ScrollView>
+
+        {/* Fixed Bottom Button */}
+        <View
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            paddingHorizontal: 20,
+            paddingTop: 12,
+            paddingBottom: Math.max(insets.bottom, 12),
+            backgroundColor: PARCHMENT,
+            borderTopWidth: 1,
+            borderTopColor: BORDER_SOFT,
+          }}
+        >
+          <Pressable
+            onPress={handleSubmit}
+            disabled={submitting || !title.trim() || !body.trim()}
+            style={{
+              backgroundColor: submitting || !title.trim() || !body.trim() ? "#d1d5db" : DEEP_FOREST,
+              paddingVertical: 14,
+              borderRadius: 12,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {submitting ? (
+              <ActivityIndicator size="small" color={PARCHMENT} />
+            ) : (
+              <>
+                <Ionicons name="help-circle" size={20} color={PARCHMENT} style={{ marginRight: 8 }} />
+                <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 16, color: PARCHMENT }}>
+                  Ask Question
+                </Text>
+              </>
+            )}
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
       
       {/* Account Required Modal */}

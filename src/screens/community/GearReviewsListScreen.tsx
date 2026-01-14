@@ -3,7 +3,7 @@
  * Shows list of gear reviews with category filtering
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { DocumentSnapshot } from "firebase/firestore";
 import * as Haptics from "expo-haptics";
@@ -26,6 +26,7 @@ import AccountRequiredModal from "../../components/AccountRequiredModal";
 import { requirePro } from "../../utils/gating";
 import { shouldShowInFeed } from "../../services/moderationService";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
+import { getDisplayHandle } from "../../utils/userHandle";
 import {
   DEEP_FOREST,
   PARCHMENT,
@@ -169,6 +170,13 @@ export default function GearReviewsListScreen() {
     loadReviews(true);
   }, [category]);
 
+  // Refresh when screen comes into focus (e.g., after creating a review)
+  useFocusEffect(
+    useCallback(() => {
+      loadReviews(true);
+    }, [category])
+  );
+
   useEffect(() => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -265,7 +273,7 @@ export default function GearReviewsListScreen() {
 
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
-          {item.authorName || "Anonymous"}
+          {getDisplayHandle({ handle: (item as any).authorHandle || (item as any).userHandle, id: item.authorId || item.userId })}
         </Text>
         <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
         <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>

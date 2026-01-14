@@ -12,6 +12,8 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db, auth } from '../../config/firebase';
+import { getUserHandleForUid } from '../userHandleService';
+import { getDisplayHandle, isValidHandle } from '../../utils/userHandle';
 
 export interface GearReview {
   id: string;
@@ -44,9 +46,14 @@ export const gearReviewsService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to create a review');
 
+    // CRITICAL: Fetch handle from users/{uid}.handle via service
+    const authorHandle = await getUserHandleForUid(user.uid);
+
     const reviewData = {
       userId: user.uid,
-      userName: user.displayName || 'Anonymous',
+      authorId: user.uid,
+      authorHandle: authorHandle, // MUST be from users/{uid}.handle
+      userHandle: authorHandle,   // Legacy field alias
       userAvatar: user.photoURL || null,
       gearName: data.gearName,
       brand: data.brand,
@@ -64,6 +71,7 @@ export const gearReviewsService = {
   },
 
   // Get all gear reviews ordered by createdAt desc
+  // Fetches author handles from users collection if not stored on review
   async getReviews(): Promise<GearReview[]> {
     const q = query(
       collection(db, 'gearReviews'),
@@ -71,16 +79,47 @@ export const gearReviewsService = {
     );
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((doc) => {
-      const data = doc.data();
+    const reviews = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
       return {
-        id: doc.id,
+        id: docSnap.id,
         ...data,
         body: data.review || data.body || data.reviewText || '',
         summary: data.summary || data.title || '',
         rating: data.rating || data.overallRating || 0,
-      };
-    }) as GearReview[];
+      } as unknown as GearReview;
+    });
+
+    // Fetch missing or invalid author handles from users collection
+    const reviewsWithHandles = await Promise.all(
+      reviews.map(async (review) => {
+        // Check if review already has a VALID handle stored
+        const existingHandle = (review as any).authorHandle || (review as any).userHandle;
+        if (existingHandle && existingHandle.trim() !== '' && isValidHandle(existingHandle)) {
+          return review;
+        }
+        
+        // No valid handle stored on review - fetch from users collection
+        const authorId = review.userId || (review as any).authorId;
+        if (!authorId) return review;
+        
+        try {
+          const userDocRef = doc(db, 'profiles', authorId);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            if (userData.handle && userData.handle.trim() !== '' && isValidHandle(userData.handle)) {
+              return { ...review, authorHandle: userData.handle };
+            }
+          }
+        } catch (err) {
+          // Silently fail - will use fallback
+        }
+        return review;
+      })
+    );
+
+    return reviewsWithHandles;
   },
 
   // Get review by ID

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, Pressable, TextInput, FlatList, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, TextInput, FlatList } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { RootStackNavigationProp } from "../../navigation/types";
@@ -8,6 +8,7 @@ import { useAuthStore } from "../../state/authStore";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
 import { requireAccount } from "../../utils/gating";
 import { useToast } from "../../components/ToastManager";
+import FireflyLoader from "../../components/common/FireflyLoader";
 import { DEEP_FOREST, PARCHMENT, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY, TEXT_MUTED } from "../../constants/colors";
 
 export default function ConnectAskScreen() {
@@ -103,9 +104,8 @@ export default function ConnectAskScreen() {
 
       <View className="px-4 mt-4">
         {loading ? (
-          <View className="flex-1 items-center justify-center py-12">
-            <ActivityIndicator size="large" color={DEEP_FOREST} />
-            <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>Loading questions...</Text>
+          <View className="flex-1" style={{ minHeight: 200 }}>
+            <FireflyLoader />
           </View>
         ) : filteredQuestions.length === 0 ? (
           <View className="flex-1 items-center justify-center py-12">

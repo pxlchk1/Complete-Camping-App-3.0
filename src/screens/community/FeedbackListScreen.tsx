@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, Pressable, FlatList, ActivityIndicator, TextInput } from "react-native";
+import { View, Text, Pressable, FlatList, TextInput } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import FireflyLoader from "../../components/common/FireflyLoader";
 import { feedbackService, FeedbackPost } from "../../services/firestore/feedbackService";
 import { feedbackVoteService } from "../../services/firestore/feedbackVoteService";
 import { auth } from "../../config/firebase";
@@ -17,6 +18,7 @@ import { shouldShowInFeed } from "../../services/moderationService";
 import { RootStackNavigationProp } from "../../navigation/types";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
 import { seedFeedbackIfEmpty } from "../../features/feedback/seedFeedback";
+import { getDisplayHandle } from "../../utils/userHandle";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -260,7 +262,7 @@ export default function FeedbackListScreen() {
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 12, borderTopWidth: 1, borderColor: BORDER_SOFT }}>
           <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
             <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
-              {item.authorName || "Anonymous"}
+              {getDisplayHandle({ handle: (item as any).authorHandle || (item as any).userHandle, id: (item as any).authorId || (item as any).createdByUserId })}
             </Text>
             <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
             <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
@@ -280,14 +282,8 @@ export default function FeedbackListScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-parchment">
-        <ActivityIndicator size="large" color={DEEP_FOREST} />
-        <Text
-          className="mt-4"
-          style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-        >
-          Loading feedback...
-        </Text>
+      <View className="flex-1 bg-parchment">
+        <FireflyLoader />
       </View>
     );
   }

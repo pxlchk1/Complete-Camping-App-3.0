@@ -12,6 +12,8 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db, auth } from '../../config/firebase';
+import { getUserHandleForUid } from '../userHandleService';
+import { getDisplayHandle, isValidHandle } from '../../utils/userHandle';
 
 export interface FeedbackPost {
   id: string;
@@ -34,6 +36,9 @@ export const feedbackService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to create feedback');
 
+    // CRITICAL: Fetch handle from users/{uid}.handle via service
+    const authorHandle = await getUserHandleForUid(user.uid);
+
     const feedbackData = {
       title: data.title,
       description: data.description,
@@ -42,6 +47,9 @@ export const feedbackService = {
       karmaScore: 1,
       createdAt: serverTimestamp(),
       createdByUserId: user.uid,
+      authorId: user.uid,
+      authorHandle: authorHandle, // MUST be from users/{uid}.handle
+      userHandle: authorHandle,   // Legacy field alias
     };
 
     const docRef = await addDoc(collection(db, 'feedbackPosts'), feedbackData);
@@ -49,6 +57,7 @@ export const feedbackService = {
   },
 
   // Get all feedback ordered by createdAt desc
+  // Fetches author handles from users collection if not stored on feedback
   async getFeedback(): Promise<FeedbackPost[]> {
     const q = query(
       collection(db, 'feedbackPosts'),
@@ -57,10 +66,41 @@ export const feedbackService = {
 
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
+    const feedbackPosts = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
     })) as FeedbackPost[];
+
+    // Fetch missing or invalid author handles from users collection
+    const feedbackWithHandles = await Promise.all(
+      feedbackPosts.map(async (feedback) => {
+        // Check if feedback already has a VALID handle stored
+        const existingHandle = (feedback as any).authorHandle || (feedback as any).userHandle;
+        if (existingHandle && existingHandle.trim() !== '' && isValidHandle(existingHandle)) {
+          return feedback;
+        }
+        
+        // No valid handle stored on feedback - fetch from users collection
+        const authorId = feedback.createdByUserId || (feedback as any).authorId || (feedback as any).userId;
+        if (!authorId) return feedback;
+        
+        try {
+          const userDocRef = doc(db, 'profiles', authorId);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            if (userData.handle && userData.handle.trim() !== '' && isValidHandle(userData.handle)) {
+              return { ...feedback, authorHandle: userData.handle };
+            }
+          }
+        } catch (err) {
+          // Silently fail - will use fallback
+        }
+        return feedback;
+      })
+    );
+
+    return feedbackWithHandles;
   },
 
   // Get feedback by ID (public read - anyone can view feedback details)

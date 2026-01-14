@@ -16,6 +16,7 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "../config/firebase";
 import type { LibraryImage, ImageCategory } from "../types/community";
+import { generateCamperHandle } from "../utils/userHandle";
 
 const PHOTOS_COLLECTION = "photos";
 const PHOTO_VOTES_COLLECTION = "photoVotes";
@@ -33,6 +34,10 @@ export async function uploadPhoto(
   isPrivate?: boolean
 ): Promise<string> {
   try {
+    // IMPORTANT: Never use userName/displayName for attribution
+    // Always use userHandle, with @CamperXXXX fallback
+    const authorHandleToStore = userHandle || generateCamperHandle(userId);
+    
     // Create photo document first to get ID
     const photoDoc = {
       title,
@@ -43,8 +48,7 @@ export async function uploadPhoto(
       tags,
       authorId: userId,
       ownerUid: userId, // Consistent owner field for rules
-      authorHandle: userHandle,
-      authorName: userHandle ? `@${userHandle}` : (userName || "Anonymous"),
+      authorHandle: authorHandleToStore,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       upvotes: 0,

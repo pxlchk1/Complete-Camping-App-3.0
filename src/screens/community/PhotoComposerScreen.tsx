@@ -29,6 +29,7 @@ import { RootStackNavigationProp } from "../../navigation/types";
 import { createPhotoPost } from "../../services/photoPostsService";
 import { requireEmailVerification } from "../../utils/authHelper";
 import { recordPhotoUpload, canUploadPhotoToday } from "../../services/photoLimitService";
+import { getUserHandleForUid } from "../../services/userHandleService";
 import {
   PhotoPostType,
   TripStyle,
@@ -218,11 +219,18 @@ export default function PhotoComposerScreen() {
       // Upload image first
       const { downloadURL, storagePath } = await uploadImageToStorage(imageUri, tempId);
 
+      // Debug: Log handle being used
+      const authorHandle = await getUserHandleForUid(currentUser.id);
+      console.log("[PhotoComposer] Creating post with handle:", {
+        rawHandle: currentUser.handle,
+        finalHandle: authorHandle,
+      });
+
       // Create photo post
+      // IMPORTANT: Never pass displayName - only userHandle is used for attribution
       const postId = await createPhotoPost({
         userId: currentUser.id,
-        displayName: currentUser.displayName || "Anonymous",
-        userHandle: currentUser.handle,
+        userHandle: authorHandle,
         photoUrls: [downloadURL],
         storagePaths: [storagePath],
         postType,

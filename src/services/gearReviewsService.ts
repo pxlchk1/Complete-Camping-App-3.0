@@ -22,6 +22,7 @@ import {
 } from "firebase/firestore";
 import firebaseApp from "../config/firebase";
 import { GearReview, GearCategory } from "../types/community";
+import { generateCamperHandle } from "../utils/userHandle";
 
 const db = getFirestore(firebaseApp);
 
@@ -80,9 +81,11 @@ export async function createGearReview(data: {
   cons?: string;
   tags: string[];
   authorId: string;
+  authorHandle?: string;
 }): Promise<string> {
   const reviewsRef = collection(db, "gearReviews");
 
+  // IMPORTANT: authorHandle must always have a value (fallback to @CamperXXXX)
   const docRef = await addDoc(reviewsRef, {
     gearName: data.gearName,
     brand: data.brand || null,
@@ -94,6 +97,7 @@ export async function createGearReview(data: {
     cons: data.cons || null,
     tags: data.tags,
     authorId: data.authorId,
+    authorHandle: data.authorHandle || generateCamperHandle(data.authorId),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     upvoteCount: 0,

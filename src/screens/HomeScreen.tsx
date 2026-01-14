@@ -29,6 +29,7 @@ import { useSubscriptionStore } from "../state/subscriptionStore";
 // Utils
 import { getWelcomeTitle, getWelcomeSubtext } from "../utils/welcomeCopy";
 import { useUserStatus } from "../utils/authHelper";
+import { getDisplayHandle } from "../utils/userHandle";
 
 // Constants
 import {
@@ -548,7 +549,7 @@ export default function HomeScreen() {
                                 color: TEXT_SECONDARY,
                               }}
                             >
-                              @{featuredPhoto.userHandle || featuredPhotoHandle || featuredPhoto.displayName || "Anonymous"}
+                              {getDisplayHandle({ handle: featuredPhoto.userHandle || featuredPhotoHandle, userId: featuredPhoto.userId })}
                             </Text>
                           )}
                         </View>

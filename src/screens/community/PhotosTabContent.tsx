@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, Pressable, FlatList, ActivityIndicator, TextInput } from "react-native";
+import { View, Text, Pressable, FlatList, TextInput } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useImageLibraryStore } from "../../state/imageLibraryStore";
@@ -14,6 +14,8 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
 import HandleLink from "../../components/HandleLink";
+import FireflyLoader from "../../components/common/FireflyLoader";
+import { getDisplayHandle } from "../../utils/userHandle";
 
 // Component to handle individual photo rendering with error state
 function PhotoCard({ item, onVote }: { item: any; onVote: (id: string, type: "up" | "down") => void }) {
@@ -42,21 +44,15 @@ function PhotoCard({ item, onVote }: { item: any; onVote: (id: string, type: "up
           </Text>
           <View className="flex-row items-center mb-2">
             <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>by </Text>
-            {item.authorId && item.authorHandle ? (
+            {(item.authorId || item.userId) ? (
               <HandleLink 
-                handle={item.authorHandle} 
-                userId={item.authorId}
+                handle={getDisplayHandle({ handle: item.authorHandle || item.userHandle, id: item.authorId || item.userId }).replace(/^@/, '')} 
+                userId={(item.authorId || item.userId)!}
                 style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12 }}
               />
-            ) : item.authorId ? (
-              <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: item.authorId })}>
-                <Text className="text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
-                  {item.authorHandle ? `@${item.authorHandle}` : (item.authorName || "Anonymous")}
-                </Text>
-              </Pressable>
             ) : (
               <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                {item.authorHandle ? `@${item.authorHandle}` : "Anonymous"}
+                {getDisplayHandle({ handle: item.authorHandle || item.userHandle, id: item.authorId || item.userId })}
               </Text>
             )}
           </View>
@@ -187,6 +183,7 @@ export default function PhotosTabContent() {
 
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
+        // IMPORTANT: Don't pass displayName - only use handle for attribution
         await addImage(
           asset.uri,
           "My Photo",
@@ -194,8 +191,7 @@ export default function PhotosTabContent() {
           "camping" as ImageCategory,
           [],
           user.id,
-          user.handle,
-          user.displayName
+          user.handle || ""
         );
         showSuccess("Photo uploaded successfully!");
       }
@@ -313,9 +309,8 @@ export default function PhotosTabContent() {
           </Pressable>
         </View>
       ) : isLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={DEEP_FOREST} />
-          <Text className="mt-4" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>Loading photos...</Text>
+        <View className="flex-1">
+          <FireflyLoader />
         </View>
       ) : filteredImages.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8">

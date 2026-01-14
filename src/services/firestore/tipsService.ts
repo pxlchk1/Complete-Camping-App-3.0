@@ -12,11 +12,13 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db, auth } from '../../config/firebase';
+import { getUserHandleForUid } from '../userHandleService';
+import { getDisplayHandle, isValidHandle } from '../../utils/userHandle';
 
 export interface TipPost {
   id: string;
   userId: string;
-  userName: string;
+  userHandle?: string;
   userAvatar?: string;
   title: string;
   content: string;
@@ -33,6 +35,7 @@ export interface TipPost {
   reviewQueueStatus?: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
   // For moderation filter - authorId is an alias for userId
   authorId?: string;
+  authorHandle?: string;
 }
 
 export const tipsService = {
@@ -45,10 +48,14 @@ export const tipsService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to create a tip');
 
+    // CRITICAL: Fetch handle from users/{uid}.handle via service
+    const authorHandle = await getUserHandleForUid(user.uid);
+
     const tipData = {
       userId: user.uid,
-      authorId: user.uid, // Alias for moderation filtering
-      userName: user.displayName || 'Anonymous',
+      authorId: user.uid,
+      authorHandle: authorHandle, // MUST be from users/{uid}.handle
+      userHandle: authorHandle,   // Legacy field alias
       userAvatar: user.photoURL || null,
       title: data.title,
       content: data.content,
@@ -56,7 +63,6 @@ export const tipsService = {
       upvotes: 0,
       downvotes: 0,
       createdAt: serverTimestamp(),
-      // Moderation fields
       isHidden: false,
       needsReview: false,
     };
@@ -66,18 +72,54 @@ export const tipsService = {
   },
 
   // Get all tips ordered by createdAt desc
+  // Fetches author handles from users collection if not stored on tip
   async getTips(): Promise<TipPost[]> {
     const q = query(collection(db, 'tips'), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((doc) => {
-      const data = doc.data();
+    const tips = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
       return {
-        id: doc.id,
+        id: docSnap.id,
         ...data,
         content: data.text || data.content || data.body || '',
       };
     }) as TipPost[];
+
+    // Fetch missing or invalid author handles from users collection
+    const tipsWithHandles = await Promise.all(
+      tips.map(async (tip) => {
+        // Check if tip already has a VALID handle stored (could be userHandle OR authorHandle)
+        const existingHandle = tip.userHandle || tip.authorHandle;
+        
+        // CRITICAL: Only skip lookup if the stored handle is actually valid
+        // Old tips might have displayName stored instead of proper handle
+        if (existingHandle && existingHandle.trim() !== '' && isValidHandle(existingHandle)) {
+          return tip;
+        }
+        
+        // No valid handle stored on tip - fetch from users collection
+        const authorId = tip.userId || tip.authorId;
+        if (!authorId) return tip;
+        
+        try {
+          const userDocRef = doc(db, 'profiles', authorId);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            if (userData.handle && userData.handle.trim() !== '' && isValidHandle(userData.handle)) {
+              // Found valid handle in users collection - attach it
+              return { ...tip, userHandle: userData.handle };
+            }
+          }
+        } catch (err) {
+          // Silently fail - will use fallback at render time
+        }
+        return tip;
+      })
+    );
+
+    return tipsWithHandles;
   },
 
   // Get a single tip by ID

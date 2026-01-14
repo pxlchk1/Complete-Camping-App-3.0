@@ -16,6 +16,7 @@ import { useCurrentUser } from "../../state/userStore";
 import { RootStackNavigationProp } from "../../navigation/types";
 import { requireEmailVerification } from "../../utils/authHelper";
 import { recordPhotoUpload, canUploadPhotoToday } from "../../services/photoLimitService";
+import { getUserHandleForUid } from "../../services/userHandleService";
 import {
   DEEP_FOREST,
   PARCHMENT,
@@ -120,14 +121,15 @@ export default function UploadPhotoScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       const db = getFirestore();
       // Create Firestore doc first to get the photoId
+      // IMPORTANT: Never store displayName - only userHandle is used for attribution
+      const authorHandle = await getUserHandleForUid(currentUser.id);
       const docRef = await addDoc(collection(db, "connectPhotos"), {
         imageUrl: "", // Placeholder, will update after upload
         storagePath: "",
         caption: caption.trim(),
         tags,
         userId: currentUser.id,
-        displayName: currentUser.displayName || "Anonymous User",
-        userHandle: currentUser.handle,
+        userHandle: authorHandle,
         locationName: locationLabel.trim() || null,
         createdAt: serverTimestamp(),
         // Moderation fields

@@ -4,18 +4,22 @@
  */
 
 import React, { useState } from "react";
-import { View, Text, Pressable, TextInput } from "react-native";
+import { View, Text, Pressable, TextInput, ActivityIndicator } from "react-native";
 import KeyboardAwareScrollView from "../../components/KeyboardAwareScrollView";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ModalHeader from "../../components/ModalHeader";
 import * as Haptics from "expo-haptics";
 import { createFeedbackPost } from "../../services/feedbackService";
 import { useCurrentUser } from "../../state/userStore";
 import { requireEmailVerification } from "../../utils/authHelper";
+import { getUserHandleForUid } from "../../services/userHandleService";
 import { RootStackNavigationProp } from "../../navigation/types";
 import { FeedbackCategory } from "../../types/community";
 import {
+  DEEP_FOREST,
+  PARCHMENT,
   BORDER_SOFT,
   TEXT_PRIMARY_STRONG,
   TEXT_SECONDARY,
@@ -58,6 +62,7 @@ const CATEGORIES: { id: FeedbackCategory; label: string; description: string; ic
 export default function CreateFeedbackScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const currentUser = useCurrentUser();
+  const insets = useSafeAreaInsets();
 
   const [category, setCategory] = useState<FeedbackCategory>("feature");
   const [title, setTitle] = useState("");
@@ -87,11 +92,13 @@ export default function CreateFeedbackScreen() {
       setError(null);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+      const authorHandle = await getUserHandleForUid(currentUser.id);
       const postId = await createFeedbackPost({
         title: title.trim(),
         body: body.trim(),
         category,
         authorId: currentUser.id,
+        authorHandle,
       });
 
       // Navigate to the feedback detail
@@ -257,8 +264,50 @@ export default function CreateFeedbackScreen() {
               • Check if similar feedback already exists
             </Text>
           </View>
-        {/* ...existing code... */}
+
+          {/* Bottom spacer for fixed button */}
+          <View style={{ height: 80 }} />
       </KeyboardAwareScrollView>
+
+      {/* Fixed Bottom Button */}
+      <View
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          paddingHorizontal: 20,
+          paddingTop: 12,
+          paddingBottom: Math.max(insets.bottom, 12),
+          backgroundColor: PARCHMENT,
+          borderTopWidth: 1,
+          borderTopColor: BORDER_SOFT,
+        }}
+      >
+        <Pressable
+          onPress={handleSubmit}
+          disabled={submitting || !title.trim() || !body.trim()}
+          style={{
+            backgroundColor: submitting || !title.trim() || !body.trim() ? "#d1d5db" : DEEP_FOREST,
+            paddingVertical: 14,
+            borderRadius: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {submitting ? (
+            <ActivityIndicator size="small" color={PARCHMENT} />
+          ) : (
+            <>
+              <Ionicons name="chatbubble-ellipses" size={20} color={PARCHMENT} style={{ marginRight: 8 }} />
+              <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 16, color: PARCHMENT }}>
+                Submit Feedback
+              </Text>
+            </>
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 }

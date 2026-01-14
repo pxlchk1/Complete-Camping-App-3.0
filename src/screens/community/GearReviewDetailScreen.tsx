@@ -13,15 +13,15 @@ import {
   View,
   Text,
   ScrollView,
-  // Pressable,
+  Pressable,
   Alert,
-  ActivityIndicator,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import VotePill from "../../components/VotePill";
+import FireflyLoader from "../../components/common/FireflyLoader";
 
 import ModalHeader from "../../components/ModalHeader";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
@@ -31,6 +31,7 @@ import { isAdmin, isModerator, canModerateContent } from "../../services/userSer
 import { User } from "../../types/user";
 import { useCurrentUser } from "../../state/userStore";
 import { auth, db } from "../../config/firebase";
+import { getDisplayHandle } from "../../utils/userHandle";
 
 /** Fallback theme values (safe if your constants are not available here). */
 const DEEP_FOREST = "#1F3B2C";
@@ -55,7 +56,7 @@ type GearReview = {
   downvotes?: number;
   createdAt?: any;
   authorId?: string;
-  displayName?: string | null;
+  authorHandle?: string | null;
 };
 
 type RouteParams = {
@@ -171,7 +172,8 @@ export default function GearReviewDetailScreen() {
         downvotes: data.downvotes || 0,
         createdAt: data.createdAt,
         authorId: data.authorId,
-        displayName: data.displayName ?? data.authorName ?? null,
+        // IMPORTANT: Only use authorHandle for attribution, never displayName/authorName
+        authorHandle: data.authorHandle ?? null,
       };
       setReview(normalized);
     } catch {
@@ -248,9 +250,7 @@ export default function GearReviewDetailScreen() {
     return (
       <View className="flex-1 bg-parchment">
         <ModalHeader title="Review" showTitle />
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={DEEP_FOREST} />
-        </View>
+        <FireflyLoader />
       </View>
     );
   }
@@ -464,12 +464,12 @@ export default function GearReviewDetailScreen() {
           {review.authorId ? (
             <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: review.authorId })}>
               <Text className="text-sm" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
-                by {review.displayName || "Anonymous"}
+                {getDisplayHandle({ handle: review.authorHandle, id: review.authorId })}
               </Text>
             </Pressable>
           ) : (
             <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-              by {review.displayName || "Anonymous"}
+              {getDisplayHandle({ handle: review.authorHandle, id: review.authorId })}
             </Text>
           )}
           <VotePill

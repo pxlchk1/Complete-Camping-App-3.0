@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { RootStackNavigationProp } from "../../navigation/types";
@@ -17,7 +18,9 @@ import * as Haptics from "expo-haptics";
 
 import { auth } from "../../config/firebase";
 import { createGearReview } from "../../services/gearReviewsService";
+import { useCurrentUser } from "../../state/userStore";
 import { requireEmailVerification } from "../../utils/authHelper";
+import { getUserHandleForUid } from "../../services/userHandleService";
 import {
   BORDER_SOFT,
   CARD_BACKGROUND_LIGHT,
@@ -47,6 +50,8 @@ const clampInt = (n: number, min: number, max: number) => Math.max(min, Math.min
 
 export default function CreateGearReviewScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
+  const insets = useSafeAreaInsets();
+  const currentUser = useCurrentUser();
 
   const [category, setCategory] = useState<GearCategory>("tent");
   const [gearName, setGearName] = useState("");
@@ -132,8 +137,10 @@ export default function CreateGearReviewScreen() {
       setSubmitting(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
+      const authorHandle = await getUserHandleForUid(user.uid);
       await createGearReview({
         authorId: user.uid,
+        authorHandle,
         category,
         gearName: trimmedGearName,
         brand: trimmedBrand || undefined,
@@ -170,8 +177,9 @@ export default function CreateGearReviewScreen() {
       {/* Header */}
       <View
         style={{
+          paddingTop: insets.top + 14,
           paddingHorizontal: 18,
-          paddingVertical: 14,
+          paddingBottom: 14,
           borderBottomWidth: 1,
           borderBottomColor: BORDER_SOFT,
           backgroundColor: PARCHMENT,
@@ -188,25 +196,8 @@ export default function CreateGearReviewScreen() {
           New Gear Review
         </Text>
 
-        <Pressable
-          onPress={onSubmit}
-          disabled={!canSubmit}
-          style={{
-            paddingHorizontal: 14,
-            paddingVertical: 8,
-            borderRadius: 999,
-            backgroundColor: canSubmit ? DEEP_FOREST : BORDER_SOFT,
-            opacity: submitting ? 0.85 : 1,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          {submitting ? <ActivityIndicator color={PARCHMENT} /> : null}
-          <Text style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT }}>
-            {submitting ? "Posting…" : "Post"}
-          </Text>
-        </Pressable>
+        {/* Spacer to balance the close button */}
+        <View style={{ width: 38 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
@@ -421,6 +412,38 @@ export default function CreateGearReviewScreen() {
           Tip: tap a tag to remove it.
         </Text>
       </ScrollView>
+
+      {/* Bottom Post Button */}
+      <View
+        style={{
+          paddingHorizontal: 18,
+          paddingTop: 12,
+          paddingBottom: insets.bottom + 12,
+          borderTopWidth: 1,
+          borderTopColor: BORDER_SOFT,
+          backgroundColor: PARCHMENT,
+        }}
+      >
+        <Pressable
+          onPress={onSubmit}
+          disabled={!canSubmit}
+          style={{
+            paddingVertical: 14,
+            borderRadius: 12,
+            backgroundColor: canSubmit ? DEEP_FOREST : BORDER_SOFT,
+            opacity: submitting ? 0.85 : 1,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          {submitting ? <ActivityIndicator color={PARCHMENT} /> : null}
+          <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 16, color: PARCHMENT }}>
+            {submitting ? "Posting…" : "Post Review"}
+          </Text>
+        </Pressable>
+      </View>
     </KeyboardAvoidingView>
   );
 }

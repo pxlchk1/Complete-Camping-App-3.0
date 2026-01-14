@@ -14,6 +14,8 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, auth, storage } from '../../config/firebase';
+import { getUserHandleForUid } from '../userHandleService';
+import { getDisplayHandle, isValidHandle } from '../../utils/userHandle';
 
 export interface Photo {
   id: string;
@@ -53,14 +55,18 @@ export const photosService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to upload a photo');
 
-    // Create document first to get ID
+    // CRITICAL: Fetch handle from users/{uid}.handle via service
+    const authorHandle = await getUserHandleForUid(user.uid);
+
     const photoData = {
       userId: user.uid,
-      ownerUid: user.uid, // Consistent owner field for rules
-      userName: user.displayName || 'Anonymous',
+      ownerUid: user.uid,
+      authorId: user.uid,
+      authorHandle: authorHandle, // MUST be from users/{uid}.handle
+      userHandle: authorHandle,   // Legacy field alias
       userAvatar: user.photoURL || null,
-      imageUrl: '', // Will be updated after upload
-      storagePath: '', // Will be updated after upload
+      imageUrl: '',
+      storagePath: '',
       caption: data.caption,
       location: data.location || '',
       tags: data.tags || [],
@@ -85,6 +91,7 @@ export const photosService = {
   },
 
   // Get all stories ordered by createdAt desc (Grid view)
+  // Fetches author handles from users collection if not stored on photo
   async getPhotos(): Promise<Photo[]> {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to view stories');
@@ -92,10 +99,41 @@ export const photosService = {
     const q = query(collection(db, 'stories'), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
+    const photos = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
     })) as Photo[];
+
+    // Fetch missing or invalid author handles from users collection
+    const photosWithHandles = await Promise.all(
+      photos.map(async (photo) => {
+        // Check if photo already has a VALID handle stored
+        const existingHandle = (photo as any).authorHandle || (photo as any).userHandle;
+        if (existingHandle && existingHandle.trim() !== '' && isValidHandle(existingHandle)) {
+          return photo;
+        }
+        
+        // No valid handle stored on photo - fetch from users collection
+        const authorId = photo.userId || (photo as any).authorId;
+        if (!authorId) return photo;
+        
+        try {
+          const userDocRef = doc(db, 'profiles', authorId);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            if (userData.handle && userData.handle.trim() !== '' && isValidHandle(userData.handle)) {
+              return { ...photo, authorHandle: userData.handle };
+            }
+          }
+        } catch (err) {
+          // Silently fail - will use fallback
+        }
+        return photo;
+      })
+    );
+
+    return photosWithHandles;
   },
 
   // Get stories by user (Detail view)

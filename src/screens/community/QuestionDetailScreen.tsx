@@ -39,6 +39,8 @@ import {
   EARTH_GREEN,
 } from "../../constants/colors";
 import HandleLink from "../../components/HandleLink";
+import { getDisplayHandle } from "../../utils/userHandle";
+import { getUserHandleForUid } from "../../services/userHandleService";
 
 type RouteParams = RootStackScreenProps<"QuestionDetail">;
 
@@ -54,7 +56,6 @@ export default function QuestionDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [answerText, setAnswerText] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [authorName, setAuthorName] = useState<string | null>(null);
   const [showAccountRequired, setShowAccountRequired] = useState(false);
 
   // Permission checks for content actions
@@ -151,17 +152,6 @@ export default function QuestionDetailScreen() {
         // Silently ignore - view count increment is not critical
         console.log("[QuestionDetail] Could not increment views:", viewErr);
       }
-
-      // Load author info (optional - may fail for non-authenticated users)
-      try {
-        const author = await getUser(questionData.authorId);
-        if (author) {
-          setAuthorName(author.displayName || author.handle);
-        }
-      } catch (authorErr) {
-        // Silently ignore - author name is not critical for viewing
-        console.log("[QuestionDetail] Could not load author:", authorErr);
-      }
     } catch (err: any) {
       setError(err.message || "Failed to load question");
     } finally {
@@ -222,11 +212,12 @@ export default function QuestionDetailScreen() {
       setSubmitting(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+      const authorHandle = await getUserHandleForUid(currentUser.id);
       const answerId = await createAnswer({
         questionId,
         body: answerText.trim(),
         authorId: currentUser.id,
-        authorHandle: currentUser.handle || currentUser.displayName || "Anonymous",
+        authorHandle,
       });
 
       // Reload answers
@@ -354,21 +345,15 @@ export default function QuestionDetailScreen() {
                   <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
                     Asked by{" "}
                   </Text>
-                  {question.authorId && question.authorHandle ? (
+                  {question.authorId ? (
                     <HandleLink 
-                      handle={question.authorHandle}
+                      handle={getDisplayHandle({ handle: question.authorHandle, id: question.authorId }).replace(/^@/, '')}
                       userId={question.authorId}
                       style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12 }}
                     />
-                  ) : question.authorId ? (
-                    <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: question.authorId })}>
-                      <Text className="text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
-                        {question.authorHandle ? `@${question.authorHandle}` : (authorName || "Anonymous")}
-                      </Text>
-                    </Pressable>
                   ) : (
                     <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                      {question.authorHandle ? `@${question.authorHandle}` : "Anonymous"}
+                      {getDisplayHandle({ handle: question.authorHandle, id: question.authorId })}
                     </Text>
                   )}
                 </View>
@@ -442,21 +427,15 @@ export default function QuestionDetailScreen() {
 
                     <View className="flex-row items-center justify-between pt-3 border-t" style={{ borderColor: BORDER_SOFT }}>
                       <View className="flex-row items-center">
-                        {answer.authorId && answer.authorHandle ? (
+                        {answer.authorId ? (
                           <HandleLink 
-                            handle={answer.authorHandle}
+                            handle={getDisplayHandle({ handle: answer.authorHandle, id: answer.authorId }).replace(/^@/, '')}
                             userId={answer.authorId}
                             style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12 }}
                           />
-                        ) : answer.authorId ? (
-                          <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: answer.authorId })}>
-                            <Text className="text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
-                              {answer.authorHandle ? `@${answer.authorHandle}` : "Anonymous"}
-                            </Text>
-                          </Pressable>
                         ) : (
                           <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                            {answer.authorHandle ? `@${answer.authorHandle}` : "Anonymous"}
+                            {getDisplayHandle({ handle: answer.authorHandle, id: answer.authorId })}
                           </Text>
                         )}
                         <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>

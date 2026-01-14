@@ -12,11 +12,16 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db, auth } from '../../config/firebase';
+import { getUserHandleForUid } from '../userHandleService';
+import { getDisplayHandle, isValidHandle } from '../../utils/userHandle';
 
 export interface AskPost {
   id: string;
   userId: string;
   userName: string;
+  userHandle?: string;
+  authorHandle?: string;
+  authorId?: string;
   userAvatar?: string;
   question: string;
   description: string;
@@ -32,6 +37,9 @@ export interface Answer {
   id: string;
   userId: string;
   userName: string;
+  userHandle?: string;
+  authorHandle?: string;
+  authorId?: string;
   userAvatar?: string;
   answer: string;
   upvotes: number;
@@ -50,9 +58,14 @@ export const askService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to ask a question');
 
+    // CRITICAL: Fetch handle from users/{uid}.handle via service
+    const authorHandle = await getUserHandleForUid(user.uid);
+
     const questionData = {
       userId: user.uid,
-      userName: user.displayName || 'Anonymous',
+      authorId: user.uid,
+      authorHandle: authorHandle, // MUST be from users/{uid}.handle
+      userHandle: authorHandle,   // Legacy field alias
       userAvatar: user.photoURL || null,
       question: data.question,
       description: data.description,
@@ -68,14 +81,46 @@ export const askService = {
   },
 
   // Get all questions ordered by createdAt desc
+  // Fetches author handles from users collection if not stored on question
   async getQuestions(): Promise<AskPost[]> {
     const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
+    const questions = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
     })) as AskPost[];
+
+    // Fetch missing or invalid author handles from users collection
+    const questionsWithHandles = await Promise.all(
+      questions.map(async (question) => {
+        // Check if question already has a VALID handle stored
+        const existingHandle = question.authorHandle || question.userHandle;
+        if (existingHandle && existingHandle.trim() !== '' && isValidHandle(existingHandle)) {
+          return question;
+        }
+        
+        // No valid handle stored on question - fetch from users collection
+        const authorId = question.userId || question.authorId;
+        if (!authorId) return question;
+        
+        try {
+          const userDocRef = doc(db, 'profiles', authorId);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            if (userData.handle && userData.handle.trim() !== '' && isValidHandle(userData.handle)) {
+              return { ...question, authorHandle: userData.handle };
+            }
+          }
+        } catch (err) {
+          // Silently fail - will use fallback
+        }
+        return question;
+      })
+    );
+
+    return questionsWithHandles;
   },
 
   // Get question by ID
@@ -156,9 +201,14 @@ export const askService = {
     const user = auth.currentUser;
     if (!user) throw new Error('Must be signed in to answer');
 
+    // CRITICAL: Fetch handle from users/{uid}.handle via service
+    const authorHandle = await getUserHandleForUid(user.uid);
+
     const answerData = {
       userId: user.uid,
-      userName: user.displayName || 'Anonymous',
+      authorId: user.uid,
+      authorHandle: authorHandle, // MUST be from users/{uid}.handle
+      userHandle: authorHandle,   // Legacy field alias
       userAvatar: user.photoURL || null,
       answer: answerText,
       upvotes: 0,

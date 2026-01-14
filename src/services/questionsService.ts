@@ -171,6 +171,8 @@ export async function createAnswer(data: {
     questionId: data.questionId,
     text: data.body,
     userId: data.authorId,
+    authorId: data.authorId,
+    authorHandle: data.authorHandle,
     username: data.authorHandle,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

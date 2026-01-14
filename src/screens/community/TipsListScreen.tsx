@@ -6,10 +6,11 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, Pressable, FlatList, ActivityIndicator, TextInput, Alert } from "react-native";
+import { View, Text, Pressable, FlatList, TextInput, Alert } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import FireflyLoader from "../../components/common/FireflyLoader";
 import { tipsService, TipPost } from "../../services/firestore/tipsService";
 import { deleteTip } from "../../services/connectDeletionService";
 import { tipVotesService } from "../../services/firestore/tipVotesService";
@@ -23,6 +24,7 @@ import { User } from "../../types/user";
 import { ContentActionsAffordance } from "../../components/contentActions";
 import { RootStackNavigationProp } from "../../navigation/types";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
+import { getDisplayHandle } from "../../utils/userHandle";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -240,7 +242,7 @@ export default function TipsListScreen() {
 
       <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
         <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
-          {item.userName}
+          {getDisplayHandle({ handle: item.userHandle || item.authorHandle, userId: item.userId, authorId: item.authorId })}
         </Text>
         <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
         <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
@@ -252,14 +254,8 @@ export default function TipsListScreen() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-parchment">
-        <ActivityIndicator size="large" color={DEEP_FOREST} />
-        <Text
-          className="mt-4"
-          style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
-        >
-          Loading tips...
-        </Text>
+      <View className="flex-1 bg-parchment">
+        <FireflyLoader />
       </View>
     );
   }

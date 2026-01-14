@@ -43,6 +43,8 @@ import {
   mapLegacyPostType,
 } from "../../types/photoPost";
 import { useCurrentUser } from "../../state/userStore";
+import { getDisplayHandle } from "../../utils/userHandle";
+import { getUserHandleForUid } from "../../services/userHandleService";
 import {
   DEEP_FOREST,
   PARCHMENT,
@@ -177,6 +179,13 @@ export default function PhotoDetailScreen() {
 
       // Try new photoPosts collection first
       const newPost = await getPhotoPostById(postId);
+      
+      console.log("[PhotoDetail] Loaded post:", {
+        postId,
+        userHandle: newPost?.userHandle,
+        userId: newPost?.userId,
+        hasPost: !!newPost,
+      });
       
       if (newPost) {
         setPhotoPost(newPost);
@@ -330,12 +339,13 @@ export default function PhotoDetailScreen() {
       setSubmitting(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
+      const authorHandle = await getUserHandleForUid(currentUser.id);
       await addPhotoComment({
         postId,
         text: commentText.trim(),
         userId: currentUser.id,
-        username: currentUser.handle || currentUser.displayName || "Anonymous",
-        userHandle: currentUser.handle,
+        username: authorHandle,
+        userHandle: authorHandle,
       });
       
       setCommentText("");
@@ -573,16 +583,13 @@ export default function PhotoDetailScreen() {
   };
   const rawHandle = getRawHandle();
   
-  // Get the author's display - prioritize stored handle, then fetched handle, then displayName
-  const getAuthorDisplay = () => {
-    if (rawHandle) return `@${rawHandle}`;
-    if (isNewFormat) {
-      return photoPost?.displayName || "Anonymous";
-    } else {
-      return photo?.displayName || "Anonymous";
-    }
+  // Get the author's display - prioritize stored handle, then fetched handle, then generate from userId
+  // IMPORTANT: This must ALWAYS return a handle (@xxx), never a displayName
+  const getAuthorDisplayValue = () => {
+    const userId = isNewFormat ? photoPost?.userId : photo?.userId;
+    return getDisplayHandle({ handle: rawHandle, id: userId });
   };
-  const displayName = getAuthorDisplay();
+  const authorDisplayHandle = getAuthorDisplayValue();
   const legacyTags = !isNewFormat && photo?.tags ? photo.tags : [];
 
   return (
@@ -682,12 +689,12 @@ export default function PhotoDetailScreen() {
                 ) : authorUserId ? (
                   <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: authorUserId })}>
                     <Text className="text-sm" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
-                      {displayName}
+                      {authorDisplayHandle}
                     </Text>
                   </Pressable>
                 ) : (
                   <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                    {displayName}
+                    {authorDisplayHandle}
                   </Text>
                 )}
               </View>
@@ -814,29 +821,15 @@ export default function PhotoDetailScreen() {
                   
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <View style={{ flex: 1 }}>
-                      {comment.userId && (comment.userHandle || comment.username) ? (
+                      {comment.userId ? (
                         <HandleLink
-                          handle={comment.userHandle || comment.username}
+                          handle={getDisplayHandle({ handle: comment.userHandle || comment.username, id: comment.userId }).replace(/^@/, '')}
                           userId={comment.userId}
                           style={{
                             fontFamily: "SourceSans3_600SemiBold",
                             fontSize: 13,
                           }}
                         />
-                      ) : comment.userId ? (
-                        <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: comment.userId })}>
-                          <Text
-                            style={{
-                              fontFamily: "SourceSans3_600SemiBold",
-                              fontSize: 13,
-                              color: DEEP_FOREST,
-                              textDecorationLine: "underline",
-                              marginBottom: 4,
-                            }}
-                          >
-                            {comment.userHandle || comment.username || "Anonymous"}
-                          </Text>
-                        </Pressable>
                       ) : (
                         <Text
                           style={{
@@ -846,7 +839,7 @@ export default function PhotoDetailScreen() {
                             marginBottom: 4,
                           }}
                         >
-                          {comment.userHandle || comment.username || "Anonymous"}
+                          {getDisplayHandle({ handle: comment.userHandle || comment.username, id: comment.userId })}
                         </Text>
                       )}
                       <Text

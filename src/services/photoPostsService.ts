@@ -24,6 +24,7 @@ import {
   DocumentSnapshot,
 } from "firebase/firestore";
 import firebaseApp from "../config/firebase";
+import { generateCamperHandle } from "../utils/userHandle";
 import {
   PhotoPost,
   PhotoPostType,
@@ -39,6 +40,7 @@ const COLLECTION = "photoPosts";
 
 export interface CreatePhotoPostData {
   userId: string;
+  /** @deprecated Do not use - kept for backwards compatibility only */
   displayName?: string;
   userHandle?: string;
   photoUrls: string[];
@@ -59,10 +61,11 @@ export interface CreatePhotoPostData {
 export async function createPhotoPost(data: CreatePhotoPostData): Promise<string> {
   const postsRef = collection(db, COLLECTION);
 
+  // IMPORTANT: Never store displayName - only store userHandle for attribution
+  // userHandle must always have a value (fallback to @CamperXXXX)
   const docData: Partial<PhotoPost> = {
     userId: data.userId,
-    displayName: data.displayName || "Anonymous",
-    userHandle: data.userHandle,
+    userHandle: data.userHandle || generateCamperHandle(data.userId),
     photoUrls: data.photoUrls,
     storagePaths: data.storagePaths || [],
     postType: data.postType,

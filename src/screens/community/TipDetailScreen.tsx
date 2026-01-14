@@ -27,6 +27,8 @@ import { reportContent } from "../../services/contentReportsService";
 import { requireEmailVerification } from "../../utils/authHelper";
 import { Tip, TipComment } from "../../types/community";
 import { useCurrentUser } from "../../state/userStore";
+import { getDisplayHandle } from "../../utils/userHandle";
+import { getUserHandleForUid } from "../../services/userHandleService";
 import { RootStackParamList, RootStackNavigationProp } from "../../navigation/types";
 import ModalHeader from "../../components/ModalHeader";
 import VotePill from "../../components/VotePill";
@@ -175,11 +177,12 @@ export default function TipDetailScreen() {
 
     try {
       setSubmitting(true);
+      const authorHandle = await getUserHandleForUid(currentUser.id);
       await addTipComment({
         tipId,
         body: commentText.trim(),
         authorId: currentUser.id,
-        username: currentUser.handle || currentUser.displayName || 'Anonymous',
+        username: authorHandle,
       });
       setCommentText("");
       await loadTip(); // Reload to get new comment
@@ -347,7 +350,7 @@ export default function TipDetailScreen() {
 
             <View className="flex-row items-center justify-between py-3 border-t" style={{ borderColor: BORDER_SOFT }}>
               <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                by @author • {formatTimeAgo(tip.createdAt)}
+                by {getDisplayHandle({ handle: tip.userHandle || tip.authorHandle, id: tip.userId || tip.authorId })} • {formatTimeAgo(tip.createdAt)}
               </Text>
               <VotePill
                 collectionPath="tips"

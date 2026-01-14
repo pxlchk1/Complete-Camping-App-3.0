@@ -22,6 +22,7 @@ import {
   DocumentSnapshot,
 } from "firebase/firestore";
 import firebaseApp from "../config/firebase";
+import { generateCamperHandle } from "../utils/userHandle";
 import { Tip, TipComment } from "../types/community";
 
 const db = getFirestore(firebaseApp);
@@ -118,6 +119,7 @@ export async function createTip(data: {
   body: string;
   tags: string[];
   authorId: string;
+  authorHandle?: string;
 }): Promise<string> {
   const tipsRef = collection(db, "tips");
 
@@ -126,6 +128,7 @@ export async function createTip(data: {
     body: data.body,
     tags: data.tags,
     authorId: data.authorId,
+    authorHandle: data.authorHandle || generateCamperHandle(data.authorId),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     upvoteCount: 0,
@@ -179,7 +182,7 @@ export async function addTipComment(data: {
     tipId: data.tipId,
     text: data.body,
     userId: data.authorId,
-    username: data.username || 'Anonymous',
+    username: data.username || generateCamperHandle(data.authorId),
     createdAt: serverTimestamp(),
     helpful_count: 0,
   });

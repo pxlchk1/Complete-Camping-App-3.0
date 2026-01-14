@@ -13,6 +13,10 @@ export interface Tip {
   body: string;
   tags: string[];
   authorId: string;
+  authorHandle?: string;
+  // Legacy field aliases
+  userId?: string;
+  userHandle?: string;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
   upvoteCount: number;
@@ -58,7 +62,11 @@ export interface GearReview {
   cons?: string;
   tags: string[];
   authorId: string;
-  authorName?: string; // Display name of the author
+  authorHandle?: string;
+  authorName?: string; // Display name of the author (legacy - do not use)
+  // Legacy field aliases
+  userId?: string;
+  userHandle?: string;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
   upvoteCount: number;
@@ -81,6 +89,9 @@ export interface Question {
   authorId: string;
   authorHandle: string;
   authorName?: string;
+  // Legacy field aliases
+  userId?: string;
+  userHandle?: string;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
   status: QuestionStatus;
@@ -129,7 +140,8 @@ export interface Story {
   caption: string;
   tags: string[];
   authorId: string;
-  displayName?: string;
+  userId?: string; // Alias for authorId
+  authorHandle?: string;
   createdAt: Timestamp | string;
   locationLabel?: string;
   locationName?: string;

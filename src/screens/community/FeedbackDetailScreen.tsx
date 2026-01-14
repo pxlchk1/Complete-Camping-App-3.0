@@ -37,6 +37,8 @@ import {
   TEXT_MUTED,
   EARTH_GREEN,
 } from "../../constants/colors";
+import HandleLink from "../../components/HandleLink";
+import { getDisplayHandle } from "../../utils/userHandle";
 
 type RouteParams = RootStackScreenProps<"FeedbackDetail">;
 
@@ -52,7 +54,7 @@ export default function FeedbackDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [authorName, setAuthorName] = useState<string | null>(null);
+  const [authorHandle, setAuthorHandle] = useState<string | null>(null);
   const [showAccountRequired, setShowAccountRequired] = useState(false);
 
   // Permission checks for content actions
@@ -142,15 +144,21 @@ export default function FeedbackDetailScreen() {
       setPost(postData);
       setComments(commentsData);
 
-      // Load author info (optional - may fail for non-authenticated users)
-      try {
-        const author = await getUser(postData.authorId);
-        if (author) {
-          setAuthorName(author.displayName || author.handle);
+      // Set author handle from post if available
+      if ((postData as any).authorHandle) {
+        setAuthorHandle((postData as any).authorHandle);
+      } else {
+        // Only fetch user.handle if post doesn't have authorHandle stored
+        // NEVER use displayName for attribution
+        try {
+          const author = await getUser(postData.authorId);
+          if (author?.handle) {
+            setAuthorHandle(author.handle);
+          }
+        } catch (authorErr) {
+          // Silently ignore - will fallback to @CamperXXXX
+          console.log("[FeedbackDetail] Could not load author:", authorErr);
         }
-      } catch (authorErr) {
-        // Silently ignore - author name is not critical for viewing
-        console.log("[FeedbackDetail] Could not load author:", authorErr);
       }
     } catch (err: any) {
       console.error("[FeedbackDetail] Error loading post:", err);
@@ -346,14 +354,14 @@ export default function FeedbackDetailScreen() {
             <View className="flex-row items-center justify-between pt-4 border-t" style={{ borderColor: BORDER_SOFT }}>
               <View>
                 {post.authorId ? (
-                  <Pressable onPress={() => navigation.navigate("MyCampsite", { userId: post.authorId })}>
-                    <Text className="text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: DEEP_FOREST, textDecorationLine: "underline" }}>
-                      Posted by {authorName || "Anonymous"}
-                    </Text>
-                  </Pressable>
+                  <HandleLink
+                    handle={getDisplayHandle({ handle: authorHandle || (post as any).authorHandle, id: post.authorId }).replace(/^@/, '')}
+                    userId={post.authorId}
+                    style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12 }}
+                  />
                 ) : (
                   <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                    Posted by {authorName || "Anonymous"}
+                    {getDisplayHandle({ handle: authorHandle || (post as any).authorHandle, id: post.authorId })}
                   </Text>
                 )}
                 <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
