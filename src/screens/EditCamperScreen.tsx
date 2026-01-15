@@ -64,6 +64,7 @@ export default function EditCamperScreen() {
       setContact(contactData);
       setDisplayName(contactData.contactName);
       setEmail(contactData.contactEmail || "");
+      setPhone(contactData.contactPhone || "");
       setNotes(contactData.contactNote || "");
     } catch (error: any) {
       console.error("Error loading contact:", error);
@@ -85,6 +86,7 @@ export default function EditCamperScreen() {
       await updateCampgroundContact(contactId, {
         contactName: displayName.trim(),
         contactEmail: email.trim() || null,
+        contactPhone: phone.trim() || null,
         contactNote: notes.trim() || null,
       });
 

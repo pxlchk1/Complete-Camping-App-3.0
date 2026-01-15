@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Share,
   Alert,
+  Linking,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -79,10 +81,10 @@ export default function InviteOptionsSheet({
       const profileDoc = await getDoc(doc(db, "profiles", user.uid));
       let inviterName = "A camper";
       if (profileDoc.exists()) {
-        const displayName = profileDoc.data().displayName;
-        // Don't use "Happy Camper" - that's the default placeholder
+        const displayName = profileDoc.data().displayName || "";
+        // Don't use "Happy Camper" - that's the default placeholder; use first name only
         if (displayName && displayName !== "Happy Camper") {
-          inviterName = displayName;
+          inviterName = displayName.split(" ")[0];
         }
       }
 
@@ -104,7 +106,7 @@ export default function InviteOptionsSheet({
       // Create new invite
       const result = await createCampgroundInvite({
         inviteeEmail: contact.contactEmail || undefined,
-        inviteePhone: undefined, // Could add phone support later
+        inviteePhone: contact.contactPhone || undefined,
         inviterName,
         campgroundId: user.uid, // Using user's uid as campground id for now
       });
@@ -181,30 +183,52 @@ export default function InviteOptionsSheet({
       if (user) {
         const profileDoc = await getDoc(doc(db, "profiles", user.uid));
         if (profileDoc.exists()) {
-          const displayName = profileDoc.data().displayName;
-          // Don't use "Happy Camper" - that's the default placeholder
+          const displayName = profileDoc.data().displayName || "";
+          // Don't use "Happy Camper" - that's the default placeholder; use first name only
           if (displayName && displayName !== "Happy Camper") {
-            inviterName = displayName;
+            inviterName = displayName.split(" ")[0];
           }
         }
       }
 
-      // Open share sheet - pass token instead of link
+      // Generate the invite message
       const message = generateInviteMessage(inviterName, invite.token);
-      
-      const result = await Share.share({
-        message,
-      });
 
-      if (result.action === Share.sharedAction) {
-        // Track analytics and core action
-        trackBuddyInviteSent("text");
-        if (user?.uid) {
-          trackCoreAction(user.uid, "buddy_invited");
+      // If we have a phone number, open SMS app with pre-populated recipient
+      if (contact.contactPhone) {
+        const phoneNumber = contact.contactPhone.replace(/[^0-9+]/g, "");
+        const separator = Platform.OS === "ios" ? "&" : "?";
+        const smsUrl = `sms:${phoneNumber}${separator}body=${encodeURIComponent(message)}`;
+        
+        const canOpen = await Linking.canOpenURL(smsUrl);
+        if (canOpen) {
+          await Linking.openURL(smsUrl);
+          // Track analytics and core action
+          trackBuddyInviteSent("text");
+          if (user?.uid) {
+            trackCoreAction(user.uid, "buddy_invited");
+          }
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          onSuccess?.();
+          onClose();
+        } else {
+          Alert.alert("Error", "Unable to open SMS app");
         }
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onSuccess?.();
-        onClose();
+      } else {
+        // Fallback to share sheet if no phone number
+        const result = await Share.share({
+          message,
+        });
+
+        if (result.action === Share.sharedAction) {
+          trackBuddyInviteSent("text");
+          if (user?.uid) {
+            trackCoreAction(user.uid, "buddy_invited");
+          }
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          onSuccess?.();
+          onClose();
+        }
       }
     } catch (error: any) {
       console.error("Error sharing invite:", error);

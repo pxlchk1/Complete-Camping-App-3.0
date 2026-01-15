@@ -68,6 +68,7 @@ export default function AddCamperScreen() {
       const contactId = await createCampgroundContact(user.uid, {
         contactName: displayName.trim(),
         contactEmail: email.trim() || undefined,
+        contactPhone: phone.trim() || undefined,
         contactNote: notes.trim() || undefined,
       });
 
