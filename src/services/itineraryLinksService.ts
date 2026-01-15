@@ -77,8 +77,8 @@ export async function getItineraryLinks(tripId: string): Promise<ItineraryLink[]
   if (!user) throw new Error('Must be signed in to get itinerary links');
 
   const linksRef = getLinksCollection(user.uid, tripId);
-  const q = query(linksRef, orderBy('dayIndex', 'asc'), orderBy('sortOrder', 'asc'));
-  const snapshot = await getDocs(q);
+  // Fetch all links without orderBy to avoid index requirement - we sort client-side anyway
+  const snapshot = await getDocs(linksRef);
 
   const links = snapshot.docs.map((doc) => ({
     id: doc.id,
