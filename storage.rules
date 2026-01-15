@@ -72,6 +72,12 @@ service firebase.storage {
       allow create, write, delete: if isSignedIn() && request.auth.uid == userId;
     }
     
+    // Profile backgrounds (cover photos) - owner-scoped
+    match /profileBackgrounds/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow create, write, delete: if isSignedIn() && request.auth.uid == userId;
+    }
+    
     // Trip photos - trip member scoped
     match /trips/{tripId}/{fileName} {
       allow read: if isSignedIn();
