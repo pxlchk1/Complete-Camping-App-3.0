@@ -137,6 +137,18 @@ const CLOTHING_PERSONAL: PackingTemplate = {
     { name: "Warm layer (fleece/jacket)", category: "Clothing", essential: true },
     { name: "Sleep clothes", category: "Clothing", essential: false },
     { name: "Hat/cap", category: "Clothing", essential: false },
+    // Toiletries
+    { name: "Toothbrush", category: "Personal Care", essential: true },
+    { name: "Toothpaste", category: "Personal Care", essential: true },
+    { name: "Deodorant", category: "Personal Care", essential: false },
+    { name: "Soap (or camp soap)", category: "Personal Care", essential: true },
+    { name: "Body wipes or baby wipes", category: "Personal Care", essential: false },
+    { name: "Hand sanitizer", category: "Personal Care", essential: true },
+    { name: "Toilet paper", category: "Personal Care", essential: true },
+    { name: "Sunscreen", category: "Personal Care", essential: true },
+    { name: "Bug spray", category: "Personal Care", essential: true },
+    { name: "Medications (daily meds)", category: "Personal Care", essential: true },
+    { name: "Feminine hygiene products", category: "Personal Care", essential: false },
   ],
 };
 
