@@ -138,6 +138,43 @@ export default function AddItineraryLinkModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
+  /**
+   * Smart paste handler: detect URL in pasted text and extract title
+   * e.g., "Blue Heron trail https://alltrails.com/123" splits into:
+   * - url: "https://alltrails.com/123"
+   * - title: "Blue Heron trail" (if title is empty)
+   */
+  const handleUrlChange = (text: string) => {
+    // Regex to find first URL (http://, https://, or www.)
+    const urlMatch = text.match(/(https?:\/\/[^\s]+|www\.[^\s]+)/i);
+    
+    if (urlMatch) {
+      let extractedUrl = urlMatch[0];
+      
+      // Normalize www. URLs to https://
+      if (extractedUrl.toLowerCase().startsWith('www.')) {
+        extractedUrl = 'https://' + extractedUrl;
+      }
+      
+      // Extract remaining text (everything except the URL)
+      const remainingText = text
+        .replace(urlMatch[0], '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Set the URL field to just the clean URL
+      setUrl(extractedUrl);
+      
+      // If there's remaining text and title is empty, use it as title
+      if (remainingText && !title.trim()) {
+        setTitle(remainingText);
+      }
+    } else {
+      // No URL found, just set the text as-is
+      setUrl(text);
+    }
+  };
+
   const handleSave = async () => {
     // Validate URL
     if (!url.trim()) {
@@ -209,7 +246,7 @@ export default function AddItineraryLinkModal({
               <TextInput
                 style={styles.input}
                 value={url}
-                onChangeText={setUrl}
+                onChangeText={handleUrlChange}
                 placeholder="Paste URL (e.g., alltrails.com/trail/...)"
                 placeholderTextColor={TEXT_MUTED}
                 autoCapitalize="none"
