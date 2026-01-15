@@ -3,7 +3,7 @@
  * Displays full gear item details with edit/delete actions
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Alert,
   Image,
 } from "react-native";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { auth } from "../config/firebase";
@@ -49,6 +49,13 @@ export default function GearDetailScreen() {
   useEffect(() => {
     loadGear();
   }, [gearId]);
+
+  // Reload gear when screen comes into focus (e.g., after editing)
+  useFocusEffect(
+    useCallback(() => {
+      loadGear();
+    }, [gearId])
+  );
 
   const loadGear = async () => {
     const user = auth.currentUser;

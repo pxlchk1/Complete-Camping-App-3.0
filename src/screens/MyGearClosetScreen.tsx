@@ -328,7 +328,7 @@ export default function MyGearClosetScreen() {
                   >
                     {item.imageUrl ? (
                       <Image
-                        source={{ uri: item.imageUrl }}
+                        source={{ uri: item.imageUrl, cache: 'reload' }}
                         className="w-full h-full rounded-lg"
                         resizeMode="cover"
                       />
