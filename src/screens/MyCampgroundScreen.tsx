@@ -73,12 +73,13 @@ export default function MyCampgroundScreen() {
     loadContacts();
   }, []);
 
-  // Reload contacts when screen comes into focus
+  // Reload contacts when screen comes into focus (with small delay for Firestore propagation)
   useFocusEffect(
     useCallback(() => {
-      if (!loading) {
+      const timer = setTimeout(() => {
         loadContacts();
-      }
+      }, 300);
+      return () => clearTimeout(timer);
     }, [])
   );
 
@@ -109,8 +110,9 @@ export default function MyCampgroundScreen() {
           onPress: async () => {
             try {
               await deleteCampgroundContact(contact.id);
+              // Update local state immediately for instant UI feedback
+              setContacts(prev => prev.filter(c => c.id !== contact.id));
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              await loadContacts();
             } catch (error) {
               Alert.alert("Error", "Failed to delete contact");
             }
@@ -296,6 +298,7 @@ export default function MyCampgroundScreen() {
           visible={showInviteSheet}
           onClose={handleInviteSheetClose}
           contact={selectedContact}
+          onSuccess={loadContacts}
         />
       )}
     </View>
