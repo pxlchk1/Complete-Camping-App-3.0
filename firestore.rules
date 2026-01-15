@@ -420,6 +420,12 @@ service cloud.firestore {
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
+    // User Email Index (for account lookup/linking)
+    match /userEmailIndex/{email} {
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
     // Push Tokens
     match /pushTokens/{tokenId} {
       allow read: if isSignedIn();
