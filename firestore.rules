@@ -115,6 +115,11 @@ service cloud.firestore {
         match /meals/{mealId} {
           allow read, write: if isSignedIn() && request.auth.uid == userId;
         }
+        
+        // Itinerary links subcollection for trips under users
+        match /itineraryLinks/{linkId} {
+          allow read, write: if isSignedIn() && request.auth.uid == userId;
+        }
       }
     }
 
