@@ -42,26 +42,39 @@ export async function getUserGear(ownerId: string): Promise<GearItem[]> {
       ...doc.data()
     })) as GearItem[];
   } catch (error: any) {
-    console.error("Error fetching user gear:", error);
-
     // Fallback: try without orderBy if index is missing
-    if (error.code === "failed-precondition" || error.message?.includes("index")) {
-      const simpleQuery = query(gearRef, where("ownerId", "==", ownerId));
-      const snapshot = await getDocs(simpleQuery);
+    // Check for various error indicators of missing index
+    const isIndexError = 
+      error.code === "failed-precondition" ||
+      error.code === "FAILED_PRECONDITION" ||
+      error.message?.includes("index") ||
+      error.message?.includes("Index") ||
+      error.name === "FirebaseError";
 
-      const gear = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as GearItem[];
+    if (isIndexError) {
+      console.log("[gearClosetService] Index not available, using fallback query");
+      try {
+        const simpleQuery = query(gearRef, where("ownerId", "==", ownerId));
+        const snapshot = await getDocs(simpleQuery);
 
-      // Sort client-side by createdAt
-      return gear.sort((a, b) => {
-        const timeA = typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : a.createdAt.toMillis();
-        const timeB = typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : b.createdAt.toMillis();
-        return timeB - timeA;
-      });
+        const gear = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as GearItem[];
+
+        // Sort client-side by createdAt
+        return gear.sort((a, b) => {
+          const timeA = typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : a.createdAt?.toMillis?.() || 0;
+          const timeB = typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : b.createdAt?.toMillis?.() || 0;
+          return timeB - timeA;
+        });
+      } catch (fallbackError) {
+        console.error("[gearClosetService] Fallback query also failed:", fallbackError);
+        return [];
+      }
     }
 
+    console.error("Error fetching user gear:", error);
     throw error;
   }
 }

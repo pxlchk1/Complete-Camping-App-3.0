@@ -28,6 +28,7 @@ export type PackingTemplateKey =
   | "cooking"
   | "safety"
   | "clothing"
+  | "hygiene"
   | "meals"
   | "backpacking"
   | "car-camping"
@@ -41,6 +42,7 @@ export interface PackingItem {
   checked: boolean;
   note?: string;
   essential?: boolean;
+  fromGearCloset?: boolean;
 }
 
 export interface PackingSection {
@@ -123,6 +125,69 @@ function generateId(): string {
   return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+/**
+ * Template priority for deduplication - higher number wins
+ * Specialized templates override generic ones
+ */
+const TEMPLATE_PRIORITY: Record<PackingTemplateKey, number> = {
+  essential: 1,
+  cooking: 1,
+  safety: 1,
+  clothing: 1,
+  hygiene: 1,
+  meals: 1,
+  "car-camping": 2,
+  backpacking: 2,
+  winter: 3,    // Cold weather needs take priority
+  family: 4,    // Size needs take highest priority (can't fit family in small tent)
+  pets: 1,
+};
+
+/**
+ * Normalize item name to a canonical key for deduplication
+ * Maps variant names to base item types so specialized templates override generic ones
+ */
+function getCanonicalKey(itemName: string): string {
+  const name = itemName.toLowerCase().trim();
+  
+  // Tent variants → "tent" (but not tent stakes, footprint, etc.)
+  if (
+    (name.includes("tent") || name === "tent") &&
+    !name.includes("stake") &&
+    !name.includes("footprint") &&
+    !name.includes("ground cloth")
+  ) {
+    return "tent";
+  }
+  
+  // Sleeping bag variants → "sleeping_bag" (handles "sleeping bag" and "sleeping bags")
+  if (name.includes("sleeping bag")) {
+    return "sleeping_bag";
+  }
+  
+  // Sleeping pad / air mattress variants → "sleeping_pad"
+  if (
+    name.includes("sleeping pad") ||
+    name.includes("air mattress") ||
+    name.includes("mattress")
+  ) {
+    return "sleeping_pad";
+  }
+  
+  // Camp chairs variants → "camp_chairs"
+  if (name.includes("camp chair") || name.includes("chair")) {
+    return "camp_chairs";
+  }
+  
+  // Camp table variants → "camp_table"
+  if (name.includes("camp table") || name.includes("table")) {
+    return "camp_table";
+  }
+  
+  // Return normalized name for exact matching
+  return name.replace(/[^a-z0-9]/g, "_");
+}
+
 // ============================================================================
 // STORE IMPLEMENTATION
 // ============================================================================
@@ -146,47 +211,61 @@ export const usePackingStore = create<PackingState>()(
         if (templateKeys && templateKeys.length > 0) {
           const templates = getTemplatesByKeys(templateKeys);
           
-          // Group items by category
-          const itemsByCategory: Record<string, PackingItem[]> = {};
+          // Track items by canonical key per category with priority
+          // { category: { canonicalKey: { name, essential, priority } } }
+          const itemsByCategoryAndKey: Record<string, Record<string, { name: string; essential: boolean; priority: number }>> = {};
           
           templates.forEach((template: any) => {
+            const templatePriority = TEMPLATE_PRIORITY[template.key as PackingTemplateKey] || 1;
+            
             template.items.forEach((item: any) => {
               const category = item.category || "Other";
-              if (!itemsByCategory[category]) {
-                itemsByCategory[category] = [];
+              const canonicalKey = getCanonicalKey(item.name);
+              
+              if (!itemsByCategoryAndKey[category]) {
+                itemsByCategoryAndKey[category] = {};
               }
               
-              // Check for duplicates
-              const exists = itemsByCategory[category].some(
-                (existing) => existing.name.toLowerCase() === item.name.toLowerCase()
-              );
+              const existing = itemsByCategoryAndKey[category][canonicalKey];
               
-              if (!exists) {
-                itemsByCategory[category].push({
-                  id: generateId(),
+              // Only override if this template has higher or equal priority
+              if (!existing || templatePriority >= existing.priority) {
+                itemsByCategoryAndKey[category][canonicalKey] = {
                   name: item.name,
-                  checked: false,
                   essential: item.essential,
-                });
+                  priority: templatePriority,
+                };
               }
             });
           });
 
-          // Convert to sections
-          sections = Object.entries(itemsByCategory).map(([title, items]) => ({
-            id: generateId(),
-            title,
-            items,
-            collapsed: false,
-          }));
+          // Convert to sections, sort items alphabetically within each section
+          sections = Object.entries(itemsByCategoryAndKey)
+            .map(([title, itemsMap]) => ({
+              id: generateId(),
+              title,
+              items: Object.values(itemsMap)
+                .map((item) => ({
+                  id: generateId(),
+                  name: item.name,
+                  checked: false,
+                  essential: item.essential,
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name)), // Sort items alphabetically
+              collapsed: false,
+            }))
+            .sort((a, b) => a.title.localeCompare(b.title)); // Sort sections alphabetically
         } else {
-          // Use default empty sections
-          sections = DEFAULT_SECTIONS.map((title: string) => ({
-            id: generateId(),
-            title,
-            items: [],
-            collapsed: false,
-          }));
+          // Use default empty sections (already in desired order)
+          sections = DEFAULT_SECTIONS
+            .slice()
+            .sort((a, b) => a.localeCompare(b))
+            .map((title: string) => ({
+              id: generateId(),
+              title,
+              items: [],
+              collapsed: false,
+            }));
         }
 
         const newList: PackingList = {

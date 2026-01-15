@@ -35,6 +35,7 @@ export const DEFAULT_SECTIONS = [
   "Navigation & Safety",
   "Personal Care",
   "Tools & Utilities",
+  "Camp Comfort",
   "Entertainment",
   "Other",
 ];
@@ -117,6 +118,26 @@ const CLOTHING_PERSONAL: PackingTemplate = {
   ],
 };
 
+const PERSONAL_CARE_HYGIENE: PackingTemplate = {
+  key: "hygiene",
+  name: "Personal Care & Hygiene",
+  description: "Toiletries and hygiene essentials",
+  icon: "body",
+  items: [
+    { name: "Toothbrush", category: "Personal Care", essential: true },
+    { name: "Toothpaste", category: "Personal Care", essential: true },
+    { name: "Deodorant", category: "Personal Care", essential: false },
+    { name: "Shampoo/body wash", category: "Personal Care", essential: false },
+    { name: "Comb/brush", category: "Personal Care", essential: false },
+    { name: "Razor", category: "Personal Care", essential: false },
+    { name: "Lip balm", category: "Personal Care", essential: false },
+    { name: "Toilet paper", category: "Personal Care", essential: true },
+    { name: "Hand sanitizer", category: "Personal Care", essential: true },
+    { name: "Towel/camp towel", category: "Personal Care", essential: false },
+    { name: "Mirror (small)", category: "Personal Care", essential: false },
+  ],
+};
+
 const MEAL_PLANNING: PackingTemplate = {
   key: "meals",
   name: "Meal Planning Essentials",
@@ -160,17 +181,17 @@ const BACKPACKING: PackingTemplate = {
 
 const CAR_CAMPING: PackingTemplate = {
   key: "car-camping",
-  name: "Car Camping Comfort",
-  description: "Extra comfort items when weight isn't a concern",
+  name: "Camp Comfort",
+  description: "Furniture and comfort items for your campsite",
   icon: "car",
   items: [
-    { name: "Camp chairs", category: "Entertainment", essential: false },
-    { name: "Camp table", category: "Entertainment", essential: false },
+    { name: "Camp chairs", category: "Camp Comfort", essential: false },
+    { name: "Camp table", category: "Camp Comfort", essential: false },
     { name: "Lantern", category: "Navigation & Safety", essential: false },
     { name: "Large cooler", category: "Cooking & Food", essential: true },
     { name: "Ice", category: "Cooking & Food", essential: true },
-    { name: "Tablecloth", category: "Entertainment", essential: false },
-    { name: "Camp rug", category: "Shelter & Sleep", essential: false },
+    { name: "Tablecloth", category: "Camp Comfort", essential: false },
+    { name: "Camp rug", category: "Camp Comfort", essential: false },
     { name: "Air mattress", category: "Shelter & Sleep", essential: false },
     { name: "Extra blankets", category: "Shelter & Sleep", essential: false },
     { name: "Portable speaker", category: "Entertainment", essential: false },
@@ -277,7 +298,7 @@ const FAMILY_CAMPING: PackingTemplate = {
     { name: "Frisbee/ball", category: "Entertainment", essential: false },
     { name: "Flashlight for each kid", category: "Navigation & Safety", essential: true },
     { name: "Whistle for each kid", category: "Navigation & Safety", essential: true },
-    { name: "Camp chairs for all", category: "Entertainment", essential: false },
+    { name: "Camp chairs for all", category: "Camp Comfort", essential: false },
   ],
 };
 
@@ -290,6 +311,7 @@ export const PACKING_TEMPLATES: PackingTemplate[] = [
   COOKING_FOOD,
   SAFETY_FIRST_AID,
   CLOTHING_PERSONAL,
+  PERSONAL_CARE_HYGIENE,
   MEAL_PLANNING,
   BACKPACKING,
   CAR_CAMPING,
