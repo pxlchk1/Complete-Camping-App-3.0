@@ -43,7 +43,7 @@ import { createItineraryLink } from "../services/itineraryLinksService";
 import { Park } from "../types/camping";
 import * as WebBrowser from "expo-web-browser";
 import { v4 as uuidv4 } from "uuid";
-import { updateDoc, doc, serverTimestamp } from "firebase/firestore";
+import { setDoc, doc, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../config/firebase";
 import * as PackingV2 from "../services/packingListServiceV2";
 import { RootStackParamList } from "../navigation/types";
@@ -393,13 +393,14 @@ export default function TripDetailScreen() {
     async (newNotes: string) => {
       setDetailsNotes(newNotes);
 
-      if (!trip) return;
+      const userId = auth.currentUser?.uid;
+      if (!trip || !userId) return;
 
       try {
-        await updateDoc(doc(db, "trips", trip.id), {
+        await setDoc(doc(db, "users", userId, "trips", trip.id), {
           detailsNotes: newNotes,
           updatedAt: serverTimestamp(),
-        });
+        }, { merge: true });
       } catch (err) {
         console.error("Failed to save notes:", err);
         Alert.alert("Error", "Could not save notes.");
@@ -444,13 +445,14 @@ export default function TripDetailScreen() {
       const newLinks = [...detailsLinks, newLink];
       setDetailsLinks(newLinks);
 
-      if (!trip) return;
+      const userId = auth.currentUser?.uid;
+      if (!trip || !userId) return;
 
       try {
-        await updateDoc(doc(db, "trips", trip.id), {
+        await setDoc(doc(db, "users", userId, "trips", trip.id), {
           detailsLinks: newLinks,
           updatedAt: serverTimestamp(),
-        });
+        }, { merge: true });
       } catch (err) {
         console.error("Failed to save link:", err);
         Alert.alert("Error", "Could not save link.");
@@ -472,13 +474,14 @@ export default function TripDetailScreen() {
       const newLinks = detailsLinks.filter((l) => l.id !== id);
       setDetailsLinks(newLinks);
 
-      if (!trip) return;
+      const userId = auth.currentUser?.uid;
+      if (!trip || !userId) return;
 
       try {
-        await updateDoc(doc(db, "trips", trip.id), {
+        await setDoc(doc(db, "users", userId, "trips", trip.id), {
           detailsLinks: newLinks,
           updatedAt: serverTimestamp(),
-        });
+        }, { merge: true });
       } catch (err) {
         console.error("Failed to delete link:", err);
         Alert.alert("Error", "Could not delete link.");
