@@ -75,11 +75,16 @@ export default function InviteOptionsSheet({
     }
 
     try {
-      // Get inviter's name
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const inviterName = userDoc.exists()
-        ? userDoc.data().displayName || "A camper"
-        : "A camper";
+      // Get inviter's name from profiles collection
+      const profileDoc = await getDoc(doc(db, "profiles", user.uid));
+      let inviterName = "A camper";
+      if (profileDoc.exists()) {
+        const displayName = profileDoc.data().displayName;
+        // Don't use "Happy Camper" - that's the default placeholder
+        if (displayName && displayName !== "Happy Camper") {
+          inviterName = displayName;
+        }
+      }
 
       // Check for existing pending invite
       if (contact.contactEmail) {
@@ -170,13 +175,17 @@ export default function InviteOptionsSheet({
         return;
       }
 
-      // Get inviter name for message
+      // Get inviter name from profiles collection
       const user = auth.currentUser;
       let inviterName = "A camper";
       if (user) {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          inviterName = userDoc.data().displayName || "A camper";
+        const profileDoc = await getDoc(doc(db, "profiles", user.uid));
+        if (profileDoc.exists()) {
+          const displayName = profileDoc.data().displayName;
+          // Don't use "Happy Camper" - that's the default placeholder
+          if (displayName && displayName !== "Happy Camper") {
+            inviterName = displayName;
+          }
         }
       }
 
@@ -221,15 +230,18 @@ export default function InviteOptionsSheet({
         return;
       }
 
-      // Get inviter first name for message
+      // Get inviter first name from profiles collection
       const user = auth.currentUser;
       let inviterName = "A friend";
       if (user) {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const displayName = userDoc.data().displayName || "A friend";
-          // Extract first name
-          inviterName = displayName.trim().split(/\s+/)[0] || "A friend";
+        const profileDoc = await getDoc(doc(db, "profiles", user.uid));
+        if (profileDoc.exists()) {
+          const displayName = profileDoc.data().displayName;
+          // Don't use "Happy Camper" - that's the default placeholder
+          if (displayName && displayName !== "Happy Camper") {
+            // Extract first name
+            inviterName = displayName.trim().split(/\s+/)[0] || "A friend";
+          }
         }
       }
 
