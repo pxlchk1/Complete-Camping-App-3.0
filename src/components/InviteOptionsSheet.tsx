@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Share,
   Alert,
+  Linking,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -75,11 +77,16 @@ export default function InviteOptionsSheet({
     }
 
     try {
-      // Get inviter's name
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const inviterName = userDoc.exists()
-        ? userDoc.data().displayName || "A camper"
-        : "A camper";
+      // Get inviter's name from profiles collection
+      const profileDoc = await getDoc(doc(db, "profiles", user.uid));
+      let inviterName = "A camper";
+      if (profileDoc.exists()) {
+        const displayName = profileDoc.data().displayName || "";
+        // Exclude default "Happy Camper" and use first name only
+        if (displayName && !displayName.toLowerCase().startsWith("happy")) {
+          inviterName = displayName.split(" ")[0];
+        }
+      }
 
       // Check for existing pending invite
       if (contact.contactEmail) {
@@ -99,7 +106,7 @@ export default function InviteOptionsSheet({
       // Create new invite
       const result = await createCampgroundInvite({
         inviteeEmail: contact.contactEmail || undefined,
-        inviteePhone: undefined, // Could add phone support later
+        inviteePhone: contact.contactPhone || undefined,
         inviterName,
         campgroundId: user.uid, // Using user's uid as campground id for now
       });
@@ -170,32 +177,58 @@ export default function InviteOptionsSheet({
         return;
       }
 
-      // Get inviter name for message
+      // Get inviter name for message from profiles collection
       const user = auth.currentUser;
       let inviterName = "A camper";
       if (user) {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          inviterName = userDoc.data().displayName || "A camper";
+        const profileDoc = await getDoc(doc(db, "profiles", user.uid));
+        if (profileDoc.exists()) {
+          const displayName = profileDoc.data().displayName || "";
+          // Exclude default "Happy Camper" and use first name only
+          if (displayName && !displayName.toLowerCase().startsWith("happy")) {
+            inviterName = displayName.split(" ")[0];
+          }
         }
       }
 
-      // Open share sheet - pass token instead of link
+      // Generate the invite message
       const message = generateInviteMessage(inviterName, invite.token);
-      
-      const result = await Share.share({
-        message,
-      });
 
-      if (result.action === Share.sharedAction) {
-        // Track analytics and core action
-        trackBuddyInviteSent("text");
-        if (user?.uid) {
-          trackCoreAction(user.uid, "buddy_invited");
+      // If we have a phone number, open SMS app with pre-populated recipient
+      if (contact.contactPhone) {
+        const phoneNumber = contact.contactPhone.replace(/[^0-9+]/g, "");
+        const separator = Platform.OS === "ios" ? "&" : "?";
+        const smsUrl = `sms:${phoneNumber}${separator}body=${encodeURIComponent(message)}`;
+        
+        const canOpen = await Linking.canOpenURL(smsUrl);
+        if (canOpen) {
+          await Linking.openURL(smsUrl);
+          // Track analytics and core action
+          trackBuddyInviteSent("text");
+          if (user?.uid) {
+            trackCoreAction(user.uid, "buddy_invited");
+          }
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          onSuccess?.();
+          onClose();
+        } else {
+          Alert.alert("Error", "Unable to open SMS app");
         }
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onSuccess?.();
-        onClose();
+      } else {
+        // Fallback to share sheet if no phone number
+        const result = await Share.share({
+          message,
+        });
+
+        if (result.action === Share.sharedAction) {
+          trackBuddyInviteSent("text");
+          if (user?.uid) {
+            trackCoreAction(user.uid, "buddy_invited");
+          }
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          onSuccess?.();
+          onClose();
+        }
       }
     } catch (error: any) {
       console.error("Error sharing invite:", error);
