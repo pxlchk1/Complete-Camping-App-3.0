@@ -36,6 +36,27 @@ import {
   PackingTemplateKey,
 } from "../state/packingStore";
 import { RootStackParamList } from "../navigation/types";
+import { getUserGear } from "../services/gearClosetService";
+import { auth } from "../config/firebase";
+import { GearCategory } from "../types/gear";
+
+// Map gear categories to packing section titles
+const GEAR_TO_PACKING_SECTION: Record<GearCategory, string> = {
+  shelter: "Shelter & Sleep",
+  sleep: "Shelter & Sleep",
+  kitchen: "Cooking & Food",
+  water: "Cooking & Food",
+  lighting: "Navigation & Safety",
+  tools: "Tools & Utilities",
+  safety: "Navigation & Safety",
+  clothing: "Clothing",
+  camp_comfort: "Camp Comfort",
+  electronics: "Entertainment",
+  hygiene: "Personal Care",
+  documents_essentials: "Other",
+  optional_extras: "Other",
+  seating: "Camp Comfort",
+};
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type RouteProps = RouteProp<RootStackParamList, "PackingListCreate">;
@@ -43,7 +64,7 @@ type RouteProps = RouteProp<RootStackParamList, "PackingListCreate">;
 export default function PackingListCreateScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
-  const { createPackingList } = usePackingStore();
+  const { createPackingList, addItem, updateItem, getPackingListById } = usePackingStore();
   
   // Get params from route (if navigating from a trip)
   const tripId = route.params?.tripId;
@@ -73,7 +94,7 @@ export default function PackingListCreateScreen() {
     });
   };
 
-  const handleCreate = useCallback(() => {
+  const handleCreate = useCallback(async () => {
     if (!listName.trim()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
@@ -84,11 +105,47 @@ export default function PackingListCreateScreen() {
     const templateKeys = Array.from(selectedTemplates);
     const listId = createPackingList(listName.trim(), tripType, season, templateKeys, tripId, false);
 
+    // Auto-import gear closet items
+    const userId = auth.currentUser?.uid;
+    if (userId) {
+      try {
+        const gearItems = await getUserGear(userId);
+        const list = getPackingListById(listId);
+        
+        if (gearItems.length > 0 && list) {
+          // Get existing item names to avoid duplicates
+          const existingNames = new Set<string>();
+          list.sections.forEach((section) => {
+            section.items.forEach((item) => {
+              existingNames.add(item.name.toLowerCase().trim());
+            });
+          });
+
+          // Add non-duplicate gear items
+          gearItems.forEach((gear) => {
+            if (!existingNames.has(gear.name.toLowerCase().trim())) {
+              const sectionTitle = GEAR_TO_PACKING_SECTION[gear.category] || "Other";
+              const section = list.sections.find((s) => s.title === sectionTitle);
+              if (section) {
+                const itemId = addItem(listId, section.id, gear.name, false);
+                if (itemId) {
+                  updateItem(listId, section.id, itemId, { fromGearCloset: true });
+                }
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.error("[PackingListCreate] Error importing gear:", error);
+        // Don't block list creation if gear import fails
+      }
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     // Navigate to the editor
     navigation.replace("PackingListEditor" as any, { listId });
-  }, [listName, tripType, season, selectedTemplates, tripId, createPackingList, navigation]);
+  }, [listName, tripType, season, selectedTemplates, tripId, createPackingList, addItem, updateItem, getPackingListById, navigation]);
 
   const canCreate = listName.trim().length > 0;
 

@@ -44,6 +44,27 @@ import {
   PackingItem,
 } from "../state/packingStore";
 import { RootStackParamList } from "../navigation/types";
+import { getUserGear } from "../services/gearClosetService";
+import { auth } from "../config/firebase";
+import { GearCategory } from "../types/gear";
+
+// Map gear categories to packing section titles
+const GEAR_TO_PACKING_SECTION: Record<GearCategory, string> = {
+  shelter: "Shelter & Sleep",
+  sleep: "Shelter & Sleep",
+  kitchen: "Cooking & Food",
+  water: "Cooking & Food",
+  lighting: "Navigation & Safety",
+  tools: "Tools & Utilities",
+  safety: "Navigation & Safety",
+  clothing: "Clothing",
+  camp_comfort: "Camp Comfort",
+  electronics: "Entertainment",
+  hygiene: "Personal Care",
+  documents_essentials: "Other",
+  optional_extras: "Other",
+  seating: "Camp Comfort",
+};
 
 type PackingListEditorRouteProp = RouteProp<{ PackingListEditor: { listId: string } }, "PackingListEditor">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -143,6 +164,22 @@ function SwipeableItem({ item, listId, sectionId, onToggle, onDelete, onEdit }: 
               >
                 {item.name}
               </Text>
+              {item.fromGearCloset && (
+                <View
+                  className="ml-2 px-2 py-0.5 rounded"
+                  style={{ backgroundColor: "#DCFCE7" }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: "SourceSans3_600SemiBold",
+                      fontSize: 10,
+                      color: EARTH_GREEN,
+                    }}
+                  >
+                    GEAR CLOSET
+                  </Text>
+                </View>
+              )}
               {item.essential && (
                 <View
                   className="ml-2 px-2 py-0.5 rounded"
@@ -222,6 +259,7 @@ export default function PackingListEditorScreen() {
   const [newItemNote, setNewItemNote] = useState("");
   const [newItemEssential, setNewItemEssential] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
+  const [importingGear, setImportingGear] = useState(false);
 
   const progress = useMemo(() => 
     list ? getProgress(listId) : { packed: 0, total: 0, percentage: 0 },
@@ -375,11 +413,84 @@ export default function PackingListEditorScreen() {
     );
   }, [list, listId, copyTemplateToTrip, navigation]);
 
+  // Handle import from gear closet
+  const handleImportFromGearCloset = useCallback(async () => {
+    const userId = auth.currentUser?.uid;
+    if (!userId || !list) {
+      Alert.alert("Error", "You must be signed in to import from Gear Closet");
+      return;
+    }
+
+    setImportingGear(true);
+    try {
+      const gearItems = await getUserGear(userId);
+      
+      if (gearItems.length === 0) {
+        Alert.alert("No Gear Found", "Add items to your Gear Closet first to import them here.");
+        return;
+      }
+
+      // Get existing item names to avoid duplicates
+      const existingNames = new Set<string>();
+      list.sections.forEach((section) => {
+        section.items.forEach((item) => {
+          existingNames.add(item.name.toLowerCase().trim());
+        });
+      });
+
+      // Filter out duplicates
+      const newGearItems = gearItems.filter(
+        (gear) => !existingNames.has(gear.name.toLowerCase().trim())
+      );
+
+      if (newGearItems.length === 0) {
+        Alert.alert("Already Added", "All your Gear Closet items are already in this packing list.");
+        return;
+      }
+
+      // Group items by target section
+      const itemsBySection: Record<string, typeof newGearItems> = {};
+      newGearItems.forEach((gear) => {
+        const sectionTitle = GEAR_TO_PACKING_SECTION[gear.category] || "Other";
+        if (!itemsBySection[sectionTitle]) {
+          itemsBySection[sectionTitle] = [];
+        }
+        itemsBySection[sectionTitle].push(gear);
+      });
+
+      // Add items to each section
+      let addedCount = 0;
+      Object.entries(itemsBySection).forEach(([sectionTitle, gearItems]) => {
+        // Find matching section
+        const section = list.sections.find((s) => s.title === sectionTitle);
+        if (section) {
+          gearItems.forEach((gear) => {
+            // Use updateItem to add with fromGearCloset flag
+            const itemId = addItem(listId, section.id, gear.name, false);
+            if (itemId) {
+              updateItem(listId, section.id, itemId, { fromGearCloset: true });
+              addedCount++;
+            }
+          });
+        }
+      });
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Imported!", `Added ${addedCount} items from your Gear Closet.`);
+    } catch (error) {
+      console.error("[PackingListEditor] Error importing gear:", error);
+      Alert.alert("Error", "Failed to import from Gear Closet. Please try again.");
+    } finally {
+      setImportingGear(false);
+    }
+  }, [list, listId, addItem, updateItem]);
+
   // More menu - different options based on whether it's a template
   const handleMoreMenu = useCallback(() => {
     const isTemplate = list?.isTemplate;
     
     const options: any[] = [
+      { text: "Import from Gear Closet", onPress: handleImportFromGearCloset },
       { text: "Add Section", onPress: () => setShowAddSection(true) },
       { text: "Reset All Items", onPress: handleResetList },
       { text: "Share List", onPress: handleShare },
@@ -397,7 +508,7 @@ export default function PackingListEditorScreen() {
       undefined,
       options
     );
-  }, [list, handleResetList, handleShare, handleUseAsNewList]);
+  }, [list, handleImportFromGearCloset, handleResetList, handleShare, handleUseAsNewList]);
 
   if (!list) {
     return (
