@@ -208,14 +208,6 @@ export default function SettingsScreen() {
         });
       }
 
-      // Also update profiles collection (used by MyCampsiteScreen)
-      const profileRef = doc(db, "profiles", user.uid);
-      await setDoc(profileRef, {
-        displayName: displayName.trim(),
-        handle: handle.trim().toLowerCase() || null,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
       // Update email subscriber document (using marketing preference)
       await updateEmailSubscription(user.uid, user.email || "", emailMarketingEnabled);
 
