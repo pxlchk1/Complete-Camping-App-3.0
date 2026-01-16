@@ -315,6 +315,11 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
         console.log("[Auth] Account created, uid:", userCredential.user.uid);
 
+        // Force token refresh to ensure Firestore rules see the new auth state
+        console.log("[Auth] Refreshing auth token before Firestore writes...");
+        await userCredential.user.getIdToken(true);
+        console.log("[Auth] Token refreshed successfully");
+
         // Create user profile in Firestore (profiles + emailSubscribers)
         // Normalize handle - remove any @ prefix before saving
         const normalizedHandle = handle.trim().replace(/^@+/, "");
