@@ -1122,6 +1122,24 @@ export default function MyCampsiteScreen({ navigation }: any) {
                   My Campground
                 </Text>
               </Pressable>
+
+              {/* Account Settings */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  navigation.navigate("Settings");
+                }}
+                className="flex-1 p-4 rounded-xl border items-center active:opacity-70"
+                style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
+              >
+                <Ionicons name="settings-outline" size={28} color={EARTH_GREEN} />
+                <Text
+                  className="mt-2 text-center"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 13, color: TEXT_PRIMARY_STRONG }}
+                >
+                  Account Settings
+                </Text>
+              </Pressable>
             </View>
           )}
 
