@@ -261,9 +261,12 @@ export default function FeedbackListScreen() {
         {/* Footer: author, date, and comments count */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 12, borderTopWidth: 1, borderColor: BORDER_SOFT }}>
           <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
-            <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
-              {getDisplayHandle({ handle: (item as any).authorHandle || (item as any).userHandle, id: (item as any).authorId || (item as any).createdByUserId })}
-            </Text>
+            <HandleLink
+              handle={getDisplayHandle({ handle: (item as any).authorHandle || (item as any).userHandle, id: (item as any).authorId || (item as any).createdByUserId }).replace(/^@/, '')}
+              userId={(item as any).authorId || (item as any).createdByUserId}
+              fontSize={12}
+              color={TEXT_MUTED}
+            />
             <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
             <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
               {formatTimeAgo(item.createdAt)}

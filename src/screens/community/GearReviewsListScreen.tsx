@@ -26,6 +26,7 @@ import AccountRequiredModal from "../../components/AccountRequiredModal";
 import { requirePro } from "../../utils/gating";
 import { shouldShowInFeed } from "../../services/moderationService";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
+import HandleLink from "../../components/HandleLink";
 import { getDisplayHandle } from "../../utils/userHandle";
 import {
   DEEP_FOREST,
@@ -272,9 +273,12 @@ export default function GearReviewsListScreen() {
       )}
 
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
-          {getDisplayHandle({ handle: (item as any).authorHandle || (item as any).userHandle, id: item.authorId || item.userId })}
-        </Text>
+        <HandleLink
+          handle={getDisplayHandle({ handle: (item as any).authorHandle || (item as any).userHandle, id: item.authorId || item.userId }).replace(/^@/, '')}
+          userId={item.authorId || item.userId}
+          fontSize={12}
+          color={TEXT_MUTED}
+        />
         <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
         <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
           {formatTimeAgo(toDateString(item.createdAt))}

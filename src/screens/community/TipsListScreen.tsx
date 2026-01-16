@@ -24,6 +24,7 @@ import { User } from "../../types/user";
 import { ContentActionsAffordance } from "../../components/contentActions";
 import { RootStackNavigationProp } from "../../navigation/types";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
+import HandleLink from "../../components/HandleLink";
 import { getDisplayHandle } from "../../utils/userHandle";
 import {
   DEEP_FOREST,
@@ -241,9 +242,12 @@ export default function TipsListScreen() {
       </Text>
 
       <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
-        <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
-          {getDisplayHandle({ handle: item.userHandle || item.authorHandle, userId: item.userId, authorId: item.authorId })}
-        </Text>
+        <HandleLink
+          handle={getDisplayHandle({ handle: item.userHandle || item.authorHandle, userId: item.userId, authorId: item.authorId }).replace(/^@/, '')}
+          userId={item.userId || item.authorId || ''}
+          fontSize={12}
+          color={TEXT_MUTED}
+        />
         <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
         <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
           {formatTimeAgo(item.createdAt)}
