@@ -47,6 +47,7 @@ import { RootStackParamList } from "../navigation/types";
 import { getUserGear } from "../services/gearClosetService";
 import { auth } from "../config/firebase";
 import { GearCategory } from "../types/gear";
+import { requirePro } from "../utils/gating";
 
 // Map gear categories to packing section titles
 const GEAR_TO_PACKING_SECTION: Record<GearCategory, string> = {
@@ -268,23 +269,41 @@ export default function PackingListEditorScreen() {
 
   // Handle toggle item
   const handleToggleItem = useCallback((sectionId: string, itemId: string) => {
+    if (!requirePro({
+      openAccountModal: () => {},
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_toggle", variant }),
+    })) {
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     toggleItemChecked(listId, sectionId, itemId);
-  }, [listId, toggleItemChecked]);
+  }, [listId, toggleItemChecked, navigation]);
 
   // Handle delete item
   const handleDeleteItem = useCallback((sectionId: string, itemId: string) => {
+    if (!requirePro({
+      openAccountModal: () => {},
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_delete_item", variant }),
+    })) {
+      return;
+    }
     deleteItem(listId, sectionId, itemId);
-  }, [listId, deleteItem]);
+  }, [listId, deleteItem, navigation]);
 
-  // Handle edit item
+  // Handle edit item - opens modal (no gating needed for opening modal)
   const handleEditItem = useCallback((sectionId: string, item: PackingItem) => {
+    if (!requirePro({
+      openAccountModal: () => {},
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_edit_item", variant }),
+    })) {
+      return;
+    }
     setEditingItem({ sectionId, item });
     setNewItemName(item.name);
     setNewItemNote(item.note || "");
     setNewItemEssential(item.essential || false);
     setShowEditItem(true);
-  }, []);
+  }, [navigation]);
 
   // Save edited item
   const handleSaveEditItem = useCallback(() => {
@@ -308,6 +327,13 @@ export default function PackingListEditorScreen() {
   const handleAddItem = useCallback(() => {
     if (!activeSectionId || !newItemName.trim()) return;
 
+    if (!requirePro({
+      openAccountModal: () => {},
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_add_item", variant }),
+    })) {
+      return;
+    }
+
     addItem(listId, activeSectionId, newItemName.trim(), newItemEssential);
 
     setShowAddItem(false);
@@ -315,21 +341,34 @@ export default function PackingListEditorScreen() {
     setNewItemNote("");
     setNewItemEssential(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [listId, activeSectionId, newItemName, newItemEssential, addItem]);
+  }, [listId, activeSectionId, newItemName, newItemEssential, addItem, navigation]);
 
   // Handle add section
   const handleAddSection = useCallback(() => {
     if (!newSectionName.trim()) return;
+
+    if (!requirePro({
+      openAccountModal: () => {},
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_add_section", variant }),
+    })) {
+      return;
+    }
 
     addSection(listId, newSectionName.trim());
 
     setShowAddSection(false);
     setNewSectionName("");
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [listId, newSectionName, addSection]);
+  }, [listId, newSectionName, addSection, navigation]);
 
   // Handle delete section
   const handleDeleteSection = useCallback((sectionId: string, sectionTitle: string) => {
+    if (!requirePro({
+      openAccountModal: () => {},
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_delete_section", variant }),
+    })) {
+      return;
+    }
     Alert.alert(
       "Delete Section",
       `Delete "${sectionTitle}" and all its items?`,
@@ -345,7 +384,7 @@ export default function PackingListEditorScreen() {
         },
       ]
     );
-  }, [listId, deleteSection]);
+  }, [listId, deleteSection, navigation]);
 
   // Handle reset list
   const handleResetList = useCallback(() => {
@@ -415,6 +454,13 @@ export default function PackingListEditorScreen() {
 
   // Handle import from gear closet
   const handleImportFromGearCloset = useCallback(async () => {
+    if (!requirePro({
+      openAccountModal: () => {},
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_import_gear", variant }),
+    })) {
+      return;
+    }
+
     const userId = auth.currentUser?.uid;
     if (!userId || !list) {
       Alert.alert("Error", "You must be signed in to import from Gear Closet");
@@ -483,7 +529,7 @@ export default function PackingListEditorScreen() {
     } finally {
       setImportingGear(false);
     }
-  }, [list, listId, addItem, updateItem]);
+  }, [list, listId, addItem, updateItem, navigation]);
 
   // More menu - different options based on whether it's a template
   const handleMoreMenu = useCallback(() => {

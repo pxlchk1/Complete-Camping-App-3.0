@@ -39,6 +39,7 @@ import { RootStackParamList } from "../navigation/types";
 import { getUserGear } from "../services/gearClosetService";
 import { auth } from "../config/firebase";
 import { GearCategory } from "../types/gear";
+import { requirePro } from "../utils/gating";
 
 // Map gear categories to packing section titles
 const GEAR_TO_PACKING_SECTION: Record<GearCategory, string> = {
@@ -97,6 +98,13 @@ export default function PackingListCreateScreen() {
   const handleCreate = useCallback(async () => {
     if (!listName.trim()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+
+    if (!requirePro({
+      openAccountModal: () => {},
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_create", variant }),
+    })) {
       return;
     }
 
