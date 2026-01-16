@@ -346,8 +346,8 @@ export async function createUserProfile(data: {
   const isAdmin = data.email.toLowerCase() === "alana@tentandlantern.com" || 
                   data.handle.toLowerCase() === "tentandlantern";
   
-  // Create profile
-  await setDoc(userRef, {
+  // Create profile - payload logged for debugging
+  const profilePayload = {
     email: data.email,
     displayName: data.displayName,
     handle: data.handle,
@@ -366,18 +366,33 @@ export async function createUserProfile(data: {
     bio: null,
     campingStyle: null,
     location: null,
-  });
+  };
+  console.log("[createUserProfile] Writing to profiles/" + data.userId, "keys:", Object.keys(profilePayload));
+  
+  try {
+    await setDoc(userRef, profilePayload);
+    console.log("[createUserProfile] Profile write successful");
+  } catch (error: any) {
+    console.error("[createUserProfile] Profile write FAILED:", error.code, error.message);
+    throw error;
+  }
 
   // Extract first name from display name
   const firstname = data.displayName.split(' ')[0] || data.displayName;
 
-  // Create email subscriber record
-  await createEmailSubscriber({
-    userId: data.userId,
-    emailAddress: data.email,
-    firstname,
-    subscriptionStatus: "subscribed",
-  });
+  console.log("[createUserProfile] Writing to emailSubscribers/" + data.userId);
+  try {
+    await createEmailSubscriber({
+      userId: data.userId,
+      emailAddress: data.email,
+      firstname,
+      subscriptionStatus: "subscribed",
+    });
+    console.log("[createUserProfile] emailSubscribers write successful");
+  } catch (error: any) {
+    console.error("[createUserProfile] emailSubscribers write FAILED:", error.code, error.message);
+    throw error;
+  }
 }
 
 // ==================== Permission Checks ====================

@@ -313,20 +313,24 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
 
         console.log("[Auth] Creating account for:", email.trim());
         userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        console.log("[Auth] Account created, uid:", userCredential.user.uid);
 
         // Create user profile in Firestore (profiles + emailSubscribers)
         // Normalize handle - remove any @ prefix before saving
         const normalizedHandle = handle.trim().replace(/^@+/, "");
 
+        console.log("[Auth] Creating user profile at profiles/" + userCredential.user.uid);
         await createUserProfile({
           userId: userCredential.user.uid,
           email: email.trim(),
           displayName: displayName.trim(),
           handle: normalizedHandle,
         });
+        console.log("[Auth] User profile created successfully");
 
         // Create email index mapping for account lookup
         const emailNormalized = email.trim().toLowerCase();
+        console.log("[Auth] Creating email index at userEmailIndex/" + emailNormalized);
         await setDoc(doc(db, "userEmailIndex", emailNormalized), {
           userId: userCredential.user.uid,
           email: email.trim(),
