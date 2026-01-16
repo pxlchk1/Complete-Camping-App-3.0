@@ -230,6 +230,13 @@ export default function TripDetailScreen() {
   }, [trip]);
 
   const handleOpenPacking = useCallback(async () => {
+    // Gate: Pro-only feature
+    const canProceed = requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "packing_list", variant }),
+    });
+    if (!canProceed) return;
+
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
@@ -261,6 +268,13 @@ export default function TripDetailScreen() {
   }, [navigation, trip, localPackingLists]);
 
   const handleOpenMeals = useCallback(async () => {
+    // Gate: Pro-only feature
+    const canProceed = requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: (variant) => navigation.navigate("Paywall", { triggerKey: "meal_planner", variant }),
+    });
+    if (!canProceed) return;
+
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
