@@ -266,8 +266,10 @@ export default function ParkDetailModal({
   };
 
   const handleReserveSite = () => {
-    if (park.url) {
+    if (park.url?.trim()) {
       Linking.openURL(park.url);
+    } else {
+      console.warn("handleReserveSite called but park.url is missing or empty");
     }
   };
 
@@ -411,33 +413,35 @@ export default function ParkDetailModal({
               )
             )}
 
-            {/* Reserve a Site */}
-            <Pressable
-              onPress={handleReserveSite}
-              style={{
-                backgroundColor: DEEP_FOREST,
-                borderRadius: 16,
-                paddingVertical: 14,
-                paddingHorizontal: 20,
-                borderWidth: 0,
-                marginTop: 4,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="calendar" size={20} color={PARCHMENT} />
-              <Text
+            {/* Reserve a Site - only show if park has valid URL */}
+            {park.url?.trim() && (
+              <Pressable
+                onPress={handleReserveSite}
                 style={{
-                  fontFamily: "SourceSans3_600SemiBold",
-                  fontSize: 16,
-                  color: PARCHMENT,
-                  marginLeft: 8,
+                  backgroundColor: DEEP_FOREST,
+                  borderRadius: 16,
+                  paddingVertical: 14,
+                  paddingHorizontal: 20,
+                  borderWidth: 0,
+                  marginTop: 4,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                Reserve a Site
-              </Text>
-            </Pressable>
+                <Ionicons name="calendar" size={20} color={PARCHMENT} />
+                <Text
+                  style={{
+                    fontFamily: "SourceSans3_600SemiBold",
+                    fontSize: 16,
+                    color: PARCHMENT,
+                    marginLeft: 8,
+                  }}
+                >
+                  Reserve a Site
+                </Text>
+              </Pressable>
+            )}
 
             {/* Bottom row of utility buttons */}
             <View
