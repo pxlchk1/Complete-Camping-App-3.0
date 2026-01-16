@@ -163,6 +163,13 @@ export default function MyTripsScreen() {
 
   // Navigate to packing list for a specific trip
   const handlePackingPress = (tripId: string) => {
+    // Gate: Pro-only feature
+    const canProceed = requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: (variant) => nav.navigate("Paywall", { triggerKey: "packing_list", variant }),
+    });
+    if (!canProceed) return;
+
     safeHaptic();
     
     // Check if there's a local packing list for this trip
@@ -190,18 +197,39 @@ export default function MyTripsScreen() {
 
   // Navigate to meals for a specific trip
   const handleMealsPress = (tripId: string) => {
+    // Gate: Pro-only feature
+    const canProceed = requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: (variant) => nav.navigate("Paywall", { triggerKey: "meal_planner", variant }),
+    });
+    if (!canProceed) return;
+
     safeHaptic();
     nav.navigate("MealPlanning", { tripId });
   };
 
   // Navigate to standalone packing (drafts mode)
   const handleQuickPacking = () => {
+    // Gate: Pro-only feature
+    const canProceed = requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: (variant) => nav.navigate("Paywall", { triggerKey: "packing_list", variant }),
+    });
+    if (!canProceed) return;
+
     safeHaptic();
     nav.navigate("PackingListCreate");
   };
 
   // Navigate to standalone meals (meal planner without trip context)
   const handleQuickMeals = () => {
+    // Gate: Pro-only feature
+    const canProceed = requirePro({
+      openAccountModal: () => setShowAccountModal(true),
+      openPaywallModal: (variant) => nav.navigate("Paywall", { triggerKey: "meal_planner", variant }),
+    });
+    if (!canProceed) return;
+
     safeHaptic();
     // Navigate to meal planning - if user has an upcoming trip, use the first one
     // Otherwise, prompt them to create a trip first
