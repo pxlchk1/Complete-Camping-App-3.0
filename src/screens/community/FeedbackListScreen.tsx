@@ -17,6 +17,7 @@ import { requireProForAction } from "../../utils/gating";
 import { shouldShowInFeed } from "../../services/moderationService";
 import { RootStackNavigationProp } from "../../navigation/types";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
+import HandleLink from "../../components/HandleLink";
 import { seedFeedbackIfEmpty } from "../../features/feedback/seedFeedback";
 import { getDisplayHandle } from "../../utils/userHandle";
 import {
