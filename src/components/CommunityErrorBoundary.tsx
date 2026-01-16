@@ -11,21 +11,43 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  errorCount: number;
+  lastErrorTime: number;
 }
 
 export class CommunityErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, errorCount: 0, lastErrorTime: 0 };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error("Community stack crashed:", error, info);
-    // TODO: send to Sentry/Crashlytics if available
+    const now = Date.now();
+    const timeSinceLastError = now - this.state.lastErrorTime;
+    const newErrorCount = timeSinceLastError < 5000 ? this.state.errorCount + 1 : 1;
+    
+    console.error("[CommunityErrorBoundary] Crash caught:", {
+      message: error.message,
+      stack: error.stack?.split("\n").slice(0, 5).join("\n"),
+      componentStack: info.componentStack?.split("\n").slice(0, 10).join("\n"),
+      errorCount: newErrorCount,
+      timeSinceLastError,
+    });
+    
+    this.setState({ errorCount: newErrorCount, lastErrorTime: now });
+    
+    // Auto-retry once if this is the first error in 5 seconds
+    // This handles transient navigation timing issues
+    if (newErrorCount === 1 && timeSinceLastError >= 5000) {
+      console.log("[CommunityErrorBoundary] Auto-retrying after first error");
+      setTimeout(() => {
+        this.setState({ hasError: false, error: null });
+      }, 100);
+    }
   }
 
   handleRetry = () => {
