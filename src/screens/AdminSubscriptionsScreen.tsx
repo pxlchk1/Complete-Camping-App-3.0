@@ -1,6 +1,7 @@
 /**
  * Admin Award Subscriptions Screen
  * Allows admin to grant premium subscriptions to users
+ * Uses Cloud Function for secure subscription updates
  */
 
 import React, { useState } from "react";
@@ -8,7 +9,7 @@ import { View, Text, ScrollView, Pressable, TextInput, Alert, ActivityIndicator 
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { auth, db } from "../config/firebase";
-import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import ModalHeader from "../components/ModalHeader";
 import {
   PARCHMENT,
@@ -21,12 +22,15 @@ import {
   DEEP_FOREST,
 } from "../constants/colors";
 
+// Cloud Function URL for awarding subscriptions
+const AWARD_SUBSCRIPTION_URL = "https://us-central1-tentandlanternapp.cloudfunctions.net/awardSubscription";
+
 const SUBSCRIPTION_DURATIONS = [
-  { id: "1_month", label: "1 Month", months: 1 },
-  { id: "3_months", label: "3 Months", months: 3 },
-  { id: "6_months", label: "6 Months", months: 6 },
-  { id: "1_year", label: "1 Year", months: 12 },
-  { id: "lifetime", label: "Lifetime", months: null },
+  { id: "1_month", label: "1 Month", days: 30 },
+  { id: "3_months", label: "3 Months", days: 90 },
+  { id: "6_months", label: "6 Months", days: 180 },
+  { id: "1_year", label: "1 Year", days: 365 },
+  { id: "lifetime", label: "Lifetime", days: null },
 ];
 
 export default function AdminSubscriptionsScreen() {
@@ -43,9 +47,9 @@ export default function AdminSubscriptionsScreen() {
     try {
       setLoading(true);
 
-      // Find user by email
-      const usersRef = collection(db, "users");
-      const q = query(usersRef, where("email", "==", email.trim().toLowerCase()));
+      // Find user by email in profiles collection
+      const profilesRef = collection(db, "profiles");
+      const q = query(profilesRef, where("email", "==", email.trim().toLowerCase()));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
@@ -54,29 +58,36 @@ export default function AdminSubscriptionsScreen() {
       }
 
       const userDoc = querySnapshot.docs[0];
-      const userId = userDoc.id;
+      const targetUid = userDoc.id;
       const duration = SUBSCRIPTION_DURATIONS.find(d => d.id === selectedDuration);
 
       if (!duration) return;
 
-      // Calculate expiration date
-      let expiresAt = null;
-      if (duration.months !== null) {
-        const now = new Date();
-        now.setMonth(now.getMonth() + duration.months);
-        expiresAt = now.toISOString();
+      // Get current user's ID token for authentication
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) {
+        Alert.alert("Error", "You must be signed in to award subscriptions");
+        return;
       }
 
-      // Update user document
-      await updateDoc(doc(db, "users", userId), {
-        membershipTier: "subscribed",
-        subscriptionProvider: "admin_granted",
-        subscriptionStatus: "active",
-        subscriptionUpdatedAt: serverTimestamp(),
-        subscriptionExpiresAt: expiresAt,
-        grantedBy: auth.currentUser?.email || "admin",
-        grantedAt: serverTimestamp(),
+      // Call Cloud Function to award subscription
+      const response = await fetch(AWARD_SUBSCRIPTION_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          targetUid,
+          durationDays: duration.days,
+        }),
       });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to award subscription");
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
