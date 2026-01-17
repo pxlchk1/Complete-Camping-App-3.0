@@ -39,8 +39,11 @@
 
 import * as admin from "firebase-admin";
 
-// Initialize Firebase Admin with ADC or GOOGLE_APPLICATION_CREDENTIALS
-admin.initializeApp();
+// Initialize Firebase Admin with explicit project ID
+// This avoids the metadata.google.internal lookup issue on local machines
+admin.initializeApp({
+  projectId: "tentandlanternapp",
+});
 
 async function setAdminClaim(identifier: string): Promise<void> {
   let user: admin.auth.UserRecord;

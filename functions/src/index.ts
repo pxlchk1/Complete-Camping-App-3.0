@@ -2128,8 +2128,21 @@ export const awardSubscription = functions.https.onRequest(async (req, res) => {
       return;
     }
 
-    // Check admin custom claim
-    if (decodedToken.admin !== true) {
+    // Check if user is admin via Firestore profile
+    const callerUid = decodedToken.uid;
+    const callerProfileRef = admin.firestore().doc(`profiles/${callerUid}`);
+    const callerProfileSnap = await callerProfileRef.get();
+    
+    let isAdmin = false;
+    if (callerProfileSnap.exists) {
+      const callerData = callerProfileSnap.data();
+      isAdmin = callerData?.isAdmin === true || 
+                callerData?.role === "admin" || 
+                callerData?.role === "administrator" ||
+                callerData?.membershipTier === "isAdmin";
+    }
+
+    if (!isAdmin) {
       functions.logger.warn("Non-admin attempted to award subscription", {
         uid: decodedToken.uid,
         email: decodedToken.email,
