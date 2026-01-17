@@ -2069,3 +2069,126 @@ export const adminUpdateProfile = functions.https.onCall(
   }
 );
 
+// ============================================
+// ADMIN AWARD SUBSCRIPTION (HTTP FUNCTION)
+// ============================================
+
+/**
+ * HTTP endpoint to award a subscription to a user.
+ * POST /awardSubscription
+ *
+ * Headers:
+ *   Authorization: Bearer <Firebase ID Token>
+ *
+ * Body (JSON):
+ *   targetUid: string (required) - The user ID to award subscription to
+ *   durationDays: number (optional) - Duration in days (null = lifetime)
+ *
+ * Returns:
+ *   200: { success: true, expiresAt: string | null }
+ *   401: Unauthorized (missing/invalid token)
+ *   403: Forbidden (not an admin)
+ *   400: Bad request (missing targetUid)
+ *   404: User not found
+ *   500: Internal error
+ */
+export const awardSubscription = functions.https.onRequest(async (req, res) => {
+  // Set CORS headers
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+
+  // Only allow POST
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+
+  try {
+    // Extract and verify ID token
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Missing or invalid Authorization header" });
+      return;
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(idToken);
+    } catch (error) {
+      functions.logger.warn("Invalid ID token", { error });
+      res.status(401).json({ error: "Invalid ID token" });
+      return;
+    }
+
+    // Check admin custom claim
+    if (decodedToken.admin !== true) {
+      functions.logger.warn("Non-admin attempted to award subscription", {
+        uid: decodedToken.uid,
+        email: decodedToken.email,
+      });
+      res.status(403).json({ error: "Forbidden: Admin access required" });
+      return;
+    }
+
+    // Parse request body
+    const { targetUid, durationDays } = req.body;
+
+    if (!targetUid || typeof targetUid !== "string") {
+      res.status(400).json({ error: "targetUid is required" });
+      return;
+    }
+
+    // Check if target user exists in profiles collection
+    const profileRef = admin.firestore().doc(`profiles/${targetUid}`);
+    const profileSnap = await profileRef.get();
+
+    if (!profileSnap.exists) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    // Calculate expiration date
+    let expiresAt: string | null = null;
+    if (durationDays && typeof durationDays === "number" && durationDays > 0) {
+      const expDate = new Date();
+      expDate.setDate(expDate.getDate() + durationDays);
+      expiresAt = expDate.toISOString();
+    }
+
+    // Update user's subscription fields in profiles collection
+    await profileRef.update({
+      membershipTier: "subscribed",
+      subscriptionProvider: "admin_granted",
+      subscriptionStatus: "active",
+      subscriptionUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      subscriptionExpiresAt: expiresAt,
+      grantedBy: decodedToken.email || decodedToken.uid,
+      grantedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    functions.logger.info("Subscription awarded by admin", {
+      adminUid: decodedToken.uid,
+      adminEmail: decodedToken.email,
+      targetUid,
+      durationDays: durationDays || "lifetime",
+      expiresAt,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Subscription awarded to user ${targetUid}`,
+      expiresAt,
+    });
+  } catch (error) {
+    functions.logger.error("Error awarding subscription", { error });
+    res.status(500).json({ error: "Internal server error" });
+  }
+});

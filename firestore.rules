@@ -123,12 +123,30 @@ service cloud.firestore {
       }
     }
 
+    // Helper function to check if request modifies subscription fields
+    // These fields can only be modified by Cloud Functions (admin SDK)
+    function modifiesSubscriptionFields() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['membershipTier', 'subscriptionProvider', 'subscriptionStatus', 
+                 'subscriptionUpdatedAt', 'subscriptionExpiresAt', 'grantedBy', 'grantedAt']);
+    }
+
     // Profiles collection
     match /profiles/{userId} {
       // Allow anyone to read profiles (public profiles)
       allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update, delete: if isSignedIn() && request.auth.uid == userId;
+      // Create: user can create their own profile, but cannot set subscription fields
+      allow create: if request.auth != null 
+        && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(['membershipTier', 'subscriptionProvider', 
+            'subscriptionStatus', 'subscriptionUpdatedAt', 'subscriptionExpiresAt', 
+            'grantedBy', 'grantedAt']);
+      // Update: user can update their own profile, but cannot modify subscription fields
+      allow update: if isSignedIn() 
+        && request.auth.uid == userId 
+        && !modifiesSubscriptionFields();
+      // Delete: user can delete their own profile
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
     // Trips collection
