@@ -1,5 +1,6 @@
 rules_version = '2';
-// Last updated: 2024-12-27
+// Last updated: 2026-01-20
+// Changes: Added userEmailIndex update rule for onboarding re-signup scenarios
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -459,11 +460,26 @@ service cloud.firestore {
       allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // User Email Index (for account lookup by email)
-    match /userEmailIndex/{emailId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
-      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+    // User Email Index (for account lookup/linking)
+    // Doc ID is normalized email, payload must include userId field
+    // SECURITY: userId field is immutable - prevents email index hijacking
+    match /userEmailIndex/{email} {
+      // Create: only if the caller is setting their own userId
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+
+      // Read: allow authenticated users to check if email exists (needed for onboarding)
+      // This reveals only existence, not sensitive data - email index only contains userId, email, createdAt
+      allow read: if request.auth != null;
+
+      // Update: only if caller owns the existing doc AND is not changing userId
+      // This prevents hijacking someone else's email index
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.userId
+        && request.auth.uid == request.resource.data.userId
+        && request.resource.data.userId == resource.data.userId;
+
+      // Delete: disabled for clients - managed by Cloud Functions or account deletion flows only
+      allow delete: if false;
     }
 
     // Push Tokens

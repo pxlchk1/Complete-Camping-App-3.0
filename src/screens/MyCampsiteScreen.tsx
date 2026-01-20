@@ -36,6 +36,7 @@ import {
   trackMyCampsiteWelcomeCtaTapped, 
   trackMyCampsiteWelcomeDismissed 
 } from "../services/analyticsService";
+import { bootstrapNewAccount } from "../onboarding";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -434,60 +435,46 @@ export default function MyCampsiteScreen({ navigation }: any) {
     const emailPrefix = user.email?.split("@")[0] || "camper";
     const handle = emailPrefix.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    const defaultProfile: UserProfile = {
-      displayName: user.displayName || "Happy Camper",
-      handle: handle, // Stored WITHOUT "@"
-      email: user.email || "",
-      avatarUrl: user.photoURL || null,
-      backgroundUrl: null,
-      membershipTier: "free",
-      bio: null,
-      location: null,
-      campingStyle: null,
-      joinedAt: serverTimestamp(),
-      stats: {
-        tripsCount: 0,
-        tipsCount: 0,
-        gearReviewsCount: 0,
-        questionsCount: 0,
-        photosCount: 0,
-      },
-    };
-
     try {
-      // Create profile document
-      await setDoc(doc(db, "profiles", userId), defaultProfile);
-
-      // Create users document with default settings
-      await setDoc(doc(db, "users", userId), {
+      // Use protected onboarding layer for account creation
+      const result = await bootstrapNewAccount({
+        userId: userId,
         email: user.email || "",
         displayName: user.displayName || "Happy Camper",
         handle: handle,
-        photoURL: user.photoURL || null,
-        createdAt: serverTimestamp(),
-        // Default notification settings - preselected ON
-        notificationsEnabled: true,
-        notificationPermissionStatus: "unknown",
-        // Default email settings - split by category
-        emailTransactionalEnabled: true,
-        emailMarketingEnabled: true,
-        emailSubscribed: true, // Legacy field for backward compatibility
-        emailConsentRegion: "unknown",
-        // Privacy settings
-        profilePublic: false,
-        showUsernamePublicly: true,
-        // Onboarding data
-        onboarding: {
-          startedAt: serverTimestamp(),
-          lastActiveAt: serverTimestamp(),
-          pushesThisWeek: 0,
-          emailsThisWeek: 0,
-          completedActions: {},
-          counters: {},
-        },
+        photoURL: user.photoURL,
       });
 
+      if (!result.success) {
+        console.error("[MyCampsite] Bootstrap failed:", result.error, result.debugInfo);
+        return;
+      }
+
+      // Set the profile state for UI after successful creation
+      const defaultProfile: UserProfile = {
+        displayName: user.displayName || "Happy Camper",
+        handle: handle,
+        email: user.email || "",
+        avatarUrl: user.photoURL || null,
+        backgroundUrl: null,
+        // Note: membershipTier is derived from absence of subscription fields
+        // Free users don't have the field set - app logic treats absence as "free"
+        membershipTier: "free",
+        bio: null,
+        location: null,
+        campingStyle: null,
+        joinedAt: serverTimestamp(),
+        stats: {
+          tripsCount: 0,
+          tipsCount: 0,
+          gearReviewsCount: 0,
+          questionsCount: 0,
+          photosCount: 0,
+        },
+      };
+
       setProfile(defaultProfile);
+      console.log("[MyCampsite] Profile created successfully via onboarding layer");
     } catch (error) {
       console.error("[MyCampsite] Error creating profile:", error);
     }

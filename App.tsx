@@ -129,10 +129,14 @@ export default function App() {
           console.log("[App] User identified in RevenueCat");
 
           // --- Bootstrap: Ensure Firestore user profile doc exists ---
+          // NOTE: Profile creation is now handled by bootstrapNewAccount in AuthLanding.
+          // This is only a safety net for edge cases (e.g., Apple Sign In session restore).
+          // CRITICAL: Do NOT include subscription fields (membershipTier, subscriptionStatus, etc.)
+          // as Firestore rules block them on create.
           const userRef = doc(db, "profiles", firebaseUser.uid);
           const userSnap = await getDoc(userRef);
           if (!userSnap.exists()) {
-            // Create with minimum fields, handling Apple edge cases
+            // Create with minimum safe fields only - NO subscription fields
             const email = firebaseUser.email || "";
             const displayName = firebaseUser.displayName || "Camper";
             const photoURL = firebaseUser.photoURL || "";
@@ -142,7 +146,8 @@ export default function App() {
               photoURL,
               handle: "", // Optionally generate a unique handle here
               role: "user",
-              membershipTier: "free",
+              // NOTE: membershipTier is OMITTED - blocked by Firestore rules on create
+              // The app treats missing membershipTier as "free" tier
               isBanned: false,
               notificationsEnabled: true,
               emailSubscribed: false,

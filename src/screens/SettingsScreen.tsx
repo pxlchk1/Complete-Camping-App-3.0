@@ -199,12 +199,14 @@ export default function SettingsScreen() {
         await updateDoc(userRef, userData);
       } else {
         // Create new document (shouldn't normally happen, but handles edge case)
+        // NOTE: Do NOT include membershipTier - it's blocked by Firestore rules on create
+        // The app treats missing membershipTier as "free" tier
         await setDoc(userRef, {
           ...userData,
           email: user.email || "",
           createdAt: serverTimestamp(),
           role: "user",
-          membershipTier: "freeMember",
+          // membershipTier omitted - blocked by Firestore rules on create
         });
       }
 

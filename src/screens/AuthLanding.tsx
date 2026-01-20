@@ -5,11 +5,11 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
 import { OAuthProvider, signInWithCredential, signInWithEmailAndPassword, createUserWithEmailAndPassword, fetchSignInMethodsForEmail, linkWithCredential, sendEmailVerification } from "firebase/auth";
 import { auth, db } from "../config/firebase";
-import { doc, setDoc, getDoc, serverTimestamp, collection } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { useAuthStore } from "../state/authStore";
 import { useUserStore } from "../state/userStore";
 import { Ionicons } from "@expo/vector-icons";
-import { createUserProfile } from "../services/userService";
+import { bootstrapNewAccount, getOnboardingErrorMessage, isPermissionDeniedError, isEmailInUseError } from "../onboarding";
 
 export default function AuthLanding({ navigation }: { navigation: any }) {
   const [loading, setLoading] = useState(false);
@@ -131,11 +131,11 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       const userCredential = await signInWithCredential(auth, firebaseCredential);
       const firebaseUser = userCredential.user;
 
-      // Check if profile exists, if not create it
+      // Check if profile exists, if not create it using protected onboarding layer
       const userDoc = await getDoc(doc(db, "profiles", firebaseUser.uid));
       
       if (!userDoc.exists()) {
-        // New user - create profile
+        // New user - create profile using protected onboarding layer
         const rawHandle = firebaseUser.displayName || appleCredential.fullName?.givenName || "user";
         const normalizedHandle = rawHandle.toLowerCase().replace(/[^a-z0-9]/g, "");
         const displayName = firebaseUser.displayName ||
@@ -144,28 +144,43 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
 
         const email = firebaseUser.email || appleCredential.email || "";
 
-        await createUserProfile({
+        // Force token refresh to ensure Firestore rules see the new auth state
+        console.log("[Apple Auth] Refreshing auth token before Firestore writes...");
+        await firebaseUser.getIdToken(true);
+        console.log("[Apple Auth] Token refreshed successfully");
+
+        // Use protected onboarding layer for all account creation writes
+        const result = await bootstrapNewAccount({
           userId: firebaseUser.uid,
           email: email,
           displayName: displayName,
           handle: normalizedHandle,
+          photoURL: firebaseUser.photoURL,
         });
 
-        // Create email index mapping for lookup
-        if (email) {
-          const emailNormalized = email.toLowerCase().trim();
-          await setDoc(doc(db, "userEmailIndex", emailNormalized), {
-            userId: firebaseUser.uid,
-            email: email,
-            createdAt: serverTimestamp(),
-          });
-          console.log("[Apple Auth] Created email index for:", emailNormalized);
+        if (!result.success) {
+          console.error("[Apple Auth] Bootstrap failed:", result.error, result.debugInfo);
+          // Handle email-in-use error specifically
+          if (result.emailInUse) {
+            throw new Error("That email is already in use. Try signing in instead.");
+          }
+          throw new Error(result.error || "We couldn't finish setting up your account. Please try again.");
         }
+        
+        console.log("[Apple Auth] Account bootstrapped successfully");
       }
 
       await loadUserProfile(firebaseUser.uid);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Complete Apple Sign In Error:", error);
+      // Map permission errors to user-friendly messages
+      if (isPermissionDeniedError(error)) {
+        throw new Error(getOnboardingErrorMessage(error));
+      }
+      // Map email-in-use errors
+      if (isEmailInUseError(error)) {
+        throw new Error("That email is already in use. Try signing in instead.");
+      }
       throw error;
     }
   };
@@ -314,25 +329,36 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         console.log("[Auth] Creating account for:", email.trim());
         userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
 
-        // Create user profile in Firestore (profiles + emailSubscribers)
+        // Force token refresh to ensure Firestore rules see the new auth state
+        console.log("[Auth] Refreshing auth token before Firestore writes...");
+        await userCredential.user.getIdToken(true);
+        console.log("[Auth] Token refreshed successfully");
+
+        // Create user profile using protected onboarding layer
         // Normalize handle - remove any @ prefix before saving
         const normalizedHandle = handle.trim().replace(/^@+/, "");
 
-        await createUserProfile({
+        // Use protected onboarding layer for all account creation writes
+        const result = await bootstrapNewAccount({
           userId: userCredential.user.uid,
           email: email.trim(),
           displayName: displayName.trim(),
           handle: normalizedHandle,
+          photoURL: null,
         });
 
-        // Create email index mapping for account lookup
-        const emailNormalized = email.trim().toLowerCase();
-        await setDoc(doc(db, "userEmailIndex", emailNormalized), {
-          userId: userCredential.user.uid,
-          email: email.trim(),
-          createdAt: serverTimestamp(),
-        });
-        console.log("[Email Auth] Created email index for:", emailNormalized);
+        if (!result.success) {
+          console.error("[Email Auth] Bootstrap failed:", result.error, result.debugInfo);
+          // Handle email-in-use error specifically
+          if (result.emailInUse) {
+            setError("That email is already in use. Try signing in instead.");
+          } else {
+            setError(result.error || "We couldn't finish setting up your account. Please try again.");
+          }
+          return;
+        }
+        
+        console.log("[Email Auth] Account bootstrapped successfully");
 
         // Send email verification
         try {
@@ -401,7 +427,10 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       console.error("Email Auth Error Code:", error.code);
       console.error("Email Auth Error Message:", error.message);
       
-      if (error.code === "auth/email-already-in-use") {
+      // Handle Firestore permission errors from onboarding
+      if (isPermissionDeniedError(error)) {
+        setError(getOnboardingErrorMessage(error));
+      } else if (error.code === "auth/email-already-in-use") {
         setError("This email is already registered. Please sign in instead.");
       } else if (error.code === "auth/invalid-email") {
         setError("Invalid email address.");
@@ -422,7 +451,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       } else {
         // Log full error details for debugging
         console.error("Unhandled auth error:", JSON.stringify(error, null, 2));
-        setError(`Authentication failed: ${error.message || error.code || "Unknown error"}`);
+        setError(getOnboardingErrorMessage(error));
       }
     } finally {
       setLoading(false);
