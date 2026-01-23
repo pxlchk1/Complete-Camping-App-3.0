@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import { Modal, View, Text, Pressable, ScrollView, Linking, Platform, ActivityIndicator, Animated } from "react-native";
+import { Modal, View, Text, Pressable, ScrollView, Linking, Platform, ActivityIndicator, Animated, Alert } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -267,6 +267,12 @@ export default function ParkDetailModal({
       }
     } catch (error) {
       console.error("[ParkDetail] Error toggling favorite:", error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(
+        "Couldn't Update Favorite",
+        "Please check your connection and try again.",
+        [{ text: "OK" }]
+      );
     } finally {
       setFavoriteLoading(false);
     }
