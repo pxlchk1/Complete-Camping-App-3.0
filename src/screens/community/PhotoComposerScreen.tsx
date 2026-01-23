@@ -33,9 +33,6 @@ import {
   PhotoPostType,
   TripStyle,
   DetailTag,
-  POST_TYPE_LABELS,
-  POST_TYPE_COLORS,
-  POST_TYPE_ICONS,
   CAPTION_TEMPLATES,
   TRIP_STYLE_LABELS,
   DETAIL_TAG_LABELS,
@@ -60,6 +57,7 @@ const TRIP_STYLE_OPTIONS: TripStyle[] = [
   "car-camping",
   "tent-camping",
   "backpacking",
+  "hiking",
   "rv-trailer",
   "group-camping",
   "solo-camping",
@@ -97,7 +95,6 @@ export default function PhotoComposerScreen() {
 
   // Post type (required)
   const [postType, setPostType] = useState<PhotoPostType | null>(initialPostType || null);
-  const [showPostTypeSelector, setShowPostTypeSelector] = useState(!initialPostType);
 
   // Caption
   const [caption, setCaption] = useState("");
@@ -155,7 +152,6 @@ export default function PhotoComposerScreen() {
   const handleSelectPostType = (type: PhotoPostType) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setPostType(type);
-    setShowPostTypeSelector(false);
     // Set caption template
     if (!caption || caption === CAPTION_TEMPLATES[postType || "campsite-spotlight"]) {
       setCaption(CAPTION_TEMPLATES[type]);
@@ -316,61 +312,36 @@ export default function PhotoComposerScreen() {
                 Post Type *
               </Text>
               
-              {postType && !showPostTypeSelector ? (
-                <Pressable
-                  onPress={() => setShowPostTypeSelector(true)}
-                  className="flex-row items-center px-4 py-3 rounded-xl border"
-                  style={{ 
-                    backgroundColor: POST_TYPE_COLORS[postType] + "15",
-                    borderColor: POST_TYPE_COLORS[postType],
-                  }}
-                >
-                  <View 
-                    className="w-8 h-8 rounded-full items-center justify-center mr-3"
-                    style={{ backgroundColor: POST_TYPE_COLORS[postType] }}
+              <View className="flex-row flex-wrap gap-2">
+                {QUICK_POST_TILES.map((tile) => (
+                  <Pressable
+                    key={tile.postType}
+                    onPress={() => handleSelectPostType(tile.postType)}
+                    className="px-4 py-3 rounded-xl flex-row items-center"
+                    style={{
+                      backgroundColor: postType === tile.postType ? tile.color + "20" : CARD_BACKGROUND_LIGHT,
+                      borderWidth: 1,
+                      borderColor: postType === tile.postType ? tile.color : BORDER_SOFT,
+                    }}
                   >
-                    <Ionicons name={POST_TYPE_ICONS[postType] as any} size={16} color="white" />
-                  </View>
-                  <Text 
-                    className="flex-1"
-                    style={{ fontFamily: "SourceSans3_600SemiBold", color: POST_TYPE_COLORS[postType] }}
-                  >
-                    {POST_TYPE_LABELS[postType]}
-                  </Text>
-                  <Ionicons name="chevron-down" size={20} color={POST_TYPE_COLORS[postType]} />
-                </Pressable>
-              ) : (
-                <View className="flex-row flex-wrap gap-2">
-                  {QUICK_POST_TILES.map((tile) => (
-                    <Pressable
-                      key={tile.postType}
-                      onPress={() => handleSelectPostType(tile.postType)}
-                      className="px-4 py-3 rounded-xl flex-row items-center"
-                      style={{
-                        backgroundColor: postType === tile.postType ? tile.color + "20" : CARD_BACKGROUND_LIGHT,
-                        borderWidth: 1,
-                        borderColor: postType === tile.postType ? tile.color : BORDER_SOFT,
+                    <Ionicons 
+                      name={tile.icon as any} 
+                      size={16} 
+                      color={postType === tile.postType ? tile.color : TEXT_SECONDARY} 
+                    />
+                    <Text 
+                      className="ml-2"
+                      style={{ 
+                        fontFamily: "SourceSans3_600SemiBold", 
+                        color: postType === tile.postType ? tile.color : TEXT_PRIMARY_STRONG,
+                        fontSize: 13,
                       }}
                     >
-                      <Ionicons 
-                        name={tile.icon as any} 
-                        size={16} 
-                        color={postType === tile.postType ? tile.color : TEXT_SECONDARY} 
-                      />
-                      <Text 
-                        className="ml-2"
-                        style={{ 
-                          fontFamily: "SourceSans3_600SemiBold", 
-                          color: postType === tile.postType ? tile.color : TEXT_PRIMARY_STRONG,
-                          fontSize: 13,
-                        }}
-                      >
-                        {tile.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
+                      {tile.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
 
             {/* Campsite Spotlight Fields */}
