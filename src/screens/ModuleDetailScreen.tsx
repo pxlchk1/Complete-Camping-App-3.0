@@ -108,8 +108,8 @@ const markdownStyles = {
   },
   list_item: {
     marginBottom: 8,
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flexDirection: "row" as const,
+    flexWrap: "wrap" as const,
   },
   bullet_list_content: {
     flex: 1,
