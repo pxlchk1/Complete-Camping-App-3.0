@@ -218,14 +218,14 @@ export default function LearnScreen() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: bottomSpacer }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomSpacer }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} />
         }
       >
         {/* Your Progress Section */}
         {tracks.length > 0 && (
-          <View style={{ marginBottom: 12 }}>
+          <View style={{ marginTop: 8, marginBottom: 12 }}>
             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
               <Ionicons name="ribbon" size={20} color={GRANITE_GOLD} />
               <Text
