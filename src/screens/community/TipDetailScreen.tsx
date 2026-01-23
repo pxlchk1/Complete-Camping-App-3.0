@@ -32,7 +32,7 @@ import ModalHeader from "../../components/ModalHeader";
 import VotePill from "../../components/VotePill";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
 import { ContentActionsAffordance } from "../../components/contentActions";
-import { isAdmin, isModerator, canModerateContent } from "../../services/userService";
+import { isAdmin, isModerator, canModerateContent, getUser } from "../../services/userService";
 import { User } from "../../types/user";
 import {
   DEEP_FOREST,
@@ -58,6 +58,7 @@ export default function TipDetailScreen() {
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showAccountRequired, setShowAccountRequired] = useState(false);
+  const [authorName, setAuthorName] = useState<string>("Anonymous");
 
   // Permission checks for content actions
   const canModerate = currentUser ? canModerateContent(currentUser as User) : false;
@@ -140,6 +141,17 @@ export default function TipDetailScreen() {
 
       setTip(tipData);
       setComments(commentsData);
+
+      // Load author info
+      try {
+        const author = await getUser(tipData.authorId);
+        if (author) {
+          setAuthorName(author.handle || author.displayName || 'Anonymous');
+        }
+      } catch (authorErr) {
+        // Silently ignore - author name is not critical for viewing
+        console.log("[TipDetail] Could not load author:", authorErr);
+      }
     } catch (err: any) {
       setError(err.message || "Failed to load tip");
     } finally {
@@ -347,7 +359,7 @@ export default function TipDetailScreen() {
 
             <View className="flex-row items-center justify-between py-3 border-t" style={{ borderColor: BORDER_SOFT }}>
               <Text className="text-sm" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                by @author • {formatTimeAgo(tip.createdAt)}
+                by @{authorName} • {formatTimeAgo(tip.createdAt)}
               </Text>
               <VotePill
                 collectionPath="tips"
@@ -405,7 +417,7 @@ export default function TipDetailScreen() {
                     />
                   </View>
                   <Text className="text-xs" style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}>
-                    by @author • {formatTimeAgo(comment.createdAt)}
+                    by @{(comment as any).username || 'Anonymous'} • {formatTimeAgo(comment.createdAt)}
                   </Text>
                 </View>
               ))
