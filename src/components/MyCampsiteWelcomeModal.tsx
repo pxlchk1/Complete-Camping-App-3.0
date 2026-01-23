@@ -95,7 +95,7 @@ export default function MyCampsiteWelcomeModal({
                 pressed && styles.buttonPressed,
               ]}
             >
-              <Text style={styles.primaryButtonText}>Set up my profile</Text>
+              <Text style={styles.primaryButtonText}>Set up my campsite</Text>
             </Pressable>
 
             <Pressable
