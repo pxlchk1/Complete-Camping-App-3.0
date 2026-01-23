@@ -1,3 +1,36 @@
+================================================================================
+VERSION 1.1.2 (Build 20) - January 23, 2026
+================================================================================
+
+BUG FIXES & IMPROVEMENTS:
+
+PLAN
+• Fixed "Create Trip" button not responding - trips now create reliably
+
+PARKS  
+• Fixed favorite button not persisting - favorites now save correctly
+
+LEARN
+• Fixed quiz scoring showing 0% when all answers correct - now shows accurate percentage
+• Fixed Leave No Trace text wrapping - content displays properly on all screen sizes
+• Fixed excess spacing above "Your Progress" section
+
+CONNECT
+• Fixed author showing as "Anonymous" on feed cards when handle exists
+• Fixed "Daily Limit Reached" incorrectly blocking Admins and Subscribers
+• Added ability for users to edit their own photo posts
+• Fixed photo upload tags - removed dead dropdown, now shows all selectable system tags
+• Removed "Open" status capsules from feedback post cards
+
+MY CAMPSITE
+• Restored name, handle, and password fields in profile edit screen
+• Updated welcome modal CTA to "Set up my campsite"
+
+GEAR REVIEWS
+• Fixed photo upload errors - photos now upload and persist correctly
+
+================================================================================
+
 - Changes made by agent 2025-11-26T23:45:24Z
 - Changes made by agent 2025-11-27T00:05:56Z
 - Changes made by agent 2025-11-27T00:12:06Z
