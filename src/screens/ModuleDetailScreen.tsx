@@ -108,6 +108,16 @@ const markdownStyles = {
   },
   list_item: {
     marginBottom: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  bullet_list_content: {
+    flex: 1,
+    flexShrink: 1,
+  },
+  ordered_list_content: {
+    flex: 1,
+    flexShrink: 1,
   },
   hr: {
     backgroundColor: BORDER_SOFT,
