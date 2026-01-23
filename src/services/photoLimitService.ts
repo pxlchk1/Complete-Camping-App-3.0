@@ -12,6 +12,7 @@
 import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { useSubscriptionStore } from '../state/subscriptionStore';
+import { useUserStore } from '../state/userStore';
 
 // Daily limit for FREE users
 export const FREE_DAILY_PHOTO_LIMIT = 1;
@@ -55,6 +56,12 @@ export async function canUploadPhotoToday(): Promise<{
   const user = auth.currentUser;
   if (!user) {
     return { canUpload: false, remaining: 0, isPro: false, message: 'Not logged in' };
+  }
+
+  // Check if user is admin - unlimited uploads, bypass all limits
+  const isAdmin = useUserStore.getState().isAdministrator();
+  if (isAdmin) {
+    return { canUpload: true, remaining: -1, isPro: true }; // -1 indicates unlimited
   }
 
   // Check if user is PRO - unlimited uploads
@@ -148,6 +155,12 @@ export async function getPhotoUsageToday(): Promise<{
   const user = auth.currentUser;
   if (!user) {
     return { used: 0, limit: FREE_DAILY_PHOTO_LIMIT, remaining: 0, isPro: false };
+  }
+
+  // Admin bypass - unlimited
+  const isAdmin = useUserStore.getState().isAdministrator();
+  if (isAdmin) {
+    return { used: 0, limit: -1, remaining: -1, isPro: true }; // Unlimited
   }
 
   const isPro = useSubscriptionStore.getState().isPro;
