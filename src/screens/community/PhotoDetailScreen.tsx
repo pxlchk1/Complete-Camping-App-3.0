@@ -25,6 +25,7 @@ import { Ionicons } from "@expo/vector-icons";
 import ModalHeader from "../../components/ModalHeader";
 import VotePill from "../../components/VotePill";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
+import EditPhotoPostModal from "../../components/EditPhotoPostModal";
 import { ContentActionsAffordance } from "../../components/contentActions";
 import { requireEmailVerification } from "../../utils/authHelper";
 import { isAdmin, isModerator, canModerateContent, getUser } from "../../services/userService";
@@ -136,6 +137,21 @@ export default function PhotoDetailScreen() {
     );
   };
 
+  // Edit handler - only for new format posts and owners
+  const handleEditPhoto = () => {
+    if (!isNewFormat || !photoPost) {
+      Alert.alert("Cannot Edit", "This photo format doesn't support editing.");
+      return;
+    }
+    setShowEditModal(true);
+  };
+
+  // Handle save from edit modal
+  const handleEditSave = (updatedPost: PhotoPost) => {
+    setPhotoPost(updatedPost);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
   // Support both legacy Story and new PhotoPost
   const [photo, setPhoto] = useState<Story | null>(null);
   const [photoPost, setPhotoPost] = useState<PhotoPost | null>(null);
@@ -159,6 +175,9 @@ export default function PhotoDetailScreen() {
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [comments, setComments] = useState<PhotoComment[]>([]);
+
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
 
   useEffect(() => {
     if (!postId) {
@@ -706,6 +725,7 @@ export default function PhotoDetailScreen() {
                 currentUserId={currentUser?.id}
                 canModerate={canModerate}
                 roleLabel={roleLabel}
+                onRequestEdit={isNewFormat ? handleEditPhoto : undefined}
                 onRequestDelete={handleDeletePhoto}
                 onRequestRemove={handleRemovePhoto}
                 layout="cardHeader"
@@ -988,6 +1008,14 @@ export default function PhotoDetailScreen() {
           navigation.navigate("Paywall");
         }}
         onMaybeLater={() => setShowAccountRequired(false)}
+      />
+
+      {/* Edit photo post modal */}
+      <EditPhotoPostModal
+        visible={showEditModal}
+        photoPost={photoPost}
+        onSave={handleEditSave}
+        onClose={() => setShowEditModal(false)}
       />
     </View>
   );
