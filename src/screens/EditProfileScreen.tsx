@@ -8,7 +8,7 @@
  * - Cover photo
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -29,8 +29,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { auth, db, storage } from "../config/firebase";
-import { doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
-import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
+import { doc, getDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { deleteUser, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useCurrentUser, useUserStore } from "../state/userStore";
 import ModalHeader from "../components/ModalHeader";
@@ -78,6 +78,135 @@ const GEAR_ICONS: Partial<Record<GearCategory, keyof typeof Ionicons.glyphMap>> 
   seating: "resize-outline",
 };
 
+// Reserved handles that cannot be used by regular users
+const RESERVED_HANDLES = [
+  // Brand and product
+  "tentandlantern",
+  "tentlantern",
+  "tentandlanternapp",
+  "completecampingapp",
+  "completecamping",
+  "thecompletecampingapp",
+  "tentandlanternofficial",
+  "tentandlanternhq",
+  "tentandlanternteam",
+  "tentandlanternsupport",
+
+  // Variants people will try
+  "tent_and_lantern",
+  "tent_lantern",
+  "complete_camping_app",
+  "complete_camping",
+  "camping_app",
+  "campingapp",
+
+  // Staff and authority impersonation
+  "admin",
+  "administrator",
+  "root",
+  "owner",
+  "moderator",
+  "mod",
+  "staff",
+  "team",
+  "official",
+  "support",
+  "help",
+  "security",
+  "trust",
+  "trustandsafety",
+  "safety",
+  "billing",
+  "payments",
+  "payment",
+  "refund",
+  "refunds",
+  "subscriptions",
+  "subscription",
+  "premium",
+  "pro",
+  "plus",
+  "developer",
+  "dev",
+
+  // App navigation and core features
+  "plan",
+  "trips",
+  "trip",
+  "newtrip",
+  "packing",
+  "packinglist",
+  "packinglists",
+  "gear",
+  "gearcloset",
+  "mygear",
+  "meal",
+  "meals",
+  "mealplan",
+  "mealplans",
+  "shopping",
+  "shoppinglist",
+  "parks",
+  "park",
+  "campground",
+  "campgrounds",
+  "itinerary",
+  "itinerarylinks",
+  "links",
+  "weather",
+  "learn",
+  "skills",
+  "leavenotrace",
+  "lnt",
+  "connect",
+  "community",
+  "askacamper",
+  "campfire",
+  "mycampsite",
+  "campsite",
+  "profile",
+  "account",
+  "settings",
+  "notifications",
+  "favorites",
+  "favorite",
+
+  // System and technical words that cause confusion
+  "api",
+  "app",
+  "system",
+  "null",
+  "undefined",
+  "test",
+  "tester",
+  "demo",
+  "staging",
+  "production",
+  "prod",
+  "beta",
+  "qa",
+
+  // Messaging and contact
+  "email",
+  "mail",
+  "sms",
+  "text",
+  "contact",
+  "press",
+  "media",
+  "partnerships",
+  "partners",
+
+  // Avoid platform brand impersonation
+  "apple",
+  "appstore",
+  "google",
+  "android",
+  "ios",
+  "firebase",
+  "revenuecat",
+];
+
 export default function EditProfileScreen() {
   const navigation = useNavigation();
   const currentUser = useCurrentUser();
@@ -113,12 +242,88 @@ export default function EditProfileScreen() {
     currentUser?.isProfileContentPublic !== false
   );
 
+  // Account fields state
+  const [displayName, setDisplayName] = useState("");
+  const [handle, setHandle] = useState("");
+  
+  // Password change modal state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+
+  // Load account fields from users collection
+  useEffect(() => {
+    const loadAccountFields = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          setDisplayName(data.displayName || "");
+          setHandle(data.handle || "");
+        }
+      } catch (error) {
+        console.error("[EditProfile] Error loading account fields:", error);
+      }
+    };
+
+    loadAccountFields();
+  }, []);
+
   const handleSave = async () => {
     const user = auth.currentUser;
     if (!user) return;
 
+    // Validate display name
+    if (!displayName.trim()) {
+      Alert.alert("Required Field", "Please enter a display name");
+      return;
+    }
+
+    if (displayName.length < 1 || displayName.length > 50) {
+      Alert.alert("Invalid Name", "Display name must be between 1 and 50 characters");
+      return;
+    }
+
+    // Validate handle
+    if (!handle.trim()) {
+      Alert.alert("Required Field", "Please enter a handle");
+      return;
+    }
+
+    const cleanHandle = handle.trim().toLowerCase();
+
+    if (cleanHandle.length < 3 || cleanHandle.length > 30) {
+      Alert.alert("Invalid Handle", "Handle must be between 3 and 30 characters");
+      return;
+    }
+
+    if (!/^[a-z0-9_-]+$/.test(cleanHandle)) {
+      Alert.alert("Invalid Handle", "Handle can only contain lowercase letters, numbers, hyphens, and underscores");
+      return;
+    }
+
+    // Check reserved handles (allow admin email to use reserved handles)
+    const isAdminEmail = user.email?.toLowerCase() === "alana@tentandlantern.com";
+    if (RESERVED_HANDLES.includes(cleanHandle) && !isAdminEmail) {
+      Alert.alert("Reserved Handle", "This handle is reserved. Please choose a different one.");
+      return;
+    }
+
     try {
       setSaving(true);
+
+      // Update users collection with account fields
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        displayName: displayName.trim(),
+        handle: cleanHandle,
+        updatedAt: serverTimestamp(),
+      });
 
       // Update profiles collection with correct field names
       const profileRef = doc(db, "profiles", user.uid);
@@ -142,6 +347,8 @@ export default function EditProfileScreen() {
 
       // Update local store (keeping photoURL/coverPhotoURL for backward compatibility)
       updateCurrentUser({
+        displayName: displayName.trim(),
+        handle: cleanHandle,
         about: about.trim() || undefined,
         favoriteCampingStyle: favoriteCampingStyle || undefined,
         favoriteGear: Object.keys(gearToSave).length > 0 ? gearToSave : undefined,
@@ -153,6 +360,11 @@ export default function EditProfileScreen() {
       setShowSuccessModal(true);
     } catch (error: any) {
       console.error("[EditProfile] Error saving:", error);
+      if (error.code === "permission-denied") {
+        Alert.alert("Error", "You do not have permission to update these settings. Please try signing out and back in.");
+      } else {
+        Alert.alert("Error", error.message || "Failed to save profile");
+      }
     } finally {
       setSaving(false);
     }
@@ -382,6 +594,74 @@ export default function EditProfileScreen() {
     (navigation as any).navigate("MyCampsite", { userId: user.uid, viewAsPublic: true });
   };
 
+  const handleChangePassword = async () => {
+    const user = auth.currentUser;
+    if (!user || !user.email) return;
+
+    // Validate passwords
+    if (!currentPassword.trim()) {
+      Alert.alert("Required Field", "Please enter your current password");
+      return;
+    }
+
+    if (!newPassword.trim()) {
+      Alert.alert("Required Field", "Please enter your new password");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      Alert.alert("Weak Password", "Password must be at least 8 characters long");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Passwords Don't Match", "New password and confirmation do not match");
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      Alert.alert("Same Password", "New password must be different from current password");
+      return;
+    }
+
+    try {
+      setUpdatingPassword(true);
+
+      // Re-authenticate user first (security requirement)
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+
+      // Update password in Firebase Auth
+      await updatePassword(user, newPassword);
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Success", "Your password has been updated successfully");
+
+      // Close modal and reset fields
+      setShowPasswordModal(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      console.error("[EditProfile] Error updating password:", error);
+
+      if (error.code === "auth/wrong-password") {
+        Alert.alert("Incorrect Password", "The current password you entered is incorrect");
+      } else if (error.code === "auth/weak-password") {
+        Alert.alert("Weak Password", "Please choose a stronger password");
+      } else if (error.code === "auth/requires-recent-login") {
+        Alert.alert(
+          "Re-authentication Required",
+          "For security, please sign out and sign back in, then try again."
+        );
+      } else {
+        Alert.alert("Error", error.message || "Failed to update password. Please try again.");
+      }
+    } finally {
+      setUpdatingPassword(false);
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
       <ModalHeader
@@ -399,6 +679,99 @@ export default function EditProfileScreen() {
         >
           <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
           <View className="px-5 pt-5 pb-8">
+            {/* Account Section */}
+            <Text
+              className="text-lg mb-3"
+              style={{ fontFamily: "Raleway_700Bold", color: TEXT_PRIMARY_STRONG }}
+            >
+              Account
+            </Text>
+
+            <View
+              className="mb-6 p-4 rounded-xl border"
+              style={{ backgroundColor: CARD_BACKGROUND_LIGHT, borderColor: BORDER_SOFT }}
+            >
+              {/* Display Name */}
+              <View className="mb-4">
+                <Text
+                  className="mb-2"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  Display Name *
+                </Text>
+                <TextInput
+                  value={displayName}
+                  onChangeText={setDisplayName}
+                  placeholder="Your name"
+                  placeholderTextColor={TEXT_MUTED}
+                  className="px-4 py-3 rounded-xl border"
+                  style={{
+                    backgroundColor: PARCHMENT,
+                    borderColor: BORDER_SOFT,
+                    fontFamily: "SourceSans3_400Regular",
+                    color: TEXT_PRIMARY_STRONG,
+                  }}
+                />
+              </View>
+
+              {/* Handle */}
+              <View className="mb-4">
+                <Text
+                  className="mb-2"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  Handle *
+                </Text>
+                <TextInput
+                  value={handle}
+                  onChangeText={setHandle}
+                  placeholder="username"
+                  placeholderTextColor={TEXT_MUTED}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  className="px-4 py-3 rounded-xl border"
+                  style={{
+                    backgroundColor: PARCHMENT,
+                    borderColor: BORDER_SOFT,
+                    fontFamily: "SourceSans3_400Regular",
+                    color: TEXT_PRIMARY_STRONG,
+                  }}
+                />
+                <Text
+                  className="mt-1 text-sm"
+                  style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}
+                >
+                  Lowercase letters, numbers, hyphens, and underscores only
+                </Text>
+              </View>
+
+              {/* Change Password */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowPasswordModal(true);
+                }}
+                className="py-3 active:opacity-70"
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 mr-4">
+                    <Text
+                      style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                    >
+                      Change Password
+                    </Text>
+                    <Text
+                      className="mt-1"
+                      style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_SECONDARY }}
+                    >
+                      Update your account password
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={TEXT_SECONDARY} />
+                </View>
+              </Pressable>
+            </View>
+
             {/* Photos Section */}
             <View
               className="mb-6 p-4 rounded-xl border"
@@ -993,6 +1366,157 @@ export default function EditProfileScreen() {
                   </Pressable>
                 </View>
               </ScrollView>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Password Change Modal */}
+      <Modal
+        visible={showPasswordModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowPasswordModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1"
+        >
+          <Pressable
+            className="flex-1 justify-end"
+            style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            onPress={() => !updatingPassword && setShowPasswordModal(false)}
+          >
+            <Pressable
+              className="rounded-t-3xl p-6"
+              style={{ backgroundColor: PARCHMENT }}
+              onPress={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <View className="flex-row items-center justify-between mb-6">
+                <Text
+                  className="text-2xl"
+                  style={{ fontFamily: "Raleway_700Bold", color: DEEP_FOREST }}
+                >
+                  Change Password
+                </Text>
+                <Pressable
+                  onPress={() => setShowPasswordModal(false)}
+                  disabled={updatingPassword}
+                  className="w-8 h-8 items-center justify-center active:opacity-70"
+                >
+                  <Ionicons name="close" size={28} color={DEEP_FOREST} />
+                </Pressable>
+              </View>
+
+              {/* Current Password */}
+              <View className="mb-4">
+                <Text
+                  className="mb-2"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  Current Password
+                </Text>
+                <TextInput
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  placeholder="Enter your current password"
+                  placeholderTextColor={TEXT_MUTED}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!updatingPassword}
+                  className="px-4 py-3 rounded-xl border"
+                  style={{
+                    backgroundColor: CARD_BACKGROUND_LIGHT,
+                    borderColor: BORDER_SOFT,
+                    fontFamily: "SourceSans3_400Regular",
+                    color: TEXT_PRIMARY_STRONG,
+                  }}
+                />
+              </View>
+
+              {/* New Password */}
+              <View className="mb-4">
+                <Text
+                  className="mb-2"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  New Password
+                </Text>
+                <TextInput
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="Enter your new password"
+                  placeholderTextColor={TEXT_MUTED}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!updatingPassword}
+                  className="px-4 py-3 rounded-xl border"
+                  style={{
+                    backgroundColor: CARD_BACKGROUND_LIGHT,
+                    borderColor: BORDER_SOFT,
+                    fontFamily: "SourceSans3_400Regular",
+                    color: TEXT_PRIMARY_STRONG,
+                  }}
+                />
+                <Text
+                  className="mt-2 text-sm"
+                  style={{ fontFamily: "SourceSans3_400Regular", color: TEXT_MUTED }}
+                >
+                  Must be at least 8 characters long
+                </Text>
+              </View>
+
+              {/* Confirm New Password */}
+              <View className="mb-6">
+                <Text
+                  className="mb-2"
+                  style={{ fontFamily: "SourceSans3_600SemiBold", color: TEXT_PRIMARY_STRONG }}
+                >
+                  Confirm New Password
+                </Text>
+                <TextInput
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Re-enter your new password"
+                  placeholderTextColor={TEXT_MUTED}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!updatingPassword}
+                  className="px-4 py-3 rounded-xl border"
+                  style={{
+                    backgroundColor: CARD_BACKGROUND_LIGHT,
+                    borderColor: BORDER_SOFT,
+                    fontFamily: "SourceSans3_400Regular",
+                    color: TEXT_PRIMARY_STRONG,
+                  }}
+                />
+              </View>
+
+              {/* Update Button */}
+              <Pressable
+                onPress={handleChangePassword}
+                disabled={updatingPassword}
+                className="rounded-xl py-4 active:opacity-70"
+                style={{
+                  backgroundColor: DEEP_FOREST,
+                  opacity: updatingPassword ? 0.5 : 1,
+                }}
+              >
+                {updatingPassword ? (
+                  <ActivityIndicator color={PARCHMENT} />
+                ) : (
+                  <Text
+                    className="text-center"
+                    style={{ fontFamily: "SourceSans3_600SemiBold", color: PARCHMENT, fontSize: 16 }}
+                  >
+                    Update Password
+                  </Text>
+                )}
+              </Pressable>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
