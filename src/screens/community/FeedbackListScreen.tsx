@@ -150,38 +150,6 @@ export default function FeedbackListScreen() {
       }
     );
   };
-  
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "open":
-        return "#6b7280";
-      case "planned":
-        return "#3b82f6";
-      case "in-progress":
-        return "#f59e0b";
-      case "completed":
-        return "#10b981";
-      case "declined":
-        return "#ef4444";
-      default:
-        return "#6b7280";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "open":
-        return "Open";
-      case "in_progress":
-        return "In Progress";
-      case "resolved":
-        return "Resolved";
-      case "declined":
-        return "Declined";
-      default:
-        return status;
-    }
-  };
 
   const getCategoryLabel = (category: string) => {
     switch (category) {
@@ -218,8 +186,6 @@ export default function FeedbackListScreen() {
   };
 
   const renderPost = ({ item }: { item: FeedbackPost & { voteScore: number; userVote: "up" | "down" | null; commentCount?: number } }) => {
-    const statusColor = getStatusColor(item.status);
-    const statusLabel = getStatusLabel(item.status);
     return (
       <Pressable
         onPress={() => handlePostPress(item.id)}
@@ -231,11 +197,6 @@ export default function FeedbackListScreen() {
             <View className="px-3 py-1 rounded-full bg-amber-100">
               <Text className="text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: "#92400e" }}>
                 {getCategoryLabel(item.category)}
-              </Text>
-            </View>
-            <View className="px-3 py-1 rounded-md" style={{ backgroundColor: statusColor + "20" }}>
-              <Text className="text-xs" style={{ fontFamily: "SourceSans3_600SemiBold", color: statusColor }}>
-                {statusLabel}
               </Text>
             </View>
           </View>
