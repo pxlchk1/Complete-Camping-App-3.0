@@ -211,6 +211,17 @@ export default function CreateGearReviewScreen() {
         setUploadingPhotos(true);
         try {
           photoUrls = await uploadPhotosToStorage(photos, user.uid);
+        } catch (uploadError: any) {
+          console.error("[CreateGearReview] Photo upload failed:", uploadError);
+          setUploadingPhotos(false);
+          const errorMessage = uploadError?.code === "storage/unauthorized" 
+            ? "You don't have permission to upload photos. Please sign out and sign back in."
+            : uploadError?.code === "storage/quota-exceeded"
+            ? "Storage quota exceeded. Please try a smaller image."
+            : "Failed to upload photo. Please check your connection and try again.";
+          Alert.alert("Photo Upload Failed", errorMessage);
+          setSubmitting(false);
+          return;
         } finally {
           setUploadingPhotos(false);
         }
@@ -239,10 +250,13 @@ export default function CreateGearReviewScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       Alert.alert("Posted!", "Your gear review has been posted.");
       navigation.goBack();
-    } catch (e) {
+    } catch (e: any) {
       console.error("[CreateGearReview] submit failed:", e);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-      Alert.alert("Couldn’t post", "Please try again in a moment.");
+      const errorMessage = e?.code === "permission-denied"
+        ? "You don't have permission to post reviews."
+        : e?.message || "Please try again in a moment.";
+      Alert.alert("Couldn't post", errorMessage);
     } finally {
       setSubmitting(false);
     }
