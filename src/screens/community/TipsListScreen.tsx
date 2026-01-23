@@ -17,7 +17,7 @@ import { auth } from "../../config/firebase";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
 import { requireAccount } from "../../utils/gating";
 import { shouldShowInFeed } from "../../services/moderationService";
-import { isAdmin, isModerator, canModerateContent } from "../../services/userService";
+import { isAdmin, isModerator, canModerateContent, getUser } from "../../services/userService";
 import { useCurrentUser } from "../../state/userStore";
 import { User } from "../../types/user";
 import { ContentActionsAffordance } from "../../components/contentActions";
@@ -60,6 +60,7 @@ export default function TipsListScreen() {
     : null;
 
   const [tips, setTips] = useState<TipWithVotes[]>([]);
+  const [authorHandles, setAuthorHandles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>("newest");
@@ -103,6 +104,31 @@ export default function TipsListScreen() {
         })
       );
       setTips(tipsWithVotes);
+
+      // Batch fetch author handles for tips with missing/Anonymous userName
+      const authorIdsToFetch = [...new Set(
+        tipsWithVotes
+          .filter(tip => !tip.userName || tip.userName === 'Anonymous')
+          .map(tip => tip.userId || tip.authorId)
+          .filter(Boolean) as string[]
+      )];
+
+      if (authorIdsToFetch.length > 0) {
+        const handleMap: Record<string, string> = {};
+        await Promise.all(
+          authorIdsToFetch.map(async (authorId) => {
+            try {
+              const author = await getUser(authorId);
+              if (author) {
+                handleMap[authorId] = author.handle || author.displayName || 'Anonymous';
+              }
+            } catch {
+              // Silently ignore - will fallback to Anonymous
+            }
+          })
+        );
+        setAuthorHandles(prev => ({ ...prev, ...handleMap }));
+      }
     } catch (err: any) {
       setError(err.message || "Failed to load tips");
     } finally {
@@ -240,7 +266,7 @@ export default function TipsListScreen() {
 
       <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
         <Text style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 12, color: TEXT_MUTED }}>
-          {item.userName}
+          @{authorHandles[item.userId || item.authorId || ''] || item.userName || 'Anonymous'}
         </Text>
         <Text style={{ marginHorizontal: 6, opacity: 0.7, color: TEXT_MUTED }}>•</Text>
         <Text style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: TEXT_MUTED }}>
