@@ -235,15 +235,17 @@ export async function submitQuizAnswers(
     return { score: 0, passed: false };
   }
   
-  // Calculate score
+  // Calculate score - normalize types to handle Firestore string/number mismatches
   let correctCount = 0;
   questions.forEach((q, index) => {
-    if (answers[index] === q.correctAnswerIndex) {
+    const userAnswer = Number(answers[index]);
+    const correctAnswer = Number(q.correctAnswerIndex);
+    if (!isNaN(userAnswer) && !isNaN(correctAnswer) && userAnswer === correctAnswer) {
       correctCount++;
     }
   });
   
-  const score = Math.round((correctCount / questions.length) * 100);
+  const score = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
   const passed = score === 100;
   
   try {

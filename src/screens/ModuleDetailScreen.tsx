@@ -439,8 +439,10 @@ export default function ModuleDetailScreen() {
             {/* Questions */}
             {module.quiz.map((question, qIndex) => {
               const selectedAnswer = quizAnswers[question.id];
-              const isCorrect = quizSubmitted && selectedAnswer === question.correctAnswerIndex;
-              const isWrong = quizSubmitted && selectedAnswer !== undefined && selectedAnswer !== question.correctAnswerIndex;
+              // Normalize types to handle Firestore string/number mismatches
+              const correctIdx = Number(question.correctAnswerIndex);
+              const isCorrect = quizSubmitted && selectedAnswer === correctIdx;
+              const isWrong = quizSubmitted && selectedAnswer !== undefined && selectedAnswer !== correctIdx;
 
               return (
                 <View
@@ -467,7 +469,7 @@ export default function ModuleDetailScreen() {
                   {/* Options */}
                   {question.options.map((option, oIndex) => {
                     const isSelected = selectedAnswer === oIndex;
-                    const isCorrectOption = oIndex === question.correctAnswerIndex;
+                    const isCorrectOption = oIndex === correctIdx;
                     const showAsCorrect = quizSubmitted && isCorrectOption;
                     const showAsWrong = quizSubmitted && isSelected && !isCorrectOption;
 
