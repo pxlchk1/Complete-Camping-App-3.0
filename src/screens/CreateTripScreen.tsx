@@ -62,6 +62,9 @@ export default function CreateTripScreen() {
   // Gating modal state
   const [showAccountModal, setShowAccountModal] = useState(false);
 
+  // Loading state for create button
+  const [isCreating, setIsCreating] = useState(false);
+
   // Pre-populate trip name from destination if available
   useEffect(() => {
     if (prefillLocation && !tripName) {
@@ -81,6 +84,11 @@ export default function CreateTripScreen() {
       return;
     }
 
+    // Prevent double-tap
+    if (isCreating) {
+      return;
+    }
+
     // Gate: PRO required to create trips
     if (!requirePro({
       openAccountModal: () => setShowAccountModal(true),
@@ -89,38 +97,46 @@ export default function CreateTripScreen() {
       return;
     }
 
-    // Build trip destination from prefill location if set
-    const tripDestination: TripDestination | undefined = destination ? {
-      sourceType: destination.placeType === "park" ? "parks" : "custom",
-      placeId: destination.placeId,
-      name: destination.name,
-      addressLine1: destination.address,
-      city: null, // Could be parsed from address if needed
-      state: destination.state,
-      lat: destination.lat,
-      lng: destination.lng,
-      formattedAddress: destination.address,
-      parkType: destination.placeType === "park" ? "State Park" : null,
-    } : undefined;
+    setIsCreating(true);
 
-    const tripId = await addTrip({
-      name: tripName.trim(),
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      campingStyle,
-      partySize: partySize ? parseInt(partySize) : undefined,
-      tripDestination,
-      parkId: destination?.placeType === "park" && destination?.placeId ? destination.placeId : undefined,
-    });
+    try {
+      // Build trip destination from prefill location if set
+      const tripDestination: TripDestination | undefined = destination ? {
+        sourceType: destination.placeType === "park" ? "parks" : "custom",
+        placeId: destination.placeId,
+        name: destination.name,
+        addressLine1: destination.address,
+        city: null, // Could be parsed from address if needed
+        state: destination.state,
+        lat: destination.lat,
+        lng: destination.lng,
+        formattedAddress: destination.address,
+        parkType: destination.placeType === "park" ? "State Park" : null,
+      } : undefined;
 
-    // Track analytics and core action
-    trackTripCreated(tripId);
-    if (user?.uid) {
-      trackCoreAction(user.uid, "trip_created");
+      const tripId = await addTrip({
+        name: tripName.trim(),
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        campingStyle,
+        partySize: partySize ? parseInt(partySize) : undefined,
+        tripDestination,
+        parkId: destination?.placeType === "park" && destination?.placeId ? destination.placeId : undefined,
+      });
+
+      // Track analytics and core action
+      trackTripCreated(tripId);
+      if (user?.uid) {
+        trackCoreAction(user.uid, "trip_created");
+      }
+
+      // Navigate to trip detail
+      navigation.replace("TripDetail", { tripId });
+    } catch (error) {
+      console.error("[CreateTripScreen] Failed to create trip:", error);
+      alert("Failed to create trip. Please try again.");
+      setIsCreating(false);
     }
-
-    // Navigate to trip detail
-    navigation.replace("TripDetail", { tripId });
   };
 
   return (
@@ -276,7 +292,7 @@ export default function CreateTripScreen() {
 
         {/* Footer */}
         <View className="px-5 pb-5 pt-3 border-t border-parchmentDark">
-          <Button onPress={handleCreate} fullWidth icon="checkmark-circle">
+          <Button onPress={handleCreate} fullWidth icon="checkmark-circle" loading={isCreating} disabled={isCreating}>
             Create Trip
           </Button>
         </View>
