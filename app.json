@@ -13,7 +13,7 @@
       "associatedDomains": ["applinks:tentlantern.app", "applinks:www.tentlantern.app"],
       "supportsTablet": true,
       "bundleIdentifier": "com.tentlanternchild.completecampingcompanion",
-      "buildNumber": "1",
+      "buildNumber": "14",
       "googleServicesFile": "./GoogleService-Info.plist",
       "usesAppleSignIn": true,
       "entitlements": {
