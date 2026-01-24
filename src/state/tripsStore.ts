@@ -24,6 +24,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../config/firebase";
 import { Trip, TripStatus } from "../types/camping";
+import { trackCoreAction } from "../services/userActionTrackerService";
 
 // Re-export Trip type for backwards compatibility
 export type { Trip };
@@ -114,6 +115,9 @@ export const useTripsStore = create<TripsState>()((set, get) => ({
       set((state) => ({
         trips: [newTrip, ...state.trips],
       }));
+
+      // Track trip creation for paywall gating (increments tripsCreatedCount)
+      trackCoreAction(userId, "trip_created");
 
       console.log("[TripsStore] Trip created:", docRef.id);
       return docRef.id;
