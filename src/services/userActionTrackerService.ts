@@ -203,6 +203,27 @@ class UserActionTrackerService {
       console.error("[UserActionTracker] Failed to mark soft prompt shown:", error);
     }
   }
+
+  /**
+   * Get total trips created count for a user
+   * Used for paywall gating - free users get ONE trip ever, not one at a time
+   */
+  async getTripsCreatedCount(userId: string): Promise<number> {
+    if (!userId) return 0;
+
+    try {
+      const userRef = doc(db, "users", userId);
+      const userDocSnap = await getDoc(userRef);
+      
+      if (!userDocSnap.exists()) return 0;
+
+      const userData = userDocSnap.data();
+      return userData?.tripsCreatedCount || 0;
+    } catch (error) {
+      console.error("[UserActionTracker] Failed to get trips created count:", error);
+      return 0;
+    }
+  }
 }
 
 // Export singleton instance
@@ -219,3 +240,5 @@ export const shouldShowPushPrompt = (userId: string) =>
   userActionTracker.shouldShowPushPrompt(userId);
 export const markSoftPromptShown = (userId: string) => 
   userActionTracker.markSoftPromptShown(userId);
+export const getTripsCreatedCount = (userId: string) =>
+  userActionTracker.getTripsCreatedCount(userId);

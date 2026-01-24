@@ -10,6 +10,7 @@ import { usePackingStore } from "../state/packingStore";
 import { useUserStatus } from "../utils/authHelper";
 import { requirePro, requireAccount } from "../utils/gating";
 import { useAuthStore } from "../state/authStore";
+import { getTripsCreatedCount } from "../services/userActionTrackerService";
 import TripCard from "../components/TripCard";
 import CreateTripModal from "../components/CreateTripModal";
 import ConfirmationModal from "../components/ConfirmationModal";
@@ -111,27 +112,31 @@ export default function MyTripsScreen() {
   const onMenu = (trip: Trip) => setMenuTrip(trip);
 
   /**
-   * Handle create trip with proper gating (2026-01-01)
+   * Handle create trip with proper gating (2026-01-24 fix)
    * 
    * Rules:
-   * - First trip (tripCount === 0): requiresAccount=true, requiresPro=false
+   * - First trip EVER (tripsCreatedCount === 0): requiresAccount=true, requiresPro=false
    *   → GUEST sees AccountRequiredModal, FREE/PRO can create
-   * - Second+ trip (tripCount >= 1): requiresPro=true
+   * - Second+ trip EVER (tripsCreatedCount >= 1): requiresPro=true
    *   → GUEST or FREE sees PaywallModal, PRO can create
+   * 
+   * NOTE: Uses tripsCreatedCount from Firestore, NOT trips.length
+   * This prevents users from deleting trips to bypass the paywall
    */
-  const handleCreateTrip = () => {
-    const tripCount = trips.length;
+  const handleCreateTrip = async () => {
+    // Check account first for all users
+    const hasAccount = requireAccount({
+      openAccountModal: () => setShowAccountModal(true),
+    });
+    if (!hasAccount) return;
+
+    // Get total trips ever created from Firestore
+    const tripsCreatedCount = currentUser ? await getTripsCreatedCount(currentUser.id) : 0;
     
-    if (tripCount === 0) {
-      // First trip - only requires account (free-tier action)
-      const canProceed = requireAccount({
-        openAccountModal: () => setShowAccountModal(true),
-      });
-      if (!canProceed) return;
-    } else {
-      // Second+ trip - requires Pro (Pro-gated action)
+    if (tripsCreatedCount >= 1) {
+      // User has already used their free trip - requires Pro
       const canProceed = requirePro({
-        openAccountModal: () => setShowAccountModal(true), // Not used for Pro gates
+        openAccountModal: () => setShowAccountModal(true),
         openPaywallModal: (variant) => nav.navigate("Paywall", { triggerKey: "second_trip", variant }),
       });
       if (!canProceed) return;
