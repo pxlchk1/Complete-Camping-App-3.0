@@ -81,7 +81,7 @@ export default function CreateTripModal({ visible, onClose, onTripCreated }: Cre
         endDate: endDate.toISOString().split("T")[0],
         campingStyle,
         partySize: size,
-        description: description.trim() || undefined,
+        description: description.trim() || "", // Use empty string, not undefined (Firestore rejects undefined)
         status: "planning",
         season,
       });
