@@ -5,7 +5,7 @@
  * Stored in Firestore on the user document.
  */
 
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../config/firebase";
 
 // Flag keys
@@ -44,10 +44,10 @@ export async function setMyCampgroundInfoSeen(): Promise<void> {
 
   try {
     const userRef = doc(db, "users", user.uid);
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
       [USER_FLAGS.HAS_SEEN_MY_CAMPGROUND_INFO]: true,
       updatedAt: serverTimestamp(),
-    });
+    }, { merge: true });
     console.log("[UserFlags] Marked hasSeenMyCampgroundInfoModal = true");
   } catch (error) {
     console.error("[UserFlags] Error setting hasSeenMyCampgroundInfoModal:", error);
@@ -103,10 +103,10 @@ export async function setMyCampsiteWelcomeSeen(): Promise<void> {
 
   try {
     const userRef = doc(db, "users", user.uid);
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
       [USER_FLAGS.HAS_SEEN_MY_CAMPSITE_WELCOME]: true,
       updatedAt: serverTimestamp(),
-    });
+    }, { merge: true });
     console.log("[UserFlags] Marked hasSeenMyCampsiteWelcomeModal = true");
   } catch (error) {
     console.error("[UserFlags] Error setting hasSeenMyCampsiteWelcomeModal:", error);
