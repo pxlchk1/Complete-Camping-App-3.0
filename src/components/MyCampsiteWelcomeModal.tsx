@@ -18,17 +18,16 @@ import {
   Modal,
   Pressable,
   StyleSheet,
+  Image,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import { LOGOS } from "../constants/images";
 import {
   DEEP_FOREST,
-  EARTH_GREEN,
   PARCHMENT,
   TEXT_PRIMARY_STRONG,
   TEXT_SECONDARY,
-  CARD_BACKGROUND_LIGHT,
   BORDER_SOFT,
 } from "../constants/colors";
 
@@ -67,9 +66,13 @@ export default function MyCampsiteWelcomeModal({
         <Pressable style={styles.backdropTouchable} onPress={onNotNow} />
 
         <View style={[styles.modalContainer, { marginBottom: Math.max(insets.bottom, 20) }]}>
-          {/* Icon */}
+          {/* App Icon */}
           <View style={styles.iconContainer}>
-            <Ionicons name="bonfire" size={56} color={EARTH_GREEN} />
+            <Image
+              source={LOGOS.APP_ICON}
+              style={styles.appIcon}
+              resizeMode="contain"
+            />
           </View>
 
           {/* Title */}
@@ -95,7 +98,7 @@ export default function MyCampsiteWelcomeModal({
                 pressed && styles.buttonPressed,
               ]}
             >
-              <Text style={styles.primaryButtonText}>Set up my campsite</Text>
+              <Text style={styles.primaryButtonText}>Set up camp</Text>
             </Pressable>
 
             <Pressable
@@ -143,13 +146,18 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: CARD_BACKGROUND_LIGHT,
-    justifyContent: "center",
-    alignItems: "center",
+    borderRadius: 16,
+    overflow: "hidden",
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: BORDER_SOFT,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  appIcon: {
+    width: 80,
+    height: 80,
   },
   title: {
     fontFamily: "Raleway_700Bold",
