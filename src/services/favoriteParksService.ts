@@ -85,7 +85,7 @@ export async function addFavoritePark(
       name: park.name,
       type: getTypeLabel(park.filter),
       state: park.state,
-      thumbnailUrl: undefined, // Parks don't have thumbnails yet
+      // thumbnailUrl omitted - parks don't have thumbnails yet (Firestore doesn't allow undefined)
       lat: park.latitude,
       lon: park.longitude,
       createdAt: serverTimestamp(),
