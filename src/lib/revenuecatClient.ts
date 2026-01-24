@@ -10,6 +10,7 @@ import Purchases, {
   LOG_LEVEL,
 } from "react-native-purchases";
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 
 // RevenueCat API Keys - Using existing Complete Camping App project
 const REVENUECAT_API_KEY_IOS = "appl_CXLKpXutDryiSmKJsclChUqLmie"; // Complete Camping App (App Store)
@@ -17,6 +18,13 @@ const REVENUECAT_API_KEY_ANDROID = ""; // Add when Android is needed
 
 let isInitialized = false;
 let isConfigured = false;
+
+/**
+ * Check if running in Expo Go (which doesn't have native RevenueCat support)
+ */
+const isExpoGo = (): boolean => {
+  return Constants.appOwnership === "expo";
+};
 
 /**
  * Check if RevenueCat is properly configured
@@ -38,6 +46,13 @@ export const initRevenueCat = async (): Promise<boolean> => {
   isInitialized = true;
 
   try {
+    // Check if we're in Expo Go - RevenueCat requires native code
+    if (isExpoGo()) {
+      console.log("[RevenueCat] Running in Expo Go - native purchases unavailable (expected)");
+      isConfigured = false;
+      return false;
+    }
+
     // Check if we're on web - RevenueCat doesn't work on web
     if (Platform.OS === "web") {
       console.log("[RevenueCat] Running on web - purchases disabled");
