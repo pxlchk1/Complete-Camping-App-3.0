@@ -1702,7 +1702,7 @@ const DRIP_EMAIL_CONTENT: Record<string, {
   tip3?: string;
 }> = {
   welcome: {
-    headline: "Welcome to Tent & Lantern! 🏕️",
+    headline: "Welcome to The Complete Camping App! 🏕️",
     body: "You're all set to plan your next camping adventure. Let's get started with your first trip.",
     ctaText: "Start Your First Trip",
     ctaLink: "https://tentandlantern.com/app/plan/new",

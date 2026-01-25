@@ -41,6 +41,9 @@ import {
 } from "../constants/colors";
 import { requirePro } from "../utils/gating";
 import AccountRequiredModal from "../components/AccountRequiredModal";
+import InfoButton from "../components/InfoButton";
+import OnboardingModal from "../components/OnboardingModal";
+import { useScreenOnboarding } from "../hooks/useScreenOnboarding";
 import MealSlotSheet from "../components/MealSlotSheet";
 import SuggestionPickerSheet from "../components/SuggestionPickerSheet";
 import AutoFillPreviewSheet from "../components/AutoFillPreviewSheet";
@@ -139,6 +142,9 @@ export default function MealPlanningScreen() {
 
   // Gating modal state
   const [showAccountModal, setShowAccountModal] = useState(false);
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("MealPlanning");
 
   // Calculate number of days
   const tripDays = trip
@@ -812,6 +818,11 @@ export default function MealPlanningScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-parchment" edges={["top"]}>
+      {/* Info button for onboarding */}
+      <View style={{ position: "absolute", top: 18, right: 56, zIndex: 10 }}>
+        <InfoButton onPress={openModal} color={DEEP_FOREST} size={22} />
+      </View>
+      
       {/* Header */}
       <View className="px-5 pt-4 pb-3 border-b border-stone-200">
         <View className="flex-row items-center mb-2 justify-between">
@@ -1620,6 +1631,13 @@ export default function MealPlanningScreen() {
           )}
         </View>
       )}
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
+      />
     </SafeAreaView>
   );
 }

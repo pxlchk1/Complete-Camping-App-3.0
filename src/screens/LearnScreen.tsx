@@ -19,6 +19,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 // Components
 import AccountButtonHeader from "../components/AccountButtonHeader";
 import AccountRequiredModal from "../components/AccountRequiredModal";
+import OnboardingModal from "../components/OnboardingModal";
+import { useScreenOnboarding } from "../hooks/useScreenOnboarding";
 
 // Services
 import {
@@ -74,6 +76,9 @@ export default function LearnScreen() {
 
   // Modal state
   const [showAccountModal, setShowAccountModal] = useState(false);
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("Learn");
 
   // State
   const [loading, setLoading] = useState(true);
@@ -186,18 +191,23 @@ export default function LearnScreen() {
             <AccountButtonHeader color={TEXT_ON_DARK} />
 
             <View style={{ flex: 1, justifyContent: "flex-end", paddingHorizontal: 24, paddingBottom: 16 }}>
-              <Text
-                style={{
-                  fontFamily: "Raleway_700Bold",
-                  fontSize: 30,
-                  color: TEXT_ON_DARK,
-                  textShadowColor: "rgba(0, 0, 0, 0.5)",
-                  textShadowOffset: { width: 0, height: 1 },
-                  textShadowRadius: 4,
-                }}
-              >
-                Learn
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text
+                  style={{
+                    fontFamily: "Raleway_700Bold",
+                    fontSize: 30,
+                    color: TEXT_ON_DARK,
+                    textShadowColor: "rgba(0, 0, 0, 0.5)",
+                    textShadowOffset: { width: 0, height: 1 },
+                    textShadowRadius: 4,
+                  }}
+                >
+                  Learn
+                </Text>
+                <Pressable onPress={openModal} style={{ padding: 4 }} accessibilityLabel="Info">
+                  <Ionicons name="information-circle-outline" size={24} color={TEXT_ON_DARK} />
+                </Pressable>
+              </View>
               <Text
                 style={{
                   fontFamily: "SourceSans3_400Regular",
@@ -590,6 +600,13 @@ export default function LearnScreen() {
           navigation.navigate("Auth");
         }}
         onMaybeLater={() => setShowAccountModal(false)}
+      />
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
       />
     </View>
   );

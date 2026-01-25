@@ -31,6 +31,8 @@ import { useSubscriptionStore } from "../state/subscriptionStore";
 import { getPaywallVariantAndTrack } from "../services/proAttemptService";
 import { useAuth } from "../context/AuthContext";
 import ModalHeader from "../components/ModalHeader";
+import OnboardingModal from "../components/OnboardingModal";
+import { useScreenOnboarding } from "../hooks/useScreenOnboarding";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -60,6 +62,9 @@ export default function MyGearClosetScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterOption>("all");
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("GearCloset");
 
   const loadGear = async () => {
     const user = auth.currentUser;
@@ -224,6 +229,7 @@ export default function MyGearClosetScreen() {
       <ModalHeader
         title="My Gear Closet"
         showTitle
+        onInfoPress={openModal}
         rightAction={{
           icon: "add",
           onPress: handleAddGear,
@@ -396,6 +402,13 @@ export default function MyGearClosetScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
+      />
     </View>
   );
 }

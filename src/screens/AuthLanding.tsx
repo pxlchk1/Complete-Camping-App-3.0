@@ -552,6 +552,16 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
                     )}
                   </TouchableOpacity>
 
+                  {/* Forgot Password Link - only show on Sign In */}
+                  {!isSignUp && (
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate("ForgotPassword")}
+                      style={styles.forgotPasswordButton}
+                    >
+                      <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                    </TouchableOpacity>
+                  )}
+
                   <TouchableOpacity
                     onPress={() => {
                       setIsSignUp(!isSignUp);
@@ -820,6 +830,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#F4EBD0",
     textAlign: "center",
+    textDecorationLine: "underline",
+  },
+
+  forgotPasswordButton: {
+    alignSelf: "center",
+    marginTop: 12,
+    paddingVertical: 8,
+  },
+
+  forgotPasswordText: {
+    fontFamily: "SourceSans3_600SemiBold",
+    fontSize: 14,
+    color: "#F4EBD0",
     textDecorationLine: "underline",
   },
 

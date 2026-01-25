@@ -23,6 +23,8 @@ import { useCurrentUser } from "../../state/userStore";
 import { RootStackNavigationProp } from "../../navigation/types";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
+import OnboardingModal from "../../components/OnboardingModal";
+import { useScreenOnboarding } from "../../hooks/useScreenOnboarding";
 import { requireAccount } from "../../utils/gating";
 import { shouldShowInFeed } from "../../services/moderationService";
 import { canUploadPhotoToday } from "../../services/photoLimitService";
@@ -97,6 +99,9 @@ export default function PhotosListScreen() {
 
   // Gating modal state
   const [showAccountModal, setShowAccountModal] = useState(false);
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("Photos");
 
   // Check if any filter is active
   const hasActiveFilters = selectedCategory !== "all" || selectedTag !== null;
@@ -655,7 +660,7 @@ export default function PhotosListScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
       {/* Header */}
-      <CommunitySectionHeader title="Camping Photos" onAddPress={handleUploadPhoto} />
+      <CommunitySectionHeader title="Camping Photos" onAddPress={handleUploadPhoto} onInfoPress={openModal} />
 
       {/* Photo Grid */}
       <FlatList
@@ -689,6 +694,13 @@ export default function PhotosListScreen() {
           navigation.navigate("Auth");
         }}
         onMaybeLater={() => setShowAccountModal(false)}
+      />
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
       />
     </View>
   );

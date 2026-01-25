@@ -325,7 +325,7 @@ export default function MyTripsScreen() {
         <View className="px-4 py-3">
           <Pressable
             onPress={handleCreateTrip}
-            className="w-full py-3.5 rounded-xl items-center justify-center active:opacity-90"
+            className="flex-1 py-3.5 rounded-xl items-center justify-center active:opacity-90"
             style={{ backgroundColor: DEEP_FOREST }}
           >
             <Text
@@ -339,12 +339,33 @@ export default function MyTripsScreen() {
 
         {/* Trips List Container with panel background */}
         <View
-          className="flex-1 mx-4 rounded-xl"
+          className="flex-1 mx-4 rounded-xl overflow-hidden"
           style={{ backgroundColor: CARD_BACKGROUND_LIGHT, minHeight: 100 }}
         >
           {/* Upcoming Trips Section (includes active/in-progress and upcoming) */}
           {allUpcomingTrips.length > 0 && (
-            <View className="p-4">
+            <View>
+              {/* Section Header */}
+              <View
+                style={{
+                  backgroundColor: DEEP_FOREST,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Raleway_700Bold",
+                    fontSize: 18,
+                    color: PARCHMENT,
+                  }}
+                >
+                  Your Trips
+                </Text>
+              </View>
+
+              {/* Trip Cards */}
+              <View className="p-4">
             
             {allUpcomingTrips.map((trip) => (
               <View
@@ -381,6 +402,25 @@ export default function MyTripsScreen() {
                     <Ionicons name="ellipsis-horizontal" size={16} color={PARCHMENT} />
                   </Pressable>
                 </View>
+
+                {/* View Trip Details CTA */}
+                <Pressable
+                  onPress={() => onResume(trip)}
+                  className="mt-2 py-2 active:opacity-70"
+                  accessibilityLabel="View trip details"
+                >
+                  <Text
+                    style={{ fontFamily: "SourceSans3_600SemiBold", fontSize: 14, color: PARCHMENT }}
+                  >
+                    View trip details »
+                  </Text>
+                  <Text
+                    className="mt-0.5"
+                    style={{ fontFamily: "SourceSans3_400Regular", fontSize: 12, color: "rgba(255,255,255,0.6)" }}
+                  >
+                    Add destinations, itinerary links, and confirmations.
+                  </Text>
+                </Pressable>
 
                 {/* Compact Packing & Meals Buttons */}
                 <View className="flex-row mt-3" style={{ gap: 8 }}>
@@ -422,6 +462,7 @@ export default function MyTripsScreen() {
                 </View>
               </View>
             ))}
+              </View>
           </View>
           )}
 

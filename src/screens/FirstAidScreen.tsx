@@ -6,6 +6,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import AccountButtonHeader from "../components/AccountButtonHeader";
+import InfoButton from "../components/InfoButton";
+import OnboardingModal from "../components/OnboardingModal";
+import { useScreenOnboarding } from "../hooks/useScreenOnboarding";
 import { DEEP_FOREST, PARCHMENT, PARCHMENT_BACKGROUND, CARD_BACKGROUND_LIGHT, BORDER_SOFT, TEXT_PRIMARY_STRONG, TEXT_SECONDARY, TEXT_ON_DARK, TEXT_MUTED, LODGE_FOREST } from "../constants/colors";
 import { HERO_IMAGES } from "../constants/images";
 import { RootStackParamList } from "../navigation/types";
@@ -31,6 +34,9 @@ export default function FirstAidScreen() {
   const bottomSpacer = 50 + Math.max(insets.bottom, 18) + 12;
   const scrollViewRef = useRef<ScrollView>(null);
   const categoryRefs = useRef<{ [key: string]: number }>({});
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("FirstAid");
 
   const scrollToCategory = (categoryId: string) => {
     const yPosition = categoryRefs.current[categoryId];
@@ -67,6 +73,11 @@ export default function FirstAidScreen() {
           <View className="flex-1" style={{ paddingTop: insets.top, transform: [{ scaleX: -1 }] }}>
             {/* Account Button - Top Right */}
             <AccountButtonHeader color={TEXT_ON_DARK} />
+
+            {/* Info Button - Top Left */}
+            <View style={{ position: "absolute", top: insets.top + 8, left: 16, zIndex: 10 }}>
+              <InfoButton onPress={openModal} color={TEXT_ON_DARK} size={24} />
+            </View>
 
             {/* Title at bottom left */}
             <View className="flex-1 justify-end px-6 pb-4">
@@ -988,6 +999,13 @@ export default function FirstAidScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
+      />
     </View>
   );
 }

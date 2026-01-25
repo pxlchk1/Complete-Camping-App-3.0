@@ -19,6 +19,7 @@ import { Satisfy_400Regular } from "@expo-google-fonts/satisfy";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { ToastProvider } from "./src/components/ToastManager";
 import { FireflyTimeProvider } from "./src/context/FireflyTimeContext";
+import { OnboardingProvider } from "./src/context/OnboardingContext";
 import { View, ImageBackground } from "react-native";
 import { useEffect, useState } from "react";
 import { initSubscriptions, identifyUser } from "./src/services/subscriptionService";
@@ -196,24 +197,26 @@ export default function App() {
 
   return (
     <FireflyTimeProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <ToastProvider>
-            <NavigationContainer
-              linking={linking}
-              onStateChange={(state) => {
-                console.log('[Navigation] State changed:', state);
-              }}
-              onUnhandledAction={(action) => {
-                console.error('[Navigation] Unhandled action:', action);
-              }}
-            >
-              <RootNavigator />
-              <StatusBar style="auto" />
-            </NavigationContainer>
-          </ToastProvider>
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
+      <OnboardingProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider>
+            <ToastProvider>
+              <NavigationContainer
+                linking={linking}
+                onStateChange={(state) => {
+                  console.log('[Navigation] State changed:', state);
+                }}
+                onUnhandledAction={(action) => {
+                  console.error('[Navigation] Unhandled action:', action);
+                }}
+              >
+                <RootNavigator />
+                <StatusBar style="auto" />
+              </NavigationContainer>
+            </ToastProvider>
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </OnboardingProvider>
     </FireflyTimeProvider>
   );
 }

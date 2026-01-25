@@ -29,13 +29,8 @@ import { useUserStatus } from "../utils/authHelper";
 import { useIsModerator, useIsAdministrator } from "../state/userStore";
 import { HERO_IMAGES } from "../constants/images";
 import AccountRequiredModal from "../components/AccountRequiredModal";
-import MyCampsiteWelcomeModal from "../components/MyCampsiteWelcomeModal";
-import { hasSeenMyCampsiteWelcome, setMyCampsiteWelcomeSeen } from "../services/userFlagsService";
-import { 
-  trackMyCampsiteWelcomeShown, 
-  trackMyCampsiteWelcomeCtaTapped, 
-  trackMyCampsiteWelcomeDismissed 
-} from "../services/analyticsService";
+import OnboardingModal from "../components/OnboardingModal";
+import { useScreenOnboarding } from "../hooks/useScreenOnboarding";
 import { bootstrapNewAccount } from "../onboarding";
 import {
   DEEP_FOREST,
@@ -133,8 +128,10 @@ export default function MyCampsiteScreen({ navigation }: any) {
   const [connectContributions, setConnectContributions] = useState<ConnectContribution[]>([]);
   const [connectLoading, setConnectLoading] = useState(true);
   const [showAccountModal, setShowAccountModal] = useState(false);
-  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const insets = useSafeAreaInsets();
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("MyCampsite");
 
   const loadProfile = useCallback(async (userId: string) => {
     try {
@@ -386,19 +383,6 @@ export default function MyCampsiteScreen({ navigation }: any) {
       
       // Only load favorites and saved places for the current user's own profile
       if (!isViewingOtherUser) {
-        // Check if we should show the welcome modal for brand new accounts
-        // Only for logged-in users (not guests) viewing their own profile
-        const checkWelcomeModal = async () => {
-          if (!isGuest && targetUserId) {
-            const hasSeen = await hasSeenMyCampsiteWelcome();
-            if (!hasSeen) {
-              setShowWelcomeModal(true);
-              trackMyCampsiteWelcomeShown();
-            }
-          }
-        };
-        checkWelcomeModal();
-
         // Listen to favorite parks
         setFavoritesLoading(true);
         const unsubscribeFavorites = listenToFavoriteParks(targetUserId, (favorites) => {
@@ -817,23 +801,37 @@ export default function MyCampsiteScreen({ navigation }: any) {
 
               {/* Only show edit button for own profile */}
               {!isViewingOtherUser ? (
-                <Pressable
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    
-                    // Gate: Login required to edit profile
-                    if (isGuest || !auth.currentUser) {
-                      navigation.navigate("Auth");
-                      return;
-                    }
-                    
-                    navigation.navigate("EditProfile");
-                  }}
-                  className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
-                  style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
-                >
-                  <Ionicons name="create-outline" size={24} color={PARCHMENT} />
-                </Pressable>
+                <View className="flex-row items-center">
+                  {/* Info Button */}
+                  <Pressable
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      openModal();
+                    }}
+                    className="w-10 h-10 rounded-full items-center justify-center active:opacity-70 mr-2"
+                    style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+                  >
+                    <Ionicons name="information-circle-outline" size={24} color={PARCHMENT} />
+                  </Pressable>
+                  {/* Edit Button */}
+                  <Pressable
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      
+                      // Gate: Login required to edit profile
+                      if (isGuest || !auth.currentUser) {
+                        navigation.navigate("Auth");
+                        return;
+                      }
+                      
+                      navigation.navigate("EditProfile");
+                    }}
+                    className="w-10 h-10 rounded-full items-center justify-center active:opacity-70"
+                    style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
+                  >
+                    <Ionicons name="create-outline" size={24} color={PARCHMENT} />
+                  </Pressable>
+                </View>
               ) : (
                 <View style={{ width: 40 }} />
               )}
@@ -1964,22 +1962,11 @@ export default function MyCampsiteScreen({ navigation }: any) {
         </Pressable>
       </Modal>
 
-      {/* Welcome Modal for brand new accounts */}
-      <MyCampsiteWelcomeModal
-        visible={showWelcomeModal}
-        onSetupProfile={async () => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setShowWelcomeModal(false);
-          await setMyCampsiteWelcomeSeen();
-          trackMyCampsiteWelcomeCtaTapped();
-          navigation.navigate("EditProfile");
-        }}
-        onNotNow={async () => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setShowWelcomeModal(false);
-          await setMyCampsiteWelcomeSeen();
-          trackMyCampsiteWelcomeDismissed();
-        }}
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
       />
     </View>
   );

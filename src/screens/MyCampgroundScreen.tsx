@@ -29,6 +29,8 @@ import { CampgroundContact } from "../types/campground";
 import { RootStackNavigationProp } from "../navigation/types";
 import ModalHeader from "../components/ModalHeader";
 import InviteOptionsSheet from "../components/InviteOptionsSheet";
+import OnboardingModal from "../components/OnboardingModal";
+import { useScreenOnboarding } from "../hooks/useScreenOnboarding";
 import {
   DEEP_FOREST,
   EARTH_GREEN,
@@ -56,6 +58,9 @@ export default function MyCampgroundScreen() {
 
   // "What is this?" modal state
   const [showWhatIsThis, setShowWhatIsThis] = useState(false);
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("MyCampground");
 
   const loadContacts = useCallback(async () => {
     const user = auth.currentUser;
@@ -216,7 +221,7 @@ export default function MyCampgroundScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: PARCHMENT }}>
-      <ModalHeader title="My Campground" showTitle />
+      <ModalHeader title="My Campground" showTitle onInfoPress={openModal} />
 
       <ScrollView
         className="flex-1"
@@ -529,6 +534,13 @@ export default function MyCampgroundScreen() {
           <View style={{ height: 12 }} />
         </View>
       </Modal>
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
+      />
     </View>
   );
 }

@@ -13,6 +13,10 @@ import { SectionTitle, BodyText, BodyTextMedium } from "../components/Typography
 import PushPermissionPrompt from "../components/PushPermissionPrompt";
 import HandleLink from "../components/HandleLink";
 import AccountRequiredModal from "../components/AccountRequiredModal";
+import OnboardingModal from "../components/OnboardingModal";
+
+// Hooks
+import { useScreenOnboarding } from "../hooks/useScreenOnboarding";
 
 // Services
 import { getPhotoPosts } from "../services/photoPostsService";
@@ -91,6 +95,9 @@ export default function HomeScreen() {
   // Gating modals state
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [accountModalTriggerKey, setAccountModalTriggerKey] = useState<string>("default");
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("Home");
 
   // Fetch a random featured photo on screen focus
   useFocusEffect(
@@ -614,6 +621,13 @@ export default function HomeScreen() {
         }}
         onMaybeLater={() => setShowAccountModal(false)}
         triggerKey={accountModalTriggerKey}
+      />
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
       />
     </View>
   );

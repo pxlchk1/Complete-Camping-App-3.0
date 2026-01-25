@@ -12,6 +12,8 @@ import { feedbackService, FeedbackPost } from "../../services/firestore/feedback
 import { feedbackVoteService } from "../../services/firestore/feedbackVoteService";
 import { auth } from "../../config/firebase";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
+import OnboardingModal from "../../components/OnboardingModal";
+import { useScreenOnboarding } from "../../hooks/useScreenOnboarding";
 import { requireProForAction } from "../../utils/gating";
 import { shouldShowInFeed } from "../../services/moderationService";
 import { RootStackNavigationProp } from "../../navigation/types";
@@ -34,6 +36,9 @@ export default function FeedbackListScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const currentUser = auth.currentUser;
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("Feedback");
 
   const [posts, setPosts] = useState<(FeedbackPost & { voteScore: number; userVote: "up" | "down" | null; commentCount?: number })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -288,6 +293,7 @@ export default function FeedbackListScreen() {
       <CommunitySectionHeader
         title="App Feedback"
         onAddPress={handleCreatePost}
+        onInfoPress={openModal}
       />
 
       {/* Category Filter */}
@@ -416,6 +422,13 @@ export default function FeedbackListScreen() {
           navigation.navigate("Auth");
         }}
         onMaybeLater={() => setShowLoginModal(false)}
+      />
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
       />
     </View>
   );

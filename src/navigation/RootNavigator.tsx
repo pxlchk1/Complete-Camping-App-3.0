@@ -28,6 +28,7 @@ import AddCamperScreen from "../screens/AddCamperScreen";
 import EditCamperScreen from "../screens/EditCamperScreen";
 import AddPeopleToTripScreen from "../screens/AddPeopleToTripScreen";
 import AuthLanding from "../screens/AuthLanding";
+import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
 import PackingListCreateScreen from "../screens/PackingListCreateScreen";
 import PackingListEditorScreen from "../screens/PackingListEditorScreen";
 import MealPlanningScreen from "../screens/MealPlanningScreen";
@@ -141,6 +142,7 @@ export default function RootNavigator() {
       initialRouteName={user ? "HomeTabs" : "Auth"}
     >
       <Stack.Screen name="Auth" component={AuthLanding} options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="HomeTabs" component={HomeTabs} />
       <Stack.Screen name="CreateTrip" component={CreateTripScreen} />
       <Stack.Screen name="TripDetail" component={TripDetailScreen} />

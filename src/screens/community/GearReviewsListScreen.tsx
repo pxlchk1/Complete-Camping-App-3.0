@@ -23,6 +23,8 @@ import { GearReview, GearCategory } from "../../types/community";
 import { RootStackNavigationProp, RootStackParamList } from "../../navigation/types";
 import { useCurrentUser } from "../../state/userStore";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
+import OnboardingModal from "../../components/OnboardingModal";
+import { useScreenOnboarding } from "../../hooks/useScreenOnboarding";
 import { requirePro } from "../../utils/gating";
 import { shouldShowInFeed } from "../../services/moderationService";
 import CommunitySectionHeader from "../../components/CommunitySectionHeader";
@@ -56,6 +58,9 @@ export default function GearReviewsListScreen() {
   const route = useRoute<RouteProp<RootStackParamList, "GearReviewsListScreen">>();
   const currentUser = useCurrentUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("Gear");
 
   // Tag filter from navigation params
   const [tagFilter, setTagFilter] = useState<string | null>(route.params?.filterByTag || null);
@@ -397,6 +402,7 @@ export default function GearReviewsListScreen() {
       {/* Action Bar */}
       <CommunitySectionHeader
         title="Gear Reviews"
+        onInfoPress={openModal}
         onAddPress={() => {
           // Gear Reviews require PRO subscription
           const canProceed = requirePro({
@@ -531,6 +537,13 @@ export default function GearReviewsListScreen() {
           navigation.navigate("Auth");
         }}
         onMaybeLater={() => setShowLoginModal(false)}
+      />
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
       />
     </View>
   );

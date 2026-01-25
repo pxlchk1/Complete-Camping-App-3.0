@@ -156,7 +156,7 @@ export interface DripEmailContent {
 export const DRIP_EMAIL_SCHEDULE: DripEmailContent[] = [
   {
     type: "welcome",
-    headline: "Welcome to Tent & Lantern! 🏕️",
+    headline: "Welcome to The Complete Camping App! 🏕️",
     body: "You're all set to plan your next camping adventure. Let's get started with your first trip.",
     ctaText: "Start Your First Trip",
     ctaLink: "cta://plan/new",

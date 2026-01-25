@@ -15,6 +15,8 @@ import { deleteQuestion } from "../../services/connectDeletionService";
 import { Question } from "../../types/community";
 import { useCurrentUser } from "../../state/userStore";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
+import OnboardingModal from "../../components/OnboardingModal";
+import { useScreenOnboarding } from "../../hooks/useScreenOnboarding";
 import { requireAccount } from "../../utils/gating";
 import { shouldShowInFeed } from "../../services/moderationService";
 import { isAdmin, isModerator, canModerateContent } from "../../services/userService";
@@ -42,6 +44,9 @@ export default function QuestionsListScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const currentUser = useCurrentUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("Ask");
 
   // Connect-only actions: Permission checks for content actions
   const canModerate = currentUser ? canModerateContent(currentUser as User) : false;
@@ -323,6 +328,7 @@ export default function QuestionsListScreen() {
       <CommunitySectionHeader
         title="Ask a Camper"
         onAddPress={handleAskQuestion}
+        onInfoPress={openModal}
       />
 
       {/* Search and Filters */}
@@ -437,6 +443,13 @@ export default function QuestionsListScreen() {
           navigation.navigate("Auth");
         }}
         onMaybeLater={() => setShowLoginModal(false)}
+      />
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
       />
     </View>
   );

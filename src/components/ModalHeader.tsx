@@ -19,6 +19,7 @@ interface ModalHeaderProps {
     onPress: () => void;
   };
   onBack?: () => void;
+  onInfoPress?: () => void;
 }
 
 export default function ModalHeader({
@@ -26,6 +27,7 @@ export default function ModalHeader({
   showTitle = false,
   rightAction,
   onBack,
+  onInfoPress,
 }: ModalHeaderProps) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -63,22 +65,24 @@ export default function ModalHeader({
           <Ionicons name="arrow-back" size={24} color={PARCHMENT} />
         </Pressable>
 
-        {/* Title (optional) */}
+        {/* Title with optional info button */}
         {showTitle && title && (
-          <Text
-            style={{
-              fontFamily: "Raleway_700Bold",
-              fontSize: 16,
-              color: PARCHMENT,
-              position: "absolute",
-              left: 0,
-              right: 0,
-              textAlign: "center",
-              pointerEvents: "none",
-            }}
-          >
-            {title}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text
+              style={{
+                fontFamily: "Raleway_700Bold",
+                fontSize: 16,
+                color: PARCHMENT,
+              }}
+            >
+              {title}
+            </Text>
+            {onInfoPress && (
+              <Pressable onPress={onInfoPress} style={{ padding: 2 }} accessibilityLabel="Info">
+                <Ionicons name="information-circle-outline" size={20} color={PARCHMENT} />
+              </Pressable>
+            )}
+          </View>
         )}
 
         {/* Right Action (optional) */}

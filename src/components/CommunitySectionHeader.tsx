@@ -13,6 +13,7 @@ interface CommunitySectionHeaderProps {
   onAddPress: () => void;
   showFilter?: boolean;
   onFilterPress?: () => void;
+  onInfoPress?: () => void;
 }
 
 export default function CommunitySectionHeader({
@@ -20,11 +21,19 @@ export default function CommunitySectionHeader({
   onAddPress,
   showFilter,
   onFilterPress,
+  onInfoPress,
 }: CommunitySectionHeaderProps) {
   return (
     <View style={styles.container}>
       <View style={styles.inner}>
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{title}</Text>
+          {onInfoPress && (
+            <Pressable onPress={onInfoPress} style={styles.infoBtn} accessibilityLabel="Info">
+              <Ionicons name="information-circle-outline" size={22} color={TEXT_ON_DARK} />
+            </Pressable>
+          )}
+        </View>
         <View style={styles.actions}>
           {showFilter && onFilterPress && (
             <Pressable onPress={onFilterPress} style={styles.actionBtn} accessibilityLabel="Filter">
@@ -51,11 +60,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   title: {
     fontFamily: 'Raleway_700Bold',
     color: TEXT_ON_DARK,
     fontSize: 22,
     letterSpacing: 0.5,
+  },
+  infoBtn: {
+    padding: 2,
   },
   actions: {
     flexDirection: 'row',

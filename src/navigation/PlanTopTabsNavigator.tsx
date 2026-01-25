@@ -4,15 +4,19 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { View, ImageBackground, Text } from "react-native";
+import { View, ImageBackground, Text, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { usePlanTabStore, PlanTab } from "../state/planTabStore";
+import { useScreenOnboarding } from "../hooks/useScreenOnboarding";
 
 import AccountButtonHeader from "../components/AccountButtonHeader";
+import OnboardingModal from "../components/OnboardingModal";
+import PlanTripIntroModal from "../components/PlanTripIntroModal";
 
 import MyTripsScreen from "../screens/MyTripsScreen";
 import ParksBrowseScreen from "../screens/ParksBrowseScreen";
@@ -52,7 +56,7 @@ const getHeroContent = (routeName: string) => {
   }
 };
 
-function HeroHeader({ activeTab }: { activeTab: string }) {
+function HeroHeader({ activeTab, onInfoPress }: { activeTab: string; onInfoPress?: () => void }) {
   const insets = useSafeAreaInsets();
 
   const heroImage = getHeroImage(activeTab);
@@ -89,19 +93,26 @@ function HeroHeader({ activeTab }: { activeTab: string }) {
           <AccountButtonHeader color={TEXT_ON_DARK} />
 
           <View style={{ flex: 1, justifyContent: "flex-end", paddingHorizontal: 24, paddingBottom: 16 }}>
-            <Text
-              style={{
-                fontFamily: "Raleway_700Bold",
-                fontSize: 30,
-                color: PARCHMENT,
-                textShadowColor: "rgba(0, 0, 0, 0.5)",
-                textShadowOffset: { width: 0, height: 1 },
-                textShadowRadius: 4,
-                zIndex: 1,
-              }}
-            >
-              {title}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text
+                style={{
+                  fontFamily: "Raleway_700Bold",
+                  fontSize: 30,
+                  color: PARCHMENT,
+                  textShadowColor: "rgba(0, 0, 0, 0.5)",
+                  textShadowOffset: { width: 0, height: 1 },
+                  textShadowRadius: 4,
+                  zIndex: 1,
+                }}
+              >
+                {title}
+              </Text>
+              {onInfoPress && (
+                <Pressable onPress={onInfoPress} style={{ padding: 4 }} accessibilityLabel="Info">
+                  <Ionicons name="information-circle-outline" size={24} color={PARCHMENT} />
+                </Pressable>
+              )}
+            </View>
             <Text
               style={{
                 fontFamily: "SourceSans3_400Regular",
@@ -128,6 +139,41 @@ export default function PlanTopTabsNavigator() {
   // Zustand store for tab state
   const activeTab = usePlanTabStore((s) => s.activeTab);
   const setActiveTab = usePlanTabStore((s) => s.setActiveTab);
+
+  // State for Plan Trip intro modal (triggered by info button)
+  const [showPlanIntro, setShowPlanIntro] = useState(false);
+
+  // Onboarding hooks for Parks and Weather tabs only
+  const parksOnboarding = useScreenOnboarding("Parks");
+  const weatherOnboarding = useScreenOnboarding("Weather");
+
+  // Get the right onInfoPress based on active tab
+  const getOnInfoPress = () => {
+    switch (activeTab) {
+      case "trips":
+        return () => setShowPlanIntro(true);
+      case "parks":
+        return parksOnboarding.openModal;
+      case "weather":
+        return weatherOnboarding.openModal;
+      default:
+        return () => setShowPlanIntro(true);
+    }
+  };
+
+  // Get the current onboarding state for rendering modal (Parks and Weather only)
+  const getCurrentOnboarding = () => {
+    switch (activeTab) {
+      case "parks":
+        return parksOnboarding;
+      case "weather":
+        return weatherOnboarding;
+      default:
+        return null;
+    }
+  };
+
+  const currentOnboarding = getCurrentOnboarding();
 
   // Ref to store the tab navigator's navigation object
   const tabNavigationRef = useRef<any>(null);
@@ -225,7 +271,7 @@ export default function PlanTopTabsNavigator() {
   return (
     <View style={{ flex: 1, backgroundColor: PARCHMENT }}>
       {/* Hero Header */}
-      <HeroHeader activeTab={activeRouteName} />
+      <HeroHeader activeTab={activeRouteName} onInfoPress={getOnInfoPress()} />
 
       {/* Material Top Tabs */}
       <Tab.Navigator
@@ -274,6 +320,21 @@ export default function PlanTopTabsNavigator() {
         <Tab.Screen name="Parks" component={ParksBrowseScreen} />
         <Tab.Screen name="Weather" component={WeatherScreen} />
       </Tab.Navigator>
+      
+      {/* Plan Trip Intro Modal (3-slide) */}
+      <PlanTripIntroModal
+        forceShow={showPlanIntro}
+        onDismiss={() => setShowPlanIntro(false)}
+      />
+
+      {/* Onboarding Modal for Parks and Weather tabs */}
+      {currentOnboarding && (
+        <OnboardingModal
+          visible={currentOnboarding.showModal}
+          tooltip={currentOnboarding.currentTooltip}
+          onDismiss={currentOnboarding.dismissModal}
+        />
+      )}
     </View>
   );
 }

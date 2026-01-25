@@ -15,6 +15,8 @@ import { deleteTip } from "../../services/connectDeletionService";
 import { tipVotesService } from "../../services/firestore/tipVotesService";
 import { auth } from "../../config/firebase";
 import AccountRequiredModal from "../../components/AccountRequiredModal";
+import OnboardingModal from "../../components/OnboardingModal";
+import { useScreenOnboarding } from "../../hooks/useScreenOnboarding";
 import { requireAccount } from "../../utils/gating";
 import { shouldShowInFeed } from "../../services/moderationService";
 import { isAdmin, isModerator, canModerateContent, getUser } from "../../services/userService";
@@ -48,6 +50,9 @@ export default function TipsListScreen() {
   const currentAuthUser = auth.currentUser;
   const currentUser = useCurrentUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Onboarding modal
+  const { showModal, currentTooltip, dismissModal, openModal } = useScreenOnboarding("Tips");
 
   // Connect-only actions: Permission checks for content actions
   const canModerate = currentUser ? canModerateContent(currentUser as User) : false;
@@ -325,6 +330,7 @@ export default function TipsListScreen() {
       <CommunitySectionHeader
         title="Camping Tips"
         onAddPress={handleCreateTip}
+        onInfoPress={openModal}
       />
 
       {/* Search and Filters */}
@@ -420,6 +426,13 @@ export default function TipsListScreen() {
           navigation.navigate("Auth");
         }}
         onMaybeLater={() => setShowLoginModal(false)}
+      />
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        visible={showModal}
+        tooltip={currentTooltip}
+        onDismiss={dismissModal}
       />
     </View>
   );
