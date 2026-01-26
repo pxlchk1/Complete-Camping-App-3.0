@@ -10,6 +10,7 @@ import { useAuthStore } from "../state/authStore";
 import { useUserStore } from "../state/userStore";
 import { Ionicons } from "@expo/vector-icons";
 import { bootstrapNewAccount, getOnboardingErrorMessage, isPermissionDeniedError, isEmailInUseError } from "../onboarding";
+import { identifyUser } from "../services/subscriptionService";
 
 export default function AuthLanding({ navigation }: { navigation: any }) {
   const [loading, setLoading] = useState(false);
@@ -280,6 +281,15 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       };
       
       setCurrentUser(userStoreData);
+      
+      // Identify user in RevenueCat to sync subscription status
+      try {
+        await identifyUser(userId);
+        console.log("🔐 [AuthLanding] RevenueCat user identified:", userId);
+      } catch (rcError) {
+        console.warn("🔐 [AuthLanding] RevenueCat identify failed (non-blocking):", rcError);
+      }
+      
       navigation.navigate("HomeTabs");
     } catch (error) {
       console.error("Load User Profile Error:", error);
@@ -420,6 +430,14 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       
       console.log("🔐 [AuthLanding - Email] Setting userStore:", JSON.stringify(userStoreData, null, 2));
       setCurrentUser(userStoreData);
+      
+      // Identify user in RevenueCat to sync subscription status
+      try {
+        await identifyUser(firebaseUser.uid);
+        console.log("🔐 [AuthLanding - Email] RevenueCat user identified:", firebaseUser.uid);
+      } catch (rcError) {
+        console.warn("🔐 [AuthLanding - Email] RevenueCat identify failed (non-blocking):", rcError);
+      }
       
       navigation.navigate("HomeTabs");
     } catch (error: any) {
