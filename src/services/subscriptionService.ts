@@ -210,9 +210,37 @@ export const syncSubscriptionToFirestore = async (): Promise<void> => {
     });
 
     console.log(`[SubscriptionService] Synced to Firestore: ${membershipTier} / ${subscriptionStatus}`);
+
+    // Sync auth store to update isPremium flag
+    await syncAuthStoreFromSubscription();
   } catch (error) {
     console.error("[SubscriptionService] Failed to sync to Firestore:", error);
     // Don't throw - this is a background sync operation
+  }
+};
+
+/**
+ * Sync subscription store state from RevenueCat
+ * Updates the isPro flag and entitlements that gates depend on
+ * Call this after subscription changes to ensure app state is in sync
+ */
+export const syncAuthStoreFromSubscription = async (): Promise<void> => {
+  try {
+    const customerInfo = await RevenueCat.getCustomerInfo();
+    if (!customerInfo) {
+      console.log("[SubscriptionService] No customer info available for subscription sync");
+      return;
+    }
+
+    // Update subscription store with latest customer info
+    // This will set isPro and activeEntitlements correctly
+    const { setSubscriptionInfo } = useSubscriptionStore.getState();
+    setSubscriptionInfo(customerInfo);
+
+    console.log("[SubscriptionService] Subscription store synced from RevenueCat");
+  } catch (error) {
+    console.error("[SubscriptionService] Failed to sync subscription store:", error);
+    // Non-critical operation, don't throw
   }
 };
 
