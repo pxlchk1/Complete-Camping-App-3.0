@@ -4,8 +4,8 @@
  * 
  * GATING:
  * - GUEST: Can view but redirected to Auth for add (handled here)
- * - FREE: Can add up to 15 items; item #16 triggers gear_closet_limit paywall
- * - PRO: Unlimited gear items
+ * - FREE: Can add up to 5 items; item #6 triggers gear_closet_limit paywall
+ * - PRO/ADMIN: Unlimited gear items
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -28,6 +28,7 @@ import { GearItem, GearCategory, GEAR_CATEGORIES } from "../types/gear";
 import { RootStackNavigationProp } from "../navigation/types";
 import { useUserStatus } from "../utils/authHelper";
 import { useSubscriptionStore } from "../state/subscriptionStore";
+import { useIsAdministrator } from "../state/userStore";
 import { getPaywallVariantAndTrack } from "../services/proAttemptService";
 import { useAuth } from "../context/AuthContext";
 import ModalHeader from "../components/ModalHeader";
@@ -45,7 +46,7 @@ import {
 } from "../constants/colors";
 
 // FREE user gear limit
-const FREE_GEAR_LIMIT = 15;
+const FREE_GEAR_LIMIT = 5;
 
 type FilterOption = "all" | GearCategory;
 
@@ -53,6 +54,7 @@ export default function MyGearClosetScreen() {
   const navigation = useNavigation<RootStackNavigationProp>();
   const { isLoggedIn, isGuest } = useUserStatus();
   const isPro = useSubscriptionStore((s) => s.isPro);
+  const isAdmin = useIsAdministrator();
   const { user } = useAuth();
   const isAuthenticated = !!user;
 
@@ -127,8 +129,8 @@ export default function MyGearClosetScreen() {
       return;
     }
 
-    // Gate: FREE users limited to 15 items; item #16 triggers paywall
-    if (!isPro && gear.length >= FREE_GEAR_LIMIT) {
+    // Gate: FREE users limited to 5 items; Pro and Admin users have unlimited
+    if (!isPro && !isAdmin && gear.length >= FREE_GEAR_LIMIT) {
       const variant = await getPaywallVariantAndTrack(isAuthenticated, isPro);
       navigation.navigate("Paywall", { triggerKey: "gear_closet_limit", variant });
       return;
