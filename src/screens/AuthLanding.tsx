@@ -258,7 +258,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         createdAt: userData?.joinedAt || new Date().toISOString(),
       };
 
-      console.log("🔐 [AuthLanding] User Profile:", JSON.stringify(userProfile, null, 2));
+      if (__DEV__) console.log("🔐 [AuthLanding] User Profile:", JSON.stringify(userProfile, null, 2));
 
       setUser(userProfile);
       
@@ -285,14 +285,14 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
       // Identify user in RevenueCat to sync subscription status
       try {
         await identifyUser(userId);
-        console.log("🔐 [AuthLanding] RevenueCat user identified:", userId);
+        if (__DEV__) console.log("🔐 [AuthLanding] RevenueCat user identified:", userId);
       } catch (rcError) {
-        console.warn("🔐 [AuthLanding] RevenueCat identify failed (non-blocking):", rcError);
+        if (__DEV__) console.warn("🔐 [AuthLanding] RevenueCat identify failed (non-blocking):", rcError);
       }
       
       navigation.navigate("HomeTabs");
     } catch (error) {
-      console.error("Load User Profile Error:", error);
+      if (__DEV__) console.error("Load User Profile Error:", error);
       throw error;
     }
   };
@@ -405,8 +405,8 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         createdAt: userData?.createdAt || new Date().toISOString(),
       };
 
-      console.log("🔐 [AuthLanding - Email] User Profile:", JSON.stringify(userProfile, null, 2));
-      console.log("🔐 [AuthLanding - Email] Firebase User Data:", JSON.stringify(userData, null, 2));
+      if (__DEV__) console.log("🔐 [AuthLanding - Email] User Profile:", JSON.stringify(userProfile, null, 2));
+      if (__DEV__) console.log("🔐 [AuthLanding - Email] Firebase User Data:", JSON.stringify(userData, null, 2));
 
       setUser(userProfile);
       
@@ -428,22 +428,22 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         updatedAt: new Date().toISOString(),
       };
       
-      console.log("🔐 [AuthLanding - Email] Setting userStore:", JSON.stringify(userStoreData, null, 2));
+      if (__DEV__) console.log("🔐 [AuthLanding - Email] Setting userStore:", JSON.stringify(userStoreData, null, 2));
       setCurrentUser(userStoreData);
       
       // Identify user in RevenueCat to sync subscription status
       try {
         await identifyUser(firebaseUser.uid);
-        console.log("🔐 [AuthLanding - Email] RevenueCat user identified:", firebaseUser.uid);
+        if (__DEV__) console.log("🔐 [AuthLanding - Email] RevenueCat user identified:", firebaseUser.uid);
       } catch (rcError) {
-        console.warn("🔐 [AuthLanding - Email] RevenueCat identify failed (non-blocking):", rcError);
+        if (__DEV__) console.warn("🔐 [AuthLanding - Email] RevenueCat identify failed (non-blocking):", rcError);
       }
       
       navigation.navigate("HomeTabs");
     } catch (error: any) {
-      console.error("Email Auth Error:", error);
-      console.error("Email Auth Error Code:", error.code);
-      console.error("Email Auth Error Message:", error.message);
+      if (__DEV__) console.error("Email Auth Error:", error);
+      if (__DEV__) console.error("Email Auth Error Code:", error.code);
+      if (__DEV__) console.error("Email Auth Error Message:", error.message);
       
       // Handle Firestore permission errors from onboarding
       if (isPermissionDeniedError(error)) {
@@ -468,7 +468,7 @@ export default function AuthLanding({ navigation }: { navigation: any }) {
         setError("Email/password sign-in is not enabled. Please contact support.");
       } else {
         // Log full error details for debugging
-        console.error("Unhandled auth error:", JSON.stringify(error, null, 2));
+        if (__DEV__) console.error("Unhandled auth error:", JSON.stringify(error, null, 2));
         setError(getOnboardingErrorMessage(error));
       }
     } finally {
