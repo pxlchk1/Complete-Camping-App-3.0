@@ -13,6 +13,14 @@ bun.lockb
 # macOS
 .DS_Store
 
+# Environment files - NEVER commit these
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+!.env.example
+
 # Secrets - NEVER commit these
 serviceAccountKey.json
 GoogleService-Info.plist
