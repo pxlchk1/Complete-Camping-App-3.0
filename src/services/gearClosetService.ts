@@ -85,12 +85,38 @@ export async function getGearItemById(gearId: string): Promise<GearItem | null> 
 
 /**
  * Create a new gear item
+ * Enforces subscription-based limits: 5 items for free users, unlimited for premium
  */
 export async function createGearItem(
   ownerId: string,
-  data: CreateGearData
+  data: CreateGearData,
+  userMembershipTier?: string
 ): Promise<string> {
   const gearRef = collection(db, "userGear");
+
+  // Client-side validation: Check free user limit before attempting creation
+  if (userMembershipTier === "freeMember") {
+    try {
+      const q = query(
+        gearRef,
+        where("ownerId", "==", ownerId)
+      );
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.size >= 5) {
+        throw new Error(
+          "You've reached the 5-item limit for free users. Upgrade to premium to add unlimited gear items."
+        );
+      }
+    } catch (error: any) {
+      // Re-throw our custom error, pass through other errors
+      if (error.message?.includes("5-item limit")) {
+        throw error;
+      }
+      console.warn("Error checking gear count:", error);
+      // Continue - let Firestore rules handle the validation
+    }
+  }
 
   const docRef = await addDoc(gearRef, {
     ownerId,

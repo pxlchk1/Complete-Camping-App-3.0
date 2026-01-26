@@ -119,7 +119,15 @@ service cloud.firestore {
     // User Gear (Gear Closet)
     match /userGear/{id} {
       allow read: if isSignedIn() && request.auth.uid == resource.data.ownerId;
-      allow create: if isSignedIn() && request.auth.uid == request.resource.data.ownerId;
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.ownerId && (
+        // Admins get unlimited gear items
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+        // Premium users (subscribed) get unlimited gear items
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.membershipTier in ['subscribed', 'weekendCamper', 'trailLeader', 'backcountryGuide', 'premium'] ||
+        // Free users limited to 5 items
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.membershipTier == 'freeMember' &&
+         firestore.query('userGear').where('ownerId', '==', request.auth.uid).count() < 5)
+      );
       allow update, delete: if isSignedIn() && request.auth.uid == resource.data.ownerId;
     }
 
